@@ -1,8 +1,8 @@
 # 05 — Claude Code Skill
 
-The skill at `skill/` documents the conventions for Daniel's web apps. It's a
+The skill at `skill/` documents the conventions for daniel-rck's web apps. It's a
 Claude Code skill (Markdown frontmatter + body), referenced by the apps via
-symlink or by Daniel's global Claude config.
+symlink or by daniel-rck's global Claude config.
 
 ## File layout
 
@@ -26,13 +26,13 @@ are loaded on demand when SKILL.md instructs Claude to read them.
 ## SKILL.md frontmatter
 
 The `description` field is the trigger. It must be specific enough to fire on
-work in Daniel's web app repos but broad enough to catch related tasks. Pushy
+work in daniel-rck's web app repos but broad enough to catch related tasks. Pushy
 phrasing per the skill-creator guidelines.
 
 ```yaml
 ---
 name: daniel-rck-web-app
-description: Conventions and patterns for daniel-rck's personal web apps (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 6 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + Biome. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever Daniel mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
+description: Conventions and patterns for daniel-rck's personal web apps (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 6 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + Biome. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever daniel-rck mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ---
 ```
 
@@ -56,7 +56,7 @@ A bulleted summary of the stack. Names only — no version pins (those live in
 ### `## The CLI`
 
 Brief description of `@daniel-rck/web-base` plus the most common commands as a
-code block. Explicitly states: "When working in any of Daniel's web app repos,
+code block. Explicitly states: "When working in any of daniel-rck's web app repos,
 prefer running the CLI over hand-copying snippets. The CLI is the source of
 truth; this skill documents the why and when."
 
@@ -178,7 +178,7 @@ The full Hausverwaltung-style sync architecture:
 
 ## Distribution
 
-The skill is installed by Daniel manually. Recommended approaches:
+The skill is installed by daniel-rck manually. Recommended approaches:
 
 1. **Symlink** from `~/.config/claude/skills/daniel-rck-web-app` to
    `<cloned-web-base>/skill/`. Updates are immediate.

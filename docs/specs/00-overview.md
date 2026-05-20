@@ -1,6 +1,6 @@
 # 00 — Overview
 
-`daniel-rck/web-base` is a monorepo combining three concerns for Daniel's
+`daniel-rck/web-base` is a monorepo combining three concerns for daniel-rck's
 personal web apps (Hausverwaltung, Tennisturnier, ErinnerMich):
 
 1. A **CLI** (`cli/`) that copies templates into target app repos — shadcn-style,
@@ -15,7 +15,7 @@ template implementation, and its documentation at once.
 
 ## Goals
 
-- **One canonical baseline** across all of Daniel's web apps. No drift on
+- **One canonical baseline** across all of daniel-rck's web apps. No drift on
   versions, tooling, layout, or conventions unless explicitly intended.
 - **Updates flow** from this repo into apps with one command (`web-base update <template>`).
 - **New apps** scaffold in seconds (`web-base init`).

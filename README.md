@@ -1,6 +1,6 @@
 # daniel-rck/web-base
 
-Shared tooling, conventions, and templates for Daniel's personal web apps
+Shared tooling, conventions, and templates for daniel-rck's personal web apps
 ([Hausverwaltung](https://github.com/daniel-rck/Hausverwaltung),
 [Tennisturnier](https://github.com/daniel-rck/Tennisturnier),
 [ErinnerMich](https://github.com/daniel-rck/ErinnerMich), and future apps).
@@ -44,4 +44,4 @@ Architecture, conventions, and implementation plans live in
 
 ## License
 
-MIT © Daniel Rück
+MIT © daniel-rck
