@@ -1,0 +1,22 @@
+{
+  "name": "worker",
+  "description": "Cloudflare Worker scaffold with /api routing and static-asset fallthrough",
+  "files": [
+    { "from": "worker.ts", "to": "worker/index.ts" },
+    { "from": "wrangler.toml", "to": "wrangler.toml" },
+    { "from": "tsconfig.worker.json", "to": "tsconfig.worker.json" }
+  ],
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260504.1",
+    "wrangler": "^4.87.0"
+  },
+  "scripts": {
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy"
+  },
+  "postInstall": [
+    "Edit wrangler.toml: set `name` to your app name",
+    "Set compatibility_date to today's date",
+    "If using R2/KV: add bindings under [[r2_buckets]] / [[kv_namespaces]] (see sync template)"
+  ]
+}
