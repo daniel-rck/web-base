@@ -1,6 +1,6 @@
-# daniel-rck/web-base
+# web-base
 
-Shared tooling, conventions, and templates for Daniel's personal web apps
+Shared tooling, conventions, and templates for personal web apps
 ([Hausverwaltung](https://github.com/daniel-rck/Hausverwaltung),
 [Tennisturnier](https://github.com/daniel-rck/Tennisturnier),
 [ErinnerMich](https://github.com/daniel-rck/ErinnerMich), and future apps).
