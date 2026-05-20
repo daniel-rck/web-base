@@ -28,7 +28,7 @@ Per-app suggested hues:
 | Tennisturnier | Emerald | `155` | `oklch(0.68 0.17 155)` |
 | ErinnerMich | Indigo | `285` | `oklch(0.58 0.19 285)` |
 
-If daniel-rck wants different hues, swap the value of `--accent-h`. No other
+If different hues are wanted, swap the value of `--accent-h`. No other
 tokens need to change.
 
 ## theme.css

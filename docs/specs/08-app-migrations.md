@@ -63,7 +63,7 @@ The most complex migration because of Dexie → idb and the existing R2+KV sync.
 **PR 2: Storage — Dexie → idb (the big one)**
 - `web-base add storage` — installs `src/lib/db/db.ts` (placeholder schema) and
   `useLiveQuery.ts`
-- Map the 16 Dexie tables to idb object stores. daniel-rck will produce a separate
+- Map the 16 Dexie tables to idb object stores. We will produce a separate
   migration spec for this (`docs/specs/migration-dexie-to-idb.md`) — it's the
   only file that should be created mid-migration, because the schema is
   app-specific.

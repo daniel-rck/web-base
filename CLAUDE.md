@@ -45,4 +45,4 @@ If a decision needs to be made that the specs don't cover:
 
 1. Make the smallest reasonable choice that fits the existing patterns
 2. Document it in the matching spec file in the same PR
-3. Flag it in the PR description so Daniel can confirm or correct
+3. Flag it in the PR description so I can confirm or correct

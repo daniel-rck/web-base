@@ -176,7 +176,7 @@ Until first major release, apps use `@main` and accept the breakage rate.
 
 ## Future workflows
 
-When/if daniel-rck wants additional reusable workflows, add them as new files:
+When/if we want additional reusable workflows, add them as new files:
 
 - `release.yml` — for tagging + GitHub release on a worker app
 - `lint-only.yml` — a lighter check for draft PRs
