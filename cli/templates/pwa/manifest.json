@@ -1,0 +1,19 @@
+{
+  "name": "pwa",
+  "description": "Service worker (injectManifest) + workbox precache",
+  "files": [
+    { "from": "sw.ts", "to": "src/sw/index.ts" },
+    { "from": "vite.snippet.md", "to": "vite.snippet.md" },
+    { "from": "tsconfig.sw.json", "to": "tsconfig.sw.json" }
+  ],
+  "devDependencies": {
+    "vite-plugin-pwa": "^1.3",
+    "workbox-precaching": "^7.4.0",
+    "workbox-window": "^7.4.0"
+  },
+  "postInstall": [
+    "Open vite.snippet.md and merge the VitePWA() config into your vite.config.ts",
+    "Delete vite.snippet.md after merging",
+    "Add to tsconfig.json references: { \"path\": \"./tsconfig.sw.json\" }"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "storage",
+  "description": "idb wrapper + useLiveQuery hook for reactive IndexedDB",
+  "files": [
+    { "from": "db.ts", "to": "src/lib/db/db.ts" },
+    { "from": "useLiveQuery.ts", "to": "src/lib/db/useLiveQuery.ts" },
+    { "from": "index.ts", "to": "src/lib/db/index.ts" }
+  ],
+  "dependencies": {
+    "idb": "^8.0.3"
+  },
+  "postInstall": [
+    "Define your schema in src/lib/db/db.ts (replace the placeholder interface)",
+    "Use `useLiveQuery(db.<store>, q => q.getAll())` in components"
+  ]
+}

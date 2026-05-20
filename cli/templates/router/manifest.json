@@ -1,0 +1,16 @@
+{
+  "name": "router",
+  "description": "react-router-dom 7 scaffold with typed route constants",
+  "files": [
+    { "from": "router.tsx", "to": "src/lib/router.tsx" },
+    { "from": "routes.ts", "to": "src/lib/routes.ts" }
+  ],
+  "dependencies": {
+    "react-router-dom": "^7.14.2"
+  },
+  "postInstall": [
+    "Wrap your app in <RouterProvider router={router} /> in main.tsx",
+    "Add routes in src/lib/router.tsx",
+    "Define route path constants in src/lib/routes.ts and import them everywhere"
+  ]
+}
