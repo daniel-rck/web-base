@@ -71,7 +71,7 @@ The `init` command generates this shape for new apps:
   "type": "module",
   "description": "<one-line German description>",
   "keywords": ["pwa", "privacy", "offline", "react", "vite", "typescript"],
-  "author": "Daniel Rück",
+  "author": "<author>",
   "license": "MIT",
   "homepage": "https://<app>.daniel-rck.workers.dev",
   "repository": { "type": "git", "url": "https://github.com/daniel-rck/<App>.git" },
@@ -140,7 +140,7 @@ shared as a runtime service.
 
 App-specific architecture, module designs, and migration plans live in the
 app's `docs/specs/` directory. Living documents, no archiving. Git for history.
-The Thanos-lightweight style — see Daniel's other repos for examples.
+The Thanos-lightweight style — see the other repos for examples.
 
 ## Anti-patterns
 

@@ -12,9 +12,9 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
   "private": false,
   "version": "0.1.0",
   "type": "module",
-  "description": "Shared tooling, conventions, and templates for daniel-rck's personal web apps",
+  "description": "Shared tooling, conventions, and templates for personal web apps",
   "keywords": ["cli", "scaffolding", "react", "vite", "pwa", "cloudflare-workers"],
-  "author": "Daniel Rück",
+  "author": "<author>",
   "license": "MIT",
   "homepage": "https://github.com/daniel-rck/web-base",
   "repository": { "type": "git", "url": "https://github.com/daniel-rck/web-base.git" },
@@ -57,7 +57,7 @@ directly — having a single bundled file avoids the user needing to run
 bundled) because the CLI reads them at runtime.
 
 **Decision: no npm publish.** Distribution is via `bunx github:...` only. The
-`files` array still exists for the future case where Daniel decides to publish.
+`files` array still exists for the future case where we decide to publish.
 
 ## tsconfig.json
 
