@@ -1,0 +1,14 @@
+{
+  "name": "hygiene",
+  "description": "LICENSE, CONTRIBUTING, SECURITY, .editorconfig",
+  "files": [
+    { "from": "LICENSE", "to": "LICENSE" },
+    { "from": "CONTRIBUTING.md", "to": "CONTRIBUTING.md" },
+    { "from": "SECURITY.md", "to": "SECURITY.md" },
+    { "from": "editorconfig", "to": ".editorconfig" }
+  ],
+  "postInstall": [
+    "Edit LICENSE to set the current year if needed",
+    "Verify SECURITY.md matches your disclosure preferences"
+  ]
+}
