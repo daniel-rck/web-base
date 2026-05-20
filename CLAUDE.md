@@ -1,6 +1,6 @@
-# Claude Code instructions for daniel-rck/web-base
+# Claude Code instructions for web-base
 
-This is the shared tooling repo for daniel-rck's web apps. The full architecture
+This is the shared tooling repo for my web apps. The full architecture
 and conventions live in `docs/specs/`. **Read those before making changes.**
 
 ## Reading order
@@ -21,7 +21,7 @@ the spec relevant to what you're doing:
 
 ## Workflow
 
-daniel-rck uses spec-driven development:
+We use spec-driven development:
 
 1. **Specs are the source of truth.** Code follows the spec, not the other way around.
 2. **Specs are living documents.** When the design changes, update the spec in the same change. Don't archive specs; use Git for history.
@@ -45,4 +45,4 @@ If a decision needs to be made that the specs don't cover:
 
 1. Make the smallest reasonable choice that fits the existing patterns
 2. Document it in the matching spec file in the same PR
-3. Flag it in the PR description so daniel-rck can confirm or correct
+3. Flag it in the PR description so Daniel can confirm or correct
