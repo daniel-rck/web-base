@@ -1,0 +1,5 @@
+{
+  "name": "core",
+  "description": "Everything every daniel-rck web app shares",
+  "extends": ["hygiene", "biome", "router", "storage", "pwa", "worker", "layout"]
+}

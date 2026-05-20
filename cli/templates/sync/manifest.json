@@ -1,0 +1,16 @@
+{
+  "name": "sync",
+  "description": "R2+KV end-to-end encrypted sync (extra, not in core)",
+  "files": [
+    { "from": "client.ts", "to": "src/lib/sync/client.ts" },
+    { "from": "crypto.ts", "to": "src/lib/sync/crypto.ts" },
+    { "from": "types.ts", "to": "src/lib/sync/types.ts" },
+    { "from": "worker-sync.ts", "to": "worker/sync.ts" },
+    { "from": "sync.md", "to": "docs/sync.md" }
+  ],
+  "postInstall": [
+    "Bind R2 bucket as `SYNC` and KV namespace as `SYNC_KV` in wrangler.toml",
+    "Mount sync handlers in worker/index.ts at /api/sync/*",
+    "Initialize sync via `await syncClient.enable()` (generates a device secret)"
+  ]
+}
