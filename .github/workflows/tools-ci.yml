@@ -1,0 +1,57 @@
+name: Tools CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+
+      - name: Verify CLI runs
+        run: |
+          chmod +x cli/dist/index.js
+          node cli/dist/index.js --help
+          node cli/dist/index.js add --help
+
+      - name: Smoke test - add hygiene
+        run: |
+          mkdir -p /tmp/scratch
+          cd /tmp/scratch
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add hygiene
+          test -f LICENSE
+          test -f CONTRIBUTING.md
+          test -f SECURITY.md
+          test -f .editorconfig
+
+      - name: Verify skill/template alignment
+        run: |
+          # Every cli/templates/<name>/ (except 'core') should have a matching
+          # skill/references/<name>.md (with -system suffix allowed for layout).
+          set -e
+          fail=0
+          for dir in cli/templates/*/; do
+            name=$(basename "$dir")
+            [ "$name" = "core" ] && continue
+            ref="skill/references/${name}.md"
+            alt="skill/references/${name}-system.md"
+            if [ ! -f "$ref" ] && [ ! -f "$alt" ]; then
+              echo "MISSING: $ref or $alt for template $name"
+              fail=1
+            fi
+          done
+          exit $fail
