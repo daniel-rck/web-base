@@ -44,4 +44,4 @@ Architecture, conventions, and implementation plans live in
 
 ## License
 
-MIT © Daniel Rück
+MIT © daniel-rck
