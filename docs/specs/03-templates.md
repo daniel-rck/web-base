@@ -13,7 +13,7 @@ templates only have an `extends` array.
 | `core` | meta | hygiene + biome + router + storage + pwa + worker + layout |
 | `hygiene` | leaf | LICENSE, CONTRIBUTING, SECURITY, .editorconfig |
 | `biome` | leaf | biome.json + lint/format scripts + biome devDep |
-| `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, theme.css |
+| `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, theme.css |
 | `storage` | leaf | idb wrapper + useLiveQuery hook |
 | `pwa` | leaf | sw.ts (injectManifest) + vite config snippet + workbox deps |
 | `router` | leaf | router.tsx + react-router-dom dep |
@@ -95,6 +95,8 @@ Files:
 - `AppNav.tsx` → `src/lib/ui/AppNav.tsx`
 - `PageHeader.tsx` → `src/lib/ui/PageHeader.tsx`
 - `primitives.tsx` → `src/lib/ui/primitives.tsx`
+- `InstallButton.tsx` → `src/lib/ui/InstallButton.tsx`
+- `useInstallPrompt.ts` → `src/lib/ui/useInstallPrompt.ts`
 - `theme.css` → `src/lib/ui/theme.css`
 - `index.ts` → `src/lib/ui/index.ts` (barrel)
 
