@@ -1,0 +1,3 @@
+# Anchors `vcs.useIgnoreFile` for Biome v2 when this nested template config is
+# discovered by `biome check` at the web-base repo root. Not shipped to apps
+# (manifest.json only copies biome.json).

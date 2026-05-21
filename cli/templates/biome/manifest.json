@@ -3,7 +3,7 @@
   "description": "biome.json + lint/format scripts (replaces ESLint + Prettier)",
   "files": [{ "from": "biome.json", "to": "biome.json" }],
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4"
+    "@biomejs/biome": "^2.4.15"
   },
   "scripts": {
     "lint": "biome check .",

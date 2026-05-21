@@ -19,9 +19,18 @@ bunx github:daniel-rck/web-base add biome
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignoreUnknown": true, "ignore": ["dist", "node_modules", ".wrangler"] },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.wrangler"]
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -31,11 +40,18 @@ bunx github:daniel-rck/web-base add biome
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "react": "recommended",
+      "test": "recommended"
+    },
     "rules": {
       "recommended": true,
       "correctness": { "useExhaustiveDependencies": "warn" },
       "style": { "noNonNullAssertion": "warn" },
-      "suspicious": { "noConsoleLog": "warn", "noExplicitAny": "warn" }
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noConsole": { "level": "warn", "options": { "allow": ["error", "warn"] } }
+      }
     }
   },
   "javascript": {
@@ -58,14 +74,21 @@ After running `add biome`:
 
 ## Quirks
 
-- Biome's `noConsoleLog` is a warn, not an error. `console.error` and
-  `console.warn` are fine for genuine errors.
+- Biome's `noConsole` is a warn, not an error. The `allow: ["error", "warn"]`
+  list keeps `console.error` / `console.warn` usable for genuine errors;
+  `console.log` and other methods are flagged.
 - `noExplicitAny` is a warn. Use `unknown` and narrow.
 - `noNonNullAssertion` is a warn. If you must use `!`, add a comment
   explaining why.
 - The `useExhaustiveDependencies` rule is a warn for React hooks. Override
   with `// biome-ignore lint/correctness/useExhaustiveDependencies: <reason>`
   only when the dependency is intentionally stale.
+- Biome v2 enables nested config discovery. If you have multiple `biome.json`
+  files under one repo, only the root should be a project root; nested ones
+  need `"root": false` or sit in a directory whose own ignore file is
+  reachable.
+- The `assist.actions.source.organizeImports: "on"` setting replaces v1's
+  top-level `organizeImports` and runs as part of `biome check --write`.
 
 ## Per-app vs web-base
 

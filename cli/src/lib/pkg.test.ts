@@ -27,11 +27,11 @@ describe("patchPackageJson", () => {
     await writePkg({ name: "scratch", version: "0.0.0" });
     await patchPackageJson({
       targetDir: scratch,
-      devDependencies: { "@biomejs/biome": "^1.9.4" },
+      devDependencies: { "@biomejs/biome": "^2.4.15" },
       scripts: { lint: "biome check ." },
     });
     const pkg = await readPkg();
-    expect(pkg.devDependencies).toEqual({ "@biomejs/biome": "^1.9.4" });
+    expect(pkg.devDependencies).toEqual({ "@biomejs/biome": "^2.4.15" });
     expect(pkg.scripts).toEqual({ lint: "biome check ." });
   });
 

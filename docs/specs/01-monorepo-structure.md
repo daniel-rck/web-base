@@ -41,7 +41,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
     "pathe": "^1.1.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.15",
     "@types/node": "^25.6.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.5"
@@ -97,11 +97,17 @@ codebase:
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "ignore": ["dist", "cli/dist", "node_modules", "cli/templates/**/*.tsx", "cli/templates/**/*.ts"]
+    "includes": ["**", "!**/dist", "!**/cli/dist", "!**/node_modules", "!**/cli/templates"]
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
   },
   "formatter": {
     "enabled": true,
@@ -112,6 +118,7 @@ codebase:
   },
   "linter": {
     "enabled": true,
+    "domains": { "project": "recommended" },
     "rules": {
       "recommended": true,
       "correctness": { "useExhaustiveDependencies": "warn" },
@@ -128,7 +135,10 @@ codebase:
 **Decision: templates are biome-ignored.** Files under `cli/templates/` are
 *source material to be copied verbatim* into target apps. Linting them here
 would either force them to match this repo's rules (wrong scope) or require
-double maintenance. They're checked by the consuming app's CI instead.
+double maintenance. They're checked by the consuming app's CI instead. The
+nested `cli/templates/biome/.gitignore` is a placeholder that anchors Biome
+v2's `vcs.useIgnoreFile` discovery for the nested template config — it's not
+shipped to apps (only `biome.json` is listed in the template manifest).
 
 ## .gitignore
 

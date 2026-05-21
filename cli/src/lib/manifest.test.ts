@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type TemplateManifest, resolveTemplate } from "./manifest.ts";
+import { resolveTemplate, type TemplateManifest } from "./manifest.ts";
 
 let scratch: string;
 
