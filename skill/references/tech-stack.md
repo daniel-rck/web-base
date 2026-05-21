@@ -27,7 +27,7 @@ TypeScript configs.
   "workbox-window": "^7.4.0",
   "tailwindcss": "^4.2.4",
   "@tailwindcss/vite": "^4.2.4",
-  "@biomejs/biome": "^1.9.4",
+  "@biomejs/biome": "^2.4.15",
   "vitest": "^4.1.5",
   "@vitest/ui": "^4.1.5",
   "jsdom": "^29.1.0",
@@ -85,9 +85,18 @@ Required in every app's `package.json`. Bun's corepack integration uses it.
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignoreUnknown": true, "ignore": ["dist", "node_modules", ".wrangler"] },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.wrangler"]
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -97,11 +106,18 @@ Required in every app's `package.json`. Bun's corepack integration uses it.
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "react": "recommended",
+      "test": "recommended"
+    },
     "rules": {
       "recommended": true,
       "correctness": { "useExhaustiveDependencies": "warn" },
       "style": { "noNonNullAssertion": "warn" },
-      "suspicious": { "noConsoleLog": "warn", "noExplicitAny": "warn" }
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noConsole": { "level": "warn", "options": { "allow": ["error", "warn"] } }
+      }
     }
   },
   "javascript": {

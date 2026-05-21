@@ -33,7 +33,7 @@ flows into apps via `web-base update`).
   "workbox-window": "^7.4.0",
   "tailwindcss": "^4.2.4",
   "@tailwindcss/vite": "^4.2.4",
-  "@biomejs/biome": "^1.9.4",
+  "@biomejs/biome": "^2.4.15",
   "vitest": "^4.1.5",
   "@vitest/ui": "^4.1.5",
   "jsdom": "^29.1.0",

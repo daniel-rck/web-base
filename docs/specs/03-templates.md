@@ -68,7 +68,7 @@ Files:
 - `biome.json` → `biome.json` (the per-app config, slightly less strict than the web-base repo's)
 
 devDependencies:
-- `@biomejs/biome`: `^1.9.4`
+- `@biomejs/biome`: `^2.4.15`
 
 scripts:
 - `lint`: `biome check .`

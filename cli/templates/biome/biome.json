@@ -1,9 +1,15 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "ignoreUnknown": true,
-    "ignore": ["dist", "node_modules", ".wrangler"]
+    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.wrangler"]
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
   },
   "formatter": {
     "enabled": true,
@@ -14,13 +20,17 @@
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "react": "recommended",
+      "test": "recommended"
+    },
     "rules": {
       "recommended": true,
       "correctness": { "useExhaustiveDependencies": "warn" },
       "style": { "noNonNullAssertion": "warn" },
       "suspicious": {
-        "noConsoleLog": "warn",
-        "noExplicitAny": "warn"
+        "noExplicitAny": "warn",
+        "noConsole": { "level": "warn", "options": { "allow": ["error", "warn"] } }
       }
     }
   },

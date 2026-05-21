@@ -4,17 +4,33 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Shared tooling, conventions, and templates for personal web apps",
-  "keywords": ["cli", "scaffolding", "react", "vite", "pwa", "cloudflare-workers"],
+  "keywords": [
+    "cli",
+    "scaffolding",
+    "react",
+    "vite",
+    "pwa",
+    "cloudflare-workers"
+  ],
   "author": "daniel-rck",
   "license": "MIT",
   "homepage": "https://github.com/daniel-rck/web-base",
-  "repository": { "type": "git", "url": "https://github.com/daniel-rck/web-base.git" },
-  "bugs": { "url": "https://github.com/daniel-rck/web-base/issues" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daniel-rck/web-base.git"
+  },
+  "bugs": {
+    "url": "https://github.com/daniel-rck/web-base/issues"
+  },
   "packageManager": "bun@1.3.11",
   "bin": {
     "web-base": "./cli/dist/index.js"
   },
-  "files": ["cli/dist", "cli/templates", "skill"],
+  "files": [
+    "cli/dist",
+    "cli/templates",
+    "skill"
+  ],
   "scripts": {
     "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify && bun run build:shebang && chmod +x cli/dist/index.js",
     "build:shebang": "sed -i '1i#!/usr/bin/env node' cli/dist/index.js",
@@ -32,7 +48,7 @@
     "pathe": "^1.1.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.15",
     "@types/node": "^25.6.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.5"
