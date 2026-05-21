@@ -136,7 +136,9 @@ type AppShellProps = {
 
 Structure:
 - Outermost: `min-h-screen flex flex-col bg-surface text-fg`
-- `<AppHeader>` (sticky, h-14)
+- `<AppHeader>` (sticky, h-14) — receives `<><InstallButton />{headerActions}</>`
+  as `actions`, so the PWA install button always renders before any app-specific
+  actions. `InstallButton` self-hides when not applicable.
 - Below header: `flex flex-1 min-h-0`
   - Desktop sidebar (hidden on `<md`): `<aside class="hidden md:flex w-56 shrink-0 border-r border-border bg-surface-muted">`
     - `<AppNav variant="sidebar">`
@@ -213,6 +215,48 @@ Structure:
 - `<div class="mb-6 flex items-start justify-between gap-4">`
 - Left: `<h2 class="text-2xl font-semibold tracking-tight">{title}</h2>` + optional `<p class="mt-1 text-sm text-fg-muted">{subtitle}</p>`
 - Right: `{actions}` if present
+
+### InstallButton
+
+`src/lib/ui/InstallButton.tsx` plus the `useInstallPrompt` hook in
+`src/lib/ui/useInstallPrompt.ts`. Renders a small ghost-variant button
+that triggers the PWA install flow. `AppShell` auto-mounts it inside the
+header's right slot, so apps need no boilerplate.
+
+Props: none.
+
+Behavior:
+- **Standalone** (`display-mode: standalone` or `navigator.standalone`):
+  renders `null`. The user already installed the app.
+- **Chrome / Edge / Android**: listens for `beforeinstallprompt`,
+  shows the button once the browser deems the app installable, and
+  triggers the deferred prompt on click. Listens for `appinstalled`
+  to hide itself.
+- **iOS Safari**: no `beforeinstallprompt` is fired. The button is
+  shown unconditionally (until standalone) and opens a native
+  `<dialog>` with a short German „Zum Home-Bildschirm hinzufügen"
+  instruction (Teilen-Symbol → Zum Home-Bildschirm → Hinzufügen).
+
+`useInstallPrompt()` is exported for apps that want to build a custom
+install UI (e.g. a banner) instead of the default button:
+
+```typescript
+type UseInstallPromptResult = {
+  canInstall: boolean;
+  isIOS: boolean;
+  isStandalone: boolean;
+  promptInstall: () => Promise<"accepted" | "dismissed" | "unavailable">;
+};
+```
+
+The hook has no runtime dependency on the `pwa` template — without a
+registered service worker, browsers simply never fire
+`beforeinstallprompt`, the iOS path still works, and the button stays
+hidden on non-iOS.
+
+If an app wants to suppress the default button (rare), pass an
+`InstallButton`-replacement via `headerActions` and additionally hide
+the auto-mounted one by overriding `AppShell`. Default is: show.
 
 ### primitives.tsx
 

@@ -78,6 +78,26 @@ type PageHeaderProps = {
 
 Section header inside a page. Title is `text-2xl font-semibold`.
 
+### `InstallButton` + `useInstallPrompt`
+
+`src/lib/ui/InstallButton.tsx` is auto-mounted by `AppShell` in the
+header's right slot. It self-hides when the app is already running
+standalone or when the browser hasn't fired `beforeinstallprompt`
+(non-iOS). On iOS Safari it always shows (until standalone) and opens
+a `<dialog>` with German „Zum Home-Bildschirm" instructions, since
+iOS has no programmatic install prompt.
+
+`useInstallPrompt()` is exported for custom install UIs:
+
+```typescript
+type UseInstallPromptResult = {
+  canInstall: boolean;
+  isIOS: boolean;
+  isStandalone: boolean;
+  promptInstall: () => Promise<"accepted" | "dismissed" | "unavailable">;
+};
+```
+
 ### Primitives
 
 Exported from `src/lib/ui/primitives.tsx`:

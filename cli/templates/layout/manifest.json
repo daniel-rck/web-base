@@ -1,12 +1,14 @@
 {
   "name": "layout",
-  "description": "AppShell, AppHeader, AppNav, PageHeader, primitives, theme.css",
+  "description": "AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, theme.css",
   "files": [
     { "from": "AppShell.tsx", "to": "src/lib/ui/AppShell.tsx" },
     { "from": "AppHeader.tsx", "to": "src/lib/ui/AppHeader.tsx" },
     { "from": "AppNav.tsx", "to": "src/lib/ui/AppNav.tsx" },
     { "from": "PageHeader.tsx", "to": "src/lib/ui/PageHeader.tsx" },
     { "from": "primitives.tsx", "to": "src/lib/ui/primitives.tsx" },
+    { "from": "InstallButton.tsx", "to": "src/lib/ui/InstallButton.tsx" },
+    { "from": "useInstallPrompt.ts", "to": "src/lib/ui/useInstallPrompt.ts" },
     { "from": "theme.css", "to": "src/lib/ui/theme.css" },
     { "from": "index.ts", "to": "src/lib/ui/index.ts" }
   ],

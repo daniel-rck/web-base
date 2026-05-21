@@ -117,6 +117,25 @@ const reg = await navigator.serviceWorker.ready;
 await reg.sync.register("sync-pending");
 ```
 
+## Install button
+
+The PWA install button is shipped with the **layout** template (not
+this one), at `src/lib/ui/InstallButton.tsx` plus the
+`useInstallPrompt` hook in `src/lib/ui/useInstallPrompt.ts`. `AppShell`
+auto-mounts it in the header, so no per-app wiring is required.
+
+- Chrome / Edge / Android: listens for `beforeinstallprompt`, shows
+  the button when the browser fires it, triggers the native prompt on
+  click, hides on `appinstalled`.
+- iOS Safari: no `beforeinstallprompt` exists. The button is shown
+  unconditionally (until `display-mode: standalone`) and opens a
+  small in-component `<dialog>` with the "Teilen → Zum
+  Home-Bildschirm" instructions.
+
+Apps that want a custom UI (banner, in-page CTA) can import
+`useInstallPrompt` directly from `@/lib/ui` — see the layout reference
+for the return shape.
+
 ## Why not generateSW
 
 `generateSW` is convenient but precludes:

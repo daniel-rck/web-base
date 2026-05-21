@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppHeader } from "./AppHeader.tsx";
 import { AppNav, type NavItem } from "./AppNav.tsx";
+import { InstallButton } from "./InstallButton.tsx";
 
 export type AppShellProps = {
   title: string;
@@ -13,7 +14,16 @@ export type AppShellProps = {
 export function AppShell({ title, logo, navItems, headerActions, children }: AppShellProps) {
   return (
     <div className="min-h-screen flex flex-col bg-surface text-fg">
-      <AppHeader title={title} logo={logo} actions={headerActions} />
+      <AppHeader
+        title={title}
+        logo={logo}
+        actions={
+          <>
+            <InstallButton />
+            {headerActions}
+          </>
+        }
+      />
       <div className="flex flex-1 min-h-0">
         <aside className="hidden md:flex w-56 shrink-0 border-r border-border bg-surface-muted">
           <AppNav items={navItems} variant="sidebar" />
