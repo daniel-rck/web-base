@@ -256,7 +256,7 @@ packages to remove).
 
 ## Tests
 
-Vitest tests live in `cli/src/**/*.test.ts`. Minimum coverage:
+Vitest tests live in `cli/src/**/*.test.ts`:
 
 - `lib/manifest.test.ts`: `resolveTemplate` returns expected order for a
   simple meta-template, handles missing extends, handles a meta extending
