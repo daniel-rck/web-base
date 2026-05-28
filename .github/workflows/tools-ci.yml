@@ -29,8 +29,9 @@ jobs:
 
       - name: Smoke test - add hygiene
         run: |
-          mkdir -p /tmp/scratch
-          cd /tmp/scratch
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
           echo '{"name":"scratch","version":"0.0.0"}' > package.json
           node ${{ github.workspace }}/cli/dist/index.js add hygiene
           test -f LICENSE

@@ -130,15 +130,29 @@ and new meta-templates (e.g. `add minimal` later) cost only a new directory.
 4. If the meta-template has its own `files`/`dependencies`/`scripts`, append
    `name` itself at the end.
 
+A `visited` set tracks the current resolution path so a circular `extends`
+(`a` → `b` → `a`) throws `Circular extends detected: …` instead of recursing
+forever. Each `extends` branch gets its own copy of the path, so two branches
+legitimately sharing a leaf don't trip the guard — only back-edges do.
+
 ```typescript
-async function resolveTemplate(template: string): Promise<string[]> {
+async function resolveTemplate(template: string, visited = new Set<string>()): Promise<string[]> {
+  if (visited.has(template)) {
+    throw new Error(`Circular extends detected: ${[...visited, template].join(" -> ")}`);
+  }
+  visited.add(template);
+
   const manifest = await loadManifest(template);
   if (!manifest.extends?.length) return [template];
 
   const resolved: string[] = [];
+  const seen = new Set<string>();
   for (const child of manifest.extends) {
-    for (const t of await resolveTemplate(child)) {
-      if (!resolved.includes(t)) resolved.push(t);
+    for (const t of await resolveTemplate(child, new Set(visited))) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        resolved.push(t);
+      }
     }
   }
   if (manifest.files?.length || manifest.dependencies || manifest.devDependencies || manifest.scripts) {
@@ -274,7 +288,13 @@ Integration test: run `bun build`, then `node cli/dist/index.js add hygiene
 - Missing template → `consola.error(\`Template "<name>" not found.\`)`, list
   available, `process.exit(1)`.
 - Missing `manifest.json` → same as missing template.
-- Malformed `manifest.json` → bubble the JSON parse error with the file path.
+- Malformed `manifest.json` → bubble the JSON parse error with the file path
+  (both `loadManifest` and `listTemplates` use the same `parseManifest` helper,
+  so a single corrupt manifest reports its path instead of crashing the list).
+- Missing source file (a manifest lists a `from` that isn't on disk) → throw
+  `Template file not found: <template>/<from>`. Applies to both copy and diff.
+- Circular `extends` → throw `Circular extends detected: a -> b -> a`.
+- Malformed target `package.json` → bubble the JSON parse error with the path.
 - Write errors (permissions, full disk) → bubble. Don't try to recover.
 
 All commands return `process.exitCode = 1` on failure (don't throw out of `run`).

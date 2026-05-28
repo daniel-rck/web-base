@@ -28,8 +28,15 @@ export class SyncClient {
     if (this.state) return true;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
-    this.state = JSON.parse(raw) as SyncClientState;
-    return true;
+    try {
+      this.state = JSON.parse(raw) as SyncClientState;
+      return true;
+    } catch {
+      // Corrupted state: drop it so the user can re-enable cleanly.
+      localStorage.removeItem(STORAGE_KEY);
+      this.state = null;
+      return false;
+    }
   }
 
   async push(payload: unknown): Promise<void> {
@@ -72,14 +79,21 @@ export class SyncClient {
 
     const envelope = (await res.json()) as SyncEnvelope;
     const key = await deriveDataKey(secret.buffer as ArrayBuffer, "data");
-    const plaintext = await decrypt(
-      key,
-      base64ToBytes(envelope.ciphertext).buffer as ArrayBuffer,
-      base64ToBytes(envelope.iv).buffer as ArrayBuffer,
-    );
+    let value: T;
+    try {
+      const plaintext = await decrypt(
+        key,
+        base64ToBytes(envelope.ciphertext).buffer as ArrayBuffer,
+        base64ToBytes(envelope.iv).buffer as ArrayBuffer,
+      );
+      value = JSON.parse(new TextDecoder().decode(plaintext)) as T;
+    } catch (cause) {
+      // AES-GCM auth failure, truncated ciphertext, or non-JSON plaintext.
+      throw new Error("Sync data could not be decrypted or parsed.", { cause });
+    }
     this.state.etag = res.headers.get("etag");
     this.persist();
-    return JSON.parse(new TextDecoder().decode(plaintext)) as T;
+    return value;
   }
 
   private persist(): void {

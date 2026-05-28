@@ -1,8 +1,7 @@
-import { copyFile, mkdir } from "node:fs/promises";
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dirname, resolve } from "pathe";
-import { diffTemplateFile } from "../lib/copy.ts";
+import { resolve } from "pathe";
+import { diffTemplateFile, writeTemplateFile } from "../lib/copy.ts";
 import { loadManifest, templatesDir } from "../lib/manifest.ts";
 
 export const updateCommand = defineCommand({
@@ -32,16 +31,16 @@ export const updateCommand = defineCommand({
       const toApply: typeof manifest.files = [];
 
       for (const spec of manifest.files) {
-        const status = await diffTemplateFile(spec, { targetDir, template: args.template });
-        if (status === "missing") {
+        const result = await diffTemplateFile(spec, { targetDir, template: args.template });
+        if (result.status === "missing") {
           consola.warn(`  ${spec.to} — missing`);
           missing++;
           toApply.push(spec);
-        } else if (status === "identical") {
+        } else if (result.status === "identical") {
           consola.info(`  ${spec.to} — identical`);
           identical++;
         } else {
-          consola.warn(`  ${spec.to} — differs`);
+          consola.warn(`  ${spec.to} — differs (+${result.added} / -${result.removed})`);
           differs++;
           toApply.push(spec);
         }
@@ -52,10 +51,7 @@ export const updateCommand = defineCommand({
       if (apply && toApply.length > 0) {
         const srcDir = resolve(templatesDir(), args.template);
         for (const spec of toApply) {
-          const src = resolve(srcDir, spec.from);
-          const dst = resolve(targetDir, spec.to);
-          await mkdir(dirname(dst), { recursive: true });
-          await copyFile(src, dst);
+          await writeTemplateFile(resolve(srcDir, spec.from), resolve(targetDir, spec.to));
           consola.success(`  ${spec.to} — applied`);
         }
       } else if (toApply.length > 0) {
