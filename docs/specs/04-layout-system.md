@@ -184,19 +184,26 @@ type AppNavProps = {
 };
 ```
 
+Both variants render a `<nav>` landmark, so both carry
+`aria-label="Hauptnavigation"` to give each landmark an accessible name. The
+icon span is `aria-hidden`; the label span is `truncate` so long labels clip
+with an ellipsis instead of wrapping and breaking the layout rhythm.
+
 Sidebar variant:
-- Outer: `<nav class="w-full p-3 space-y-1">`
+- Outer: `<nav class="w-full p-3 space-y-1" aria-label="Hauptnavigation">`
 - Each item: `<NavLink>` from react-router-dom, `end={true}`
 - Item classes:
-  - Base: `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors`
+  - Base: `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors min-w-0`
   - Active: `bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-200`
   - Inactive: `text-fg-muted hover:bg-surface-sunken hover:text-fg`
+- Label span: `truncate`
 
 Bottom variant:
-- Outer: `<nav class="flex h-16">`
-- Each item: `<NavLink class="flex-1 flex flex-col items-center justify-center gap-1 text-xs">`
+- Outer: `<nav class="flex h-16" aria-label="Hauptnavigation">`
+- Each item: `<NavLink class="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 text-xs">`
 - Active: `text-accent-600`
 - Inactive: `text-fg-muted`
+- Label span: `max-w-full truncate`
 
 ### PageHeader
 
