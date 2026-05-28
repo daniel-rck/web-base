@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveTemplate, type TemplateManifest } from "./manifest.ts";
+import { listTemplates, resolveTemplate, type TemplateManifest } from "./manifest.ts";
 
 let scratch: string;
 
@@ -94,5 +94,37 @@ describe("resolveTemplate", () => {
     await expect(resolveTemplate("nonexistent")).rejects.toMatchObject({
       code: "TEMPLATE_NOT_FOUND",
     });
+  });
+
+  it("rejects on a direct circular extends instead of hanging", { timeout: 2000 }, async () => {
+    await writeManifest("a", { name: "a", description: "x", extends: ["b"] });
+    await writeManifest("b", { name: "b", description: "x", extends: ["a"] });
+    await expect(resolveTemplate("a")).rejects.toThrow(/Circular extends detected/);
+  });
+
+  it("rejects on a self-referential extends", { timeout: 2000 }, async () => {
+    await writeManifest("loop", { name: "loop", description: "x", extends: ["loop"] });
+    await expect(resolveTemplate("loop")).rejects.toThrow(/Circular extends detected/);
+  });
+
+  it("allows two branches to share a leaf without a false cycle", async () => {
+    await writeManifest("shared", {
+      name: "shared",
+      description: "x",
+      files: [{ from: "s", to: "s" }],
+    });
+    await writeManifest("left", { name: "left", description: "x", extends: ["shared"] });
+    await writeManifest("right", { name: "right", description: "x", extends: ["shared"] });
+    await writeManifest("top", { name: "top", description: "x", extends: ["left", "right"] });
+    expect(await resolveTemplate("top")).toEqual(["shared"]);
+  });
+});
+
+describe("listTemplates", () => {
+  it("reports the file path when a manifest is malformed", async () => {
+    const dir = resolve(scratch, "broken");
+    await mkdir(dir, { recursive: true });
+    await writeFile(resolve(dir, "manifest.json"), "{ not valid json", "utf8");
+    await expect(listTemplates()).rejects.toThrow(/Malformed manifest\.json at .*broken/);
   });
 });
