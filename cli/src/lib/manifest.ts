@@ -30,6 +30,14 @@ export function templatesDir(): string {
   return resolve(here, "../../templates");
 }
 
+function parseManifest(raw: string, path: string): TemplateManifest {
+  try {
+    return JSON.parse(raw) as TemplateManifest;
+  } catch (cause) {
+    throw new Error(`Malformed manifest.json at ${path}: ${(cause as Error).message}`);
+  }
+}
+
 export async function loadManifest(template: string): Promise<TemplateManifest> {
   const manifestPath = resolve(templatesDir(), template, "manifest.json");
   if (!existsSync(manifestPath)) {
@@ -38,21 +46,32 @@ export async function loadManifest(template: string): Promise<TemplateManifest> 
     throw err;
   }
   const raw = await readFile(manifestPath, "utf8");
-  try {
-    return JSON.parse(raw) as TemplateManifest;
-  } catch (cause) {
-    throw new Error(`Malformed manifest.json at ${manifestPath}: ${(cause as Error).message}`);
-  }
+  return parseManifest(raw, manifestPath);
 }
 
-export async function resolveTemplate(template: string): Promise<string[]> {
+export async function resolveTemplate(
+  template: string,
+  visited: Set<string> = new Set(),
+): Promise<string[]> {
+  if (visited.has(template)) {
+    const cycle = [...visited, template].join(" -> ");
+    throw new Error(`Circular extends detected: ${cycle}`);
+  }
+  visited.add(template);
+
   const manifest = await loadManifest(template);
   if (!manifest.extends?.length) return [template];
 
   const resolved: string[] = [];
+  const seen = new Set<string>();
   for (const child of manifest.extends) {
-    for (const t of await resolveTemplate(child)) {
-      if (!resolved.includes(t)) resolved.push(t);
+    // A fresh branch view of `visited` so independent branches that legitimately
+    // share a leaf don't trip the cycle guard, while back-edges still do.
+    for (const t of await resolveTemplate(child, new Set(visited))) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        resolved.push(t);
+      }
     }
   }
   if (
@@ -77,7 +96,7 @@ export async function listTemplates(): Promise<TemplateManifest[]> {
     const path = resolve(dir, entry.name, "manifest.json");
     if (!existsSync(path)) continue;
     const raw = await readFile(path, "utf8");
-    manifests.push(JSON.parse(raw) as TemplateManifest);
+    manifests.push(parseManifest(raw, path));
   }
   return manifests.sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -27,7 +27,12 @@ export async function patchPackageJson(options: PatchOptions): Promise<void> {
     throw new Error(`No package.json found at ${pkgPath}`);
   }
   const raw = await readFile(pkgPath, "utf8");
-  const pkg = JSON.parse(raw) as PackageJson;
+  let pkg: PackageJson;
+  try {
+    pkg = JSON.parse(raw) as PackageJson;
+  } catch (cause) {
+    throw new Error(`Malformed package.json at ${pkgPath}: ${(cause as Error).message}`);
+  }
 
   let changed = false;
   for (const section of SECTIONS) {
