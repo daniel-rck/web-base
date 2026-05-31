@@ -65,7 +65,7 @@ export function Spinner({ size = "md", className, label = "Lädt …" }: Spinner
       aria-label={label}
       className={cn("inline-block animate-spin text-accent-600", SPINNER_SIZE[size], className)}
     >
-      <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+      <svg viewBox="0 0 24 24" fill="none" className="w-full h-full" aria-hidden="true">
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
         <path
           d="M22 12a10 10 0 0 0-10-10"

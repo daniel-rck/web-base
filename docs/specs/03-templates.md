@@ -83,6 +83,11 @@ postInstall:
 The per-app biome.json includes warnings for `noConsoleLog` and
 `noExplicitAny` — see `04-layout-system.md` for the full config.
 
+It also sets `css.parser.tailwindDirectives: true`. Without it Biome's CSS
+parser rejects the Tailwind 4 directives (`@theme`, `@apply`, `@custom-variant`,
+`@utility`) used by the `layout` template's `theme.css`, so `biome check` would
+fail on a freshly scaffolded app before any user code is written.
+
 ---
 
 ## layout
