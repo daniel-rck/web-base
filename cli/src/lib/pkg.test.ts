@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { patchPackageJson } from "./pkg.ts";
+import { patchPackageJson, readWebBaseVersion, stampWebBaseVersion } from "./pkg.ts";
 
 let scratch: string;
 
@@ -90,5 +90,55 @@ describe("patchPackageJson", () => {
     });
     const pkg = await readPkg();
     expect(pkg.devDependencies).toBeUndefined();
+  });
+});
+
+describe("stampWebBaseVersion", () => {
+  it("adds webBase.version when absent", async () => {
+    await writePkg({ name: "scratch", version: "0.0.0" });
+    await stampWebBaseVersion({ targetDir: scratch, version: "0.2.0" });
+    const pkg = await readPkg();
+    expect(pkg.webBase).toEqual({ version: "0.2.0" });
+  });
+
+  it("updates an existing webBase.version", async () => {
+    await writePkg({ name: "scratch", version: "0.0.0", webBase: { version: "0.1.0" } });
+    await stampWebBaseVersion({ targetDir: scratch, version: "0.2.0" });
+    const pkg = await readPkg();
+    expect(pkg.webBase).toEqual({ version: "0.2.0" });
+  });
+
+  it("preserves other webBase fields", async () => {
+    await writePkg({
+      name: "scratch",
+      version: "0.0.0",
+      webBase: { version: "0.1.0", note: "keep me" },
+    });
+    await stampWebBaseVersion({ targetDir: scratch, version: "0.2.0" });
+    const pkg = await readPkg();
+    expect(pkg.webBase).toEqual({ version: "0.2.0", note: "keep me" });
+  });
+
+  it("does not write the file in dry-run mode", async () => {
+    await writePkg({ name: "scratch", version: "0.0.0" });
+    await stampWebBaseVersion({ targetDir: scratch, version: "0.2.0", dryRun: true });
+    const pkg = await readPkg();
+    expect(pkg.webBase).toBeUndefined();
+  });
+});
+
+describe("readWebBaseVersion", () => {
+  it("returns the stamped version", async () => {
+    await writePkg({ name: "scratch", version: "0.0.0", webBase: { version: "0.2.0" } });
+    expect(await readWebBaseVersion(scratch)).toBe("0.2.0");
+  });
+
+  it("returns undefined when unstamped", async () => {
+    await writePkg({ name: "scratch", version: "0.0.0" });
+    expect(await readWebBaseVersion(scratch)).toBeUndefined();
+  });
+
+  it("returns undefined when package.json is missing", async () => {
+    expect(await readWebBaseVersion(resolve(scratch, "nope"))).toBeUndefined();
   });
 });

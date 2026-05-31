@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppHeader } from "./AppHeader.tsx";
 import { AppNav, type NavItem } from "./AppNav.tsx";
 import { InstallButton } from "./InstallButton.tsx";
+import { ThemeToggle } from "./ThemeToggle.tsx";
 
 export type AppShellProps = {
   title: string;
@@ -19,6 +20,7 @@ export function AppShell({ title, logo, navItems, headerActions, children }: App
         logo={logo}
         actions={
           <>
+            <ThemeToggle />
             <InstallButton />
             {headerActions}
           </>

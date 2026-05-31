@@ -18,6 +18,9 @@ template implementation, and its documentation at once.
 - **One canonical baseline** across all the web apps. No drift on
   versions, tooling, layout, or conventions unless explicitly intended.
 - **Updates flow** from this repo into apps with one command (`web-base update <template>`).
+  web-base carries one incrementing version (`cli/src/version.ts`); apps are
+  stamped with the version they last pulled (`webBase.version` in their
+  `package.json`), so `update` can report whether an app is behind. See `02-cli.md`.
 - **New apps** scaffold in seconds (`web-base init`).
 - **Cross-cutting changes** (e.g. bumping React, switching linters) happen once
   here, propagate to apps via `update`.

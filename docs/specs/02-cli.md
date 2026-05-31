@@ -10,6 +10,7 @@ output). Pathes are resolved with [pathe](https://github.com/unjs/pathe).
 cli/
 ├── src/
 │   ├── index.ts                # citty entry, registers subcommands
+│   ├── version.ts              # WEB_BASE_VERSION (source of truth), compareVersions
 │   ├── commands/
 │   │   ├── init.ts             # scaffold a new app
 │   │   ├── add.ts              # copy a template (or meta-template) into an app
@@ -17,7 +18,7 @@ cli/
 │   └── lib/
 │       ├── manifest.ts         # loadManifest, resolveTemplate, types
 │       ├── copy.ts             # copyTemplateFiles, diffTemplateFile
-│       └── pkg.ts              # patchPackageJson
+│       └── pkg.ts              # patchPackageJson, stampWebBaseVersion, readWebBaseVersion
 └── templates/
     └── <template-name>/
         ├── manifest.json
@@ -41,11 +42,12 @@ import { defineCommand, runMain } from "citty";
 import { initCommand } from "./commands/init.ts";
 import { addCommand } from "./commands/add.ts";
 import { updateCommand } from "./commands/update.ts";
+import { WEB_BASE_VERSION } from "./version.ts";
 
 const main = defineCommand({
   meta: {
     name: "web-base",
-    version: "0.1.0",
+    version: WEB_BASE_VERSION,
     description: "Scaffolding CLI for daniel-rck web apps",
   },
   subCommands: {
@@ -57,6 +59,32 @@ const main = defineCommand({
 
 runMain(main);
 ```
+
+## Versioning
+
+web-base carries one incrementing version, the single source of truth being
+`cli/src/version.ts`:
+
+```typescript
+export const WEB_BASE_VERSION = "0.2.0";
+export function compareVersions(a: string, b: string): -1 | 0 | 1 { /* x.y.z */ }
+```
+
+- **SemVer, driven by conventional commits.** Bump on every change: `fix:` →
+  patch, `feat:` → minor, breaking → major. The root `package.json` `version`
+  must match `WEB_BASE_VERSION`; `cli/src/version.test.ts` fails if they drift.
+- **Stamping.** `init`, `add`, and `update --apply` write the current version
+  into the consuming app's `package.json` under `webBase.version` (via
+  `stampWebBaseVersion`, additive — other `webBase` fields are preserved). The
+  stamp means "this app last pulled web-base vX."
+- **Reporting.** `update` reads the stamp (`readWebBaseVersion`, never throws)
+  and reports `current` / `behind (X → Y)` / `ahead` / `unstamped` so an app
+  knows whether to pull. The catch-up path is `web-base update <template>
+  --apply`.
+- **CHANGELOG.** `CHANGELOG.md` (Keep a Changelog) records what each version
+  changed.
+
+`web-base --version` surfaces `WEB_BASE_VERSION` through citty's `meta.version`.
 
 ## Manifest format
 
@@ -178,8 +206,9 @@ Behavior:
 2. Write a fresh `package.json` using the template in `07-conventions.md`,
    substituting the name, description, homepage URL pattern, repo URL pattern.
 3. Resolve and apply `core` (calls the same code path as `add core`).
-4. Initialize a Git repo (`git init && git add -A && git commit -m "chore: initial scaffold"`).
-5. Print next steps (set the color accent in `theme.css`, fill in domain content).
+4. Stamp `webBase.version` into the new `package.json`.
+5. Initialize a Git repo (`git init && git add -A && git commit -m "chore: initial scaffold"`).
+6. Print next steps (set the color accent in `theme.css`, fill in domain content).
 
 If the target already has a `package.json`, `init` aborts and suggests
 `add core` instead.
@@ -201,7 +230,9 @@ Behavior:
    b. `patchPackageJson(...)` — additive merge of `dependencies`,
       `devDependencies`, `scripts`. Existing entries are overwritten only if
       the value differs.
-3. Collect and display all `postInstall` messages at the end.
+3. Stamp `webBase.version` into the app's `package.json` (once, after the chain,
+   if a `package.json` exists).
+4. Collect and display all `postInstall` messages at the end.
 
 `--dry-run` logs all operations but writes nothing.
 
@@ -220,16 +251,21 @@ web-base update <template> [--cwd <dir>] [--apply]
 Behavior:
 
 1. Load the manifest (no extends-expansion — `update` operates per-template).
-2. For each file in `manifest.files`:
+2. Report the app's base-version status by comparing its stamped
+   `webBase.version` against `WEB_BASE_VERSION`: `current` / `behind` / `ahead`
+   / `unstamped`.
+3. For each file in `manifest.files`:
    - If missing locally: report as `missing`.
    - If identical: report as `identical`.
    - If differs: report as `differs` with line counts.
-3. Print a summary.
-4. If `--apply` is set and differences exist, overwrite the local files with
-   the template source.
+4. Print a summary.
+5. If `--apply` is set, overwrite any differing/missing files with the template
+   source and stamp `webBase.version` (the stamp updates even when all files
+   were already identical, since `--apply` asserts the app pulled current source).
 
-`update` does **not** patch `package.json` — only files. Dependency drift is
-visible through normal `bun outdated`.
+`update` does **not** patch `package.json` dependencies/scripts — only files
+(plus the `webBase.version` stamp on `--apply`). Dependency drift is visible
+through normal `bun outdated`.
 
 ## File copy: behavior contract
 
@@ -278,7 +314,11 @@ Vitest tests live in `cli/src/**/*.test.ts`:
 - `lib/copy.test.ts`: skip-existing behavior, force-overwrite behavior,
   dry-run produces no writes.
 - `lib/pkg.test.ts`: patch adds missing keys, leaves existing identical keys
-  alone, overwrites existing differing keys.
+  alone, overwrites existing differing keys; `stampWebBaseVersion` adds/updates
+  `webBase.version` and preserves other fields; `readWebBaseVersion` reads or
+  returns undefined.
+- `version.test.ts`: `WEB_BASE_VERSION` matches the root `package.json` version
+  (drift guard); `compareVersions` ordering.
 
 Integration test: run `bun build`, then `node cli/dist/index.js add hygiene
 --cwd /tmp/scratch-app`, assert files exist. This runs in `tools-ci.yml`.

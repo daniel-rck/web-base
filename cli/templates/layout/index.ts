@@ -9,4 +9,7 @@ export type { PageHeaderProps } from "./PageHeader.tsx";
 export { InstallButton } from "./InstallButton.tsx";
 export { useInstallPrompt } from "./useInstallPrompt.ts";
 export type { UseInstallPromptResult } from "./useInstallPrompt.ts";
+export { ThemeToggle } from "./ThemeToggle.tsx";
+export { themeInitScript, useTheme } from "./useTheme.ts";
+export type { Theme, UseThemeResult } from "./useTheme.ts";
 export * from "./primitives.tsx";

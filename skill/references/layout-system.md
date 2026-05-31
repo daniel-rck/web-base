@@ -12,7 +12,9 @@ reference is the day-to-day terse version.
 2. Same shell, different paint. Only `--accent-h` differs per app.
 3. Tailwind 4 utility classes + CSS variables via `@theme`. No CSS-in-JS.
 4. Custom primitives only. No shadcn/ui, no Radix UI.
-5. Dark mode automatic via `prefers-color-scheme`.
+5. Dark mode defaults to `prefers-color-scheme`, with a built-in `ThemeToggle`
+   (light/dark/system) that persists in `localStorage` as `data-theme` on
+   `<html>`.
 
 ## Per-app accent hues
 
@@ -97,6 +99,30 @@ type UseInstallPromptResult = {
   promptInstall: () => Promise<"accepted" | "dismissed" | "unavailable">;
 };
 ```
+
+### `ThemeToggle` + `useTheme`
+
+`src/lib/ui/ThemeToggle.tsx` is auto-mounted by `AppShell` in the header's
+right slot (before `InstallButton`). It's a ghost button that cycles
+system → light → dark, with `Monitor`/`Sun`/`Moon` icons and German labels.
+The choice persists in `localStorage` (key `theme`) and is written as
+`data-theme` on `<html>` (`"system"` removes it → falls back to
+`prefers-color-scheme`).
+
+`useTheme()` is exported for custom theme UIs:
+
+```typescript
+type Theme = "light" | "dark" | "system";
+type UseThemeResult = {
+  theme: Theme;
+  resolvedTheme: "light" | "dark";
+  setTheme: (t: Theme) => void;
+};
+```
+
+`themeInitScript` is an exported string to inline in `index.html` `<head>`
+before the stylesheet — it sets `data-theme` from `localStorage` before first
+paint to avoid a flash of the wrong theme.
 
 ### Primitives
 

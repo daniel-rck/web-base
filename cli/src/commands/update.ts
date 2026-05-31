@@ -3,6 +3,8 @@ import { consola } from "consola";
 import { resolve } from "pathe";
 import { diffTemplateFile, writeTemplateFile } from "../lib/copy.ts";
 import { loadManifest, templatesDir } from "../lib/manifest.ts";
+import { readWebBaseVersion, stampWebBaseVersion } from "../lib/pkg.ts";
+import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
 
 export const updateCommand = defineCommand({
   meta: {
@@ -23,6 +25,22 @@ export const updateCommand = defineCommand({
       if (!manifest.files?.length) {
         consola.info(`Template "${args.template}" has no files to update.`);
         return;
+      }
+
+      const stamped = await readWebBaseVersion(targetDir);
+      if (!stamped) {
+        consola.info(
+          `web-base: this app is unstamped (web-base ${WEB_BASE_VERSION}). Run with --apply to start tracking.`,
+        );
+      } else {
+        const cmp = compareVersions(stamped, WEB_BASE_VERSION);
+        if (cmp < 0) {
+          consola.warn(`web-base: app is behind (${stamped} → ${WEB_BASE_VERSION}).`);
+        } else if (cmp > 0) {
+          consola.info(`web-base: app is ahead (${stamped} > ${WEB_BASE_VERSION}).`);
+        } else {
+          consola.info(`web-base: app is current (${WEB_BASE_VERSION}).`);
+        }
       }
 
       let missing = 0;
@@ -48,12 +66,17 @@ export const updateCommand = defineCommand({
 
       consola.info(`Summary: ${identical} identical, ${differs} differs, ${missing} missing`);
 
-      if (apply && toApply.length > 0) {
-        const srcDir = resolve(templatesDir(), args.template);
-        for (const spec of toApply) {
-          await writeTemplateFile(resolve(srcDir, spec.from), resolve(targetDir, spec.to));
-          consola.success(`  ${spec.to} — applied`);
+      if (apply) {
+        if (toApply.length > 0) {
+          const srcDir = resolve(templatesDir(), args.template);
+          for (const spec of toApply) {
+            await writeTemplateFile(resolve(srcDir, spec.from), resolve(targetDir, spec.to));
+            consola.success(`  ${spec.to} — applied`);
+          }
         }
+        // Stamp even when files were already identical: --apply asserts the app
+        // has pulled the current template source.
+        await stampWebBaseVersion({ targetDir, version: WEB_BASE_VERSION });
       } else if (toApply.length > 0) {
         consola.info("Run with --apply to overwrite local files with template source.");
       }
