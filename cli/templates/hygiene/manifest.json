@@ -2,9 +2,9 @@
   "name": "hygiene",
   "description": "LICENSE, CONTRIBUTING, SECURITY, .editorconfig",
   "files": [
-    { "from": "LICENSE", "to": "LICENSE" },
+    { "from": "LICENSE", "to": "LICENSE", "policy": "scaffold" },
     { "from": "CONTRIBUTING.md", "to": "CONTRIBUTING.md" },
-    { "from": "SECURITY.md", "to": "SECURITY.md" },
+    { "from": "SECURITY.md", "to": "SECURITY.md", "policy": "scaffold" },
     { "from": "editorconfig", "to": ".editorconfig" }
   ],
   "postInstall": [

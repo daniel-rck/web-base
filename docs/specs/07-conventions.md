@@ -210,10 +210,15 @@ worker/
 └── index.ts                   # from `web-base add worker`
 ```
 
-Files inside `lib/` (other than feature-specific extensions) should remain
-identical across apps. Diff drift in `lib/ui/` or `lib/db/` is a signal
-something's wrong — either the convention needs to change (update the
-template) or the app should run `web-base update`.
+This maps onto the file `policy` in the template manifests (`02-cli.md`):
+
+- **owned** building blocks should remain identical across apps — `primitives`,
+  the layout shell, `useLiveQuery`, router/worker plumbing, `biome.json`. Diff
+  drift here is a signal something's wrong: either the convention changes (update
+  the template) or the app runs `web-base update --apply` to pull the base back.
+- **scaffold** seams are expected to differ per app — `theme.css` (`--accent-h`),
+  `db.ts` (`AppSchema`), `routes.ts`/`router.tsx`, `sw.ts`/`worker.ts`,
+  `wrangler.toml`. `update` reports their drift but never overwrites them.
 
 Files inside `features/` are per-app, never copied.
 

@@ -2,7 +2,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listTemplates, resolveTemplate, type TemplateManifest } from "./manifest.ts";
+import {
+  filePolicy,
+  listTemplates,
+  resolveTemplate,
+  shouldApplyUpdate,
+  type TemplateManifest,
+} from "./manifest.ts";
 
 let scratch: string;
 
@@ -117,6 +123,37 @@ describe("resolveTemplate", () => {
     await writeManifest("right", { name: "right", description: "x", extends: ["shared"] });
     await writeManifest("top", { name: "top", description: "x", extends: ["left", "right"] });
     expect(await resolveTemplate("top")).toEqual(["shared"]);
+  });
+});
+
+describe("filePolicy", () => {
+  it("defaults to owned when no policy is set", () => {
+    expect(filePolicy({ from: "a", to: "a" })).toBe("owned");
+  });
+
+  it("returns the explicit policy when set", () => {
+    expect(filePolicy({ from: "a", to: "a", policy: "scaffold" })).toBe("scaffold");
+    expect(filePolicy({ from: "a", to: "a", policy: "owned" })).toBe("owned");
+  });
+});
+
+describe("shouldApplyUpdate", () => {
+  const owned = { from: "a", to: "a" } as const;
+  const scaffold = { from: "a", to: "a", policy: "scaffold" } as const;
+
+  it("never applies identical files regardless of policy", () => {
+    expect(shouldApplyUpdate(owned, "identical")).toBe(false);
+    expect(shouldApplyUpdate(scaffold, "identical")).toBe(false);
+  });
+
+  it("applies owned files that differ or are missing", () => {
+    expect(shouldApplyUpdate(owned, "differs")).toBe(true);
+    expect(shouldApplyUpdate(owned, "missing")).toBe(true);
+  });
+
+  it("never overwrites scaffold files even when they differ or are missing", () => {
+    expect(shouldApplyUpdate(scaffold, "differs")).toBe(false);
+    expect(shouldApplyUpdate(scaffold, "missing")).toBe(false);
   });
 });
 

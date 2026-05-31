@@ -24,6 +24,12 @@ template implementation, and its documentation at once.
 - **New apps** scaffold in seconds (`web-base init`).
 - **Cross-cutting changes** (e.g. bumping React, switching linters) happen once
   here, propagate to apps via `update`.
+- **Flexible, but built from shared blocks.** Each template file is either an
+  `owned` building block (centrally managed, `update` overwrites it) or a
+  `scaffold` seam (per-app starting point, `update` never touches it). Apps
+  customize by editing the seams (`theme.css` accent, `db.ts` schema, routes,
+  handlers) and composing the owned blocks from `features/` — so upstream fixes
+  flow into the machinery without clobbering app-specific code. See `02-cli.md`.
 
 ## Non-goals
 

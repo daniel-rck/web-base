@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolve } from "pathe";
 import { diffTemplateFile, writeTemplateFile } from "../lib/copy.ts";
-import { loadManifest, templatesDir } from "../lib/manifest.ts";
+import { filePolicy, loadManifest, templatesDir } from "../lib/manifest.ts";
 import { readWebBaseVersion, stampWebBaseVersion } from "../lib/pkg.ts";
 import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
 
@@ -28,6 +28,7 @@ export const updateCommand = defineCommand({
       }
 
       const stamped = await readWebBaseVersion(targetDir);
+      let atCurrent = false;
       if (!stamped) {
         consola.info(
           `web-base: this app is unstamped (web-base ${WEB_BASE_VERSION}). Run with --apply to start tracking.`,
@@ -39,6 +40,7 @@ export const updateCommand = defineCommand({
         } else if (cmp > 0) {
           consola.info(`web-base: app is ahead (${stamped} > ${WEB_BASE_VERSION}).`);
         } else {
+          atCurrent = true;
           consola.info(`web-base: app is current (${WEB_BASE_VERSION}).`);
         }
       }
@@ -46,25 +48,37 @@ export const updateCommand = defineCommand({
       let missing = 0;
       let identical = 0;
       let differs = 0;
+      let scaffold = 0;
       const toApply: typeof manifest.files = [];
 
       for (const spec of manifest.files) {
         const result = await diffTemplateFile(spec, { targetDir, template: args.template });
-        if (result.status === "missing") {
+        const isScaffold = filePolicy(spec) === "scaffold";
+        if (result.status === "identical") {
+          consola.info(`  ${spec.to} — identical`);
+          identical++;
+        } else if (isScaffold) {
+          // Scaffold files belong to the app: report drift but never overwrite.
+          const detail = result.status === "missing" ? "missing" : "differs";
+          consola.info(`  ${spec.to} — scaffold, ${detail} (left as-is)`);
+          scaffold++;
+        } else if (result.status === "missing") {
           consola.warn(`  ${spec.to} — missing`);
           missing++;
           toApply.push(spec);
-        } else if (result.status === "identical") {
-          consola.info(`  ${spec.to} — identical`);
-          identical++;
         } else {
-          consola.warn(`  ${spec.to} — differs (+${result.added} / -${result.removed})`);
+          // An owned file that differs while the app is on the current version
+          // means it was hand-edited — flag it, since --apply will revert it.
+          const drift = atCurrent ? " [owned file edited locally — will be reverted]" : "";
+          consola.warn(`  ${spec.to} — differs (+${result.added} / -${result.removed})${drift}`);
           differs++;
           toApply.push(spec);
         }
       }
 
-      consola.info(`Summary: ${identical} identical, ${differs} differs, ${missing} missing`);
+      consola.info(
+        `Summary: ${identical} identical, ${differs} differs, ${missing} missing, ${scaffold} scaffold left as-is`,
+      );
 
       if (apply) {
         if (toApply.length > 0) {

@@ -2,7 +2,7 @@
   "name": "storage",
   "description": "idb wrapper + useLiveQuery hook for reactive IndexedDB",
   "files": [
-    { "from": "db.ts", "to": "src/lib/db/db.ts" },
+    { "from": "db.ts", "to": "src/lib/db/db.ts", "policy": "scaffold" },
     { "from": "useLiveQuery.ts", "to": "src/lib/db/useLiveQuery.ts" },
     { "from": "index.ts", "to": "src/lib/db/index.ts" }
   ],

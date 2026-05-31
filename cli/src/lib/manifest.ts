@@ -3,11 +3,39 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "pathe";
 
+/**
+ * Whether a template file is a base building block or an app starting point.
+ * - "owned": part of the shared base. The app should not hand-edit it;
+ *   `update --apply` overwrites it so upstream fixes flow in cleanly.
+ * - "scaffold": a per-app seam (schema, routes, accent, handlers). Copied once
+ *   as a starting point; `update` reports drift but never overwrites it.
+ */
+export type FilePolicy = "owned" | "scaffold";
+
 export type TemplateFileSpec = {
   from: string;
   to: string;
   overwrite?: boolean;
+  policy?: FilePolicy;
 };
+
+/** A file's effective policy. Files are owned (centrally managed) by default. */
+export function filePolicy(spec: TemplateFileSpec): FilePolicy {
+  return spec.policy ?? "owned";
+}
+
+/**
+ * Whether `update --apply` should overwrite a local file with the template
+ * source. Only owned files that actually differ (or are missing) are applied;
+ * scaffold files are left as-is so per-app customizations survive.
+ */
+export function shouldApplyUpdate(
+  spec: TemplateFileSpec,
+  status: "missing" | "identical" | "differs",
+): boolean {
+  if (status === "identical") return false;
+  return filePolicy(spec) === "owned";
+}
 
 export type TemplateManifest = {
   name: string;

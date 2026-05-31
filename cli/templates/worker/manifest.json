@@ -2,8 +2,8 @@
   "name": "worker",
   "description": "Cloudflare Worker scaffold with /api routing and static-asset fallthrough",
   "files": [
-    { "from": "worker.ts", "to": "worker/index.ts" },
-    { "from": "wrangler.toml", "to": "wrangler.toml" },
+    { "from": "worker.ts", "to": "worker/index.ts", "policy": "scaffold" },
+    { "from": "wrangler.toml", "to": "wrangler.toml", "policy": "scaffold" },
     { "from": "tsconfig.worker.json", "to": "tsconfig.worker.json" }
   ],
   "devDependencies": {

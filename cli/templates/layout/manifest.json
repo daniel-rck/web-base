@@ -11,7 +11,7 @@
     { "from": "useInstallPrompt.ts", "to": "src/lib/ui/useInstallPrompt.ts" },
     { "from": "ThemeToggle.tsx", "to": "src/lib/ui/ThemeToggle.tsx" },
     { "from": "useTheme.ts", "to": "src/lib/ui/useTheme.ts" },
-    { "from": "theme.css", "to": "src/lib/ui/theme.css" },
+    { "from": "theme.css", "to": "src/lib/ui/theme.css", "policy": "scaffold" },
     { "from": "index.ts", "to": "src/lib/ui/index.ts" }
   ],
   "dependencies": {

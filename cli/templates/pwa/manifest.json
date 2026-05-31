@@ -2,7 +2,7 @@
   "name": "pwa",
   "description": "Service worker (injectManifest) + workbox precache",
   "files": [
-    { "from": "sw.ts", "to": "src/sw/index.ts" },
+    { "from": "sw.ts", "to": "src/sw/index.ts", "policy": "scaffold" },
     { "from": "vite.snippet.md", "to": "vite.snippet.md" },
     { "from": "tsconfig.sw.json", "to": "tsconfig.sw.json" }
   ],
