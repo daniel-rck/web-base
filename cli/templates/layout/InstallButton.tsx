@@ -30,12 +30,7 @@ export function InstallButton() {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleClick}
-        aria-label="App installieren"
-      >
+      <Button variant="ghost" size="sm" onClick={handleClick} aria-label="App installieren">
         <Download className="h-4 w-4" aria-hidden="true" />
         <span className="hidden sm:inline">Installieren</span>
       </Button>
@@ -61,11 +56,7 @@ export function InstallButton() {
               <li>Bestätige mit „Hinzufügen".</li>
             </ol>
             <div className="mt-5 flex justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => dialogRef.current?.close()}
-              >
+              <Button variant="secondary" size="sm" onClick={() => dialogRef.current?.close()}>
                 Schließen
               </Button>
             </div>

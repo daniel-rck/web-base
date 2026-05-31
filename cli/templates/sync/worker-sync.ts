@@ -70,11 +70,9 @@ async function allow(
   const bucket = raw ? (JSON.parse(raw) as { count: number; resetAt: number }) : null;
 
   if (!bucket || bucket.resetAt <= now) {
-    await kv.put(
-      key,
-      JSON.stringify({ count: 1, resetAt: now + window }),
-      { expirationTtl: window + 5 },
-    );
+    await kv.put(key, JSON.stringify({ count: 1, resetAt: now + window }), {
+      expirationTtl: window + 5,
+    });
     return true;
   }
 

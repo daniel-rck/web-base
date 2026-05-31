@@ -1,9 +1,4 @@
-import {
-  type ButtonHTMLAttributes,
-  type HTMLAttributes,
-  type ReactNode,
-  forwardRef,
-} from "react";
+import { type ButtonHTMLAttributes, forwardRef, type HTMLAttributes, type ReactNode } from "react";
 
 function cn(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -41,9 +36,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
     <div className={cn("flex flex-col items-center text-center py-12 px-4", className)}>
       {icon ? <div className="mb-4 text-fg-subtle">{icon}</div> : null}
       <h3 className="text-base font-medium">{title}</h3>
-      {description ? (
-        <p className="mt-1 text-sm text-fg-muted max-w-sm">{description}</p>
-      ) : null}
+      {description ? <p className="mt-1 text-sm text-fg-muted max-w-sm">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
@@ -118,10 +111,8 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
     "bg-accent-600 text-white hover:bg-accent-700 focus-visible:ring-accent-500 disabled:bg-accent-300",
   secondary:
     "bg-surface-muted text-fg hover:bg-surface-sunken focus-visible:ring-accent-500 border border-border",
-  ghost:
-    "bg-transparent text-fg hover:bg-surface-sunken focus-visible:ring-accent-500",
-  danger:
-    "bg-danger text-white hover:opacity-90 focus-visible:ring-danger disabled:opacity-50",
+  ghost: "bg-transparent text-fg hover:bg-surface-sunken focus-visible:ring-accent-500",
+  danger: "bg-danger text-white hover:opacity-90 focus-visible:ring-danger disabled:opacity-50",
 };
 
 const BUTTON_SIZE: Record<ButtonSize, string> = {

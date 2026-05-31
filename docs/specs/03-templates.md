@@ -78,7 +78,12 @@ postInstall:
 - "Remove config files: eslint.config.js, .prettierrc*, .eslintrc*"
 - "Remove devDeps: eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier"
 - "Run: bun install"
-- "Run: bun run format && bun run lint"
+- "Run: bunx @biomejs/biome check --write . && bun run lint"
+
+`check --write` (not `format`) is used for the setup step because `biome format`
+only reformats whitespace — it does not organize imports/exports, so a plain
+`format && lint` can still fail on import ordering. `biome check --write` applies
+formatting *and* the safe import-organization fixes in one pass.
 
 The per-app biome.json includes warnings for `noConsoleLog` and
 `noExplicitAny` — see `04-layout-system.md` for the full config.

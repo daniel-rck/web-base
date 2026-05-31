@@ -39,6 +39,20 @@ jobs:
           test -f SECURITY.md
           test -f .editorconfig
 
+      - name: Smoke test - scaffold core and lint
+        run: |
+          # Scaffold a full app from the templates and lint the result with the
+          # shipped biome.json. The repo's own `bun run lint` skips cli/templates,
+          # so this is the only guard that a freshly scaffolded app is lint-clean
+          # (Tailwind directives parse, a11y rules pass, imports organized).
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
+          git init -q && touch .gitignore   # biome.json uses vcs.useIgnoreFile
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add core
+          bunx --bun @biomejs/biome@2.4.15 check .
+
       - name: Verify skill/template alignment
         run: |
           # Every cli/templates/<name>/ (except 'core') should have a matching
