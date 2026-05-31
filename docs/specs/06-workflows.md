@@ -185,6 +185,46 @@ check. Typecheck/build of the scaffolded app are intentionally left out: they
 need a full dependency install (React, idb, lucide-react, Vite …) and would be
 slow and flaky; revisit if template type errors start slipping through.
 
+## web-base-check.yml (reusable — owned-drift guard)
+
+`web-base-check.yml` is a `workflow_call` workflow that an app's CI includes to
+fail when an **owned** base building block has drifted (`web-base check`).
+Scaffold seams (theme accent, db schema, routes, handlers) are ignored, so
+per-app customization never trips it.
+
+Inputs:
+- `template` (default `core`) — the baseline to check against.
+- `ref` (default `main`) — the web-base ref/tag to run the check with; pin it to
+  the app's `webBase.version` so the comparison matches what the app pulled.
+
+Caller pattern in an app:
+
+```yaml
+jobs:
+  web-base-check:
+    uses: daniel-rck/web-base/.github/workflows/web-base-check.yml@main
+    with:
+      ref: v0.2.0
+```
+
+## notify-apps.yml (release → issue notifications)
+
+When a web-base release is published, `notify-apps.yml` opens an "update
+available" issue in each consuming app repo (the repo list is a matrix in the
+workflow). Updates stay manual — the issue is the reminder to run
+`web-base update`. It also fires on `workflow_dispatch` with a `version` input.
+
+Requirements and behavior:
+- Needs an `APP_NOTIFY_TOKEN` secret with `issues:write` on the app repos (a PAT
+  or GitHub App token). No write access to app *code* is required.
+- If the secret is absent, each matrix job no-ops (so the workflow is safe to
+  merge before the secret exists).
+- Deduplicates: skips a repo if an open issue with the same title already exists.
+
+This is the Stage-2 "issue-notification" propagation model. A future, more
+automated variant could open `web-base update --apply` PRs instead of issues
+(needs code-write access); the issue path was chosen to avoid granting that.
+
 ## Releasing the workflow
 
 When breaking changes are introduced to `web-app-ci.yml`:

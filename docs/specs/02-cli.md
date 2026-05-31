@@ -293,6 +293,32 @@ Behavior:
 (plus the `webBase.version` stamp on `--apply`). Dependency drift is visible
 through normal `bun outdated`.
 
+### `web-base check <template>`
+
+Read-only drift guard for CI. Verifies that the app's **owned** building blocks
+still match the template source; scaffold seams are ignored.
+
+```
+web-base check [template] [--cwd <dir>]
+```
+
+Behavior:
+
+1. Resolve the template (default `core`) including `extends`.
+2. For every **owned** file across the resolved templates:
+   - missing locally → the app doesn't use this block; skip (counted as absent).
+   - differs → record as drift and report line counts.
+   - identical → counts as matched.
+3. Scaffold files are never checked.
+4. If any owned file drifted, print an error and exit non-zero (so CI fails);
+   otherwise exit zero. Also warns when the app's stamped `webBase.version`
+   differs from the running CLI's version, since the comparison is against the
+   CLI's bundled templates.
+
+This is what makes the "owned files stay identical across apps" rule
+(`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`
+reusable workflow in `06-workflows.md`.
+
 ## File copy: behavior contract
 
 `copyTemplateFiles(files, { targetDir, template, force, dryRun })`:
