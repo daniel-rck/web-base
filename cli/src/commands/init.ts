@@ -5,7 +5,8 @@ import { consola } from "consola";
 import { resolve } from "pathe";
 import { copyTemplateFiles } from "../lib/copy.ts";
 import { loadManifest, resolveTemplate } from "../lib/manifest.ts";
-import { patchPackageJson } from "../lib/pkg.ts";
+import { patchPackageJson, stampWebBaseVersion } from "../lib/pkg.ts";
+import { WEB_BASE_VERSION } from "../version.ts";
 
 export const initCommand = defineCommand({
   meta: {
@@ -72,6 +73,8 @@ export const initCommand = defineCommand({
         }
         if (manifest.postInstall?.length) postInstall.push(...manifest.postInstall);
       }
+
+      await stampWebBaseVersion({ targetDir, version: WEB_BASE_VERSION, dryRun });
 
       const nextSteps = [
         ...postInstall,

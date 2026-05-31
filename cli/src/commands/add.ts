@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolve } from "pathe";
 import { copyTemplateFiles } from "../lib/copy.ts";
 import { listTemplates, loadManifest, resolveTemplate } from "../lib/manifest.ts";
-import { patchPackageJson } from "../lib/pkg.ts";
+import { patchPackageJson, stampWebBaseVersion } from "../lib/pkg.ts";
+import { WEB_BASE_VERSION } from "../version.ts";
 
 export const addCommand = defineCommand({
   meta: {
@@ -53,6 +55,10 @@ export const addCommand = defineCommand({
         if (manifest.postInstall?.length) {
           postInstall.push(...manifest.postInstall);
         }
+      }
+
+      if (existsSync(resolve(targetDir, "package.json"))) {
+        await stampWebBaseVersion({ targetDir, version: WEB_BASE_VERSION, dryRun });
       }
 
       if (postInstall.length) {

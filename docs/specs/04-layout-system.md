@@ -11,8 +11,11 @@ only the color accent in `theme.css` changes per app.
 3. **No CSS-in-JS.** Tailwind 4 utility classes + CSS variables via `@theme`.
 4. **No third-party UI library.** Custom primitives only. Shadcn-style means
    the code lives in the app after `web-base add layout`.
-5. **Dark mode automatic** via `prefers-color-scheme`. No toggle needed.
-   Apps may add a manual toggle on top of this if they want.
+5. **Dark mode defaults to `prefers-color-scheme`**, with a built-in manual
+   override. A `ThemeToggle` (auto-mounted in the header) cycles
+   system → light → dark; the choice persists in `localStorage` and is expressed
+   as `data-theme` on `<html>`. An inline init script (`themeInitScript`) in
+   `index.html` prevents a flash of the wrong theme on load.
 
 ## Color tokens
 
@@ -42,6 +45,23 @@ The full template file at `cli/templates/layout/theme.css`:
  */
 
 @import "tailwindcss";
+
+/*
+ * Make Tailwind's `dark:` variant follow the manual theme choice, not just the
+ * OS. It triggers when the OS prefers dark AND the user hasn't forced light, or
+ * when the user has forced dark — mirroring the token logic below so utilities
+ * like `dark:bg-accent-900/40` stay in sync with the surface tokens.
+ */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:not([data-theme="light"]), :not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}
 
 @theme {
   /* ── App accent — change this per app ─────────────────── */
@@ -95,8 +115,16 @@ The full template file at `cli/templates/layout/theme.css`:
   --duration-slow: 400ms;
 }
 
+/*
+ * Dark tokens. `@theme` only works at top level, so dark values are plain
+ * custom-property overrides on `:root` (utilities read them via `var()`).
+ * Three states: no `data-theme` = follow the OS; `data-theme="dark"` / `"light"`
+ * = forced. The dark token list appears twice — once in the media query (system)
+ * and once on the forced selector — because CSS can't share one declaration
+ * block across a media query and a plain selector. Keep both blocks in sync.
+ */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root:not([data-theme="light"]) {
     --color-surface:        oklch(0.18 0 0);
     --color-surface-muted:  oklch(0.22 0 0);
     --color-surface-sunken: oklch(0.14 0 0);
@@ -104,8 +132,22 @@ The full template file at `cli/templates/layout/theme.css`:
     --color-fg:             oklch(0.95 0 0);
     --color-fg-muted:       oklch(0.70 0 0);
     --color-fg-subtle:      oklch(0.55 0 0);
+    color-scheme: dark;
   }
 }
+
+:root[data-theme="dark"] {
+  --color-surface:        oklch(0.18 0 0);
+  --color-surface-muted:  oklch(0.22 0 0);
+  --color-surface-sunken: oklch(0.14 0 0);
+  --color-border:         oklch(0.30 0 0);
+  --color-fg:             oklch(0.95 0 0);
+  --color-fg-muted:       oklch(0.70 0 0);
+  --color-fg-subtle:      oklch(0.55 0 0);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
 
 html { color-scheme: light dark; }
 body {
@@ -265,6 +307,51 @@ If an app wants to suppress the default button (rare), pass an
 `InstallButton`-replacement via `headerActions` and additionally hide
 the auto-mounted one by overriding `AppShell`. Default is: show.
 
+### ThemeToggle
+
+`src/lib/ui/ThemeToggle.tsx` plus the `useTheme` hook in
+`src/lib/ui/useTheme.ts`. A ghost-variant button that cycles the theme
+system → light → dark on click, showing the matching `lucide-react` icon
+(`Monitor` / `Sun` / `Moon`) with a German `aria-label`/`title` and an
+`sr-only` label. `AppShell` auto-mounts it in the header's right slot — before
+`InstallButton`, so the always-present toggle keeps a stable position while the
+conditional install button appears/disappears. Unlike `InstallButton`, it is
+always visible.
+
+Props: none.
+
+`useTheme()` is exported for custom theme UIs:
+
+```typescript
+type Theme = "light" | "dark" | "system";
+
+type UseThemeResult = {
+  theme: Theme;                       // the user's choice
+  resolvedTheme: "light" | "dark";    // what's actually showing
+  setTheme: (t: Theme) => void;
+};
+```
+
+Behavior:
+- The choice persists in `localStorage` under the key `theme` (settings-only,
+  per `07-conventions.md`). Default is `"system"`.
+- `setTheme` writes `localStorage` and sets/removes `data-theme` on
+  `document.documentElement` (`"system"` removes it, so the CSS falls back to
+  `prefers-color-scheme`).
+- `resolvedTheme` tracks the live system preference via a
+  `matchMedia("(prefers-color-scheme: dark)")` listener while in `"system"` mode.
+- SSR-safe (`typeof window` guards).
+
+**FOUC prevention.** `themeInitScript` is an exported string to inline in
+`index.html` `<head>` before the stylesheet; it sets `data-theme` from
+`localStorage` before first paint:
+
+```html
+<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+```
+
+This is listed in the layout template's `postInstall` instructions.
+
 ### primitives.tsx
 
 Small reusable primitives co-located in one file (don't grow this past
@@ -293,6 +380,12 @@ export { AppNav } from "./AppNav.tsx";
 export type { NavItem, AppNavProps } from "./AppNav.tsx";
 export { PageHeader } from "./PageHeader.tsx";
 export type { PageHeaderProps } from "./PageHeader.tsx";
+export { InstallButton } from "./InstallButton.tsx";
+export { useInstallPrompt } from "./useInstallPrompt.ts";
+export type { UseInstallPromptResult } from "./useInstallPrompt.ts";
+export { ThemeToggle } from "./ThemeToggle.tsx";
+export { themeInitScript, useTheme } from "./useTheme.ts";
+export type { Theme, UseThemeResult } from "./useTheme.ts";
 export * from "./primitives.tsx";
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "layout",
-  "description": "AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, theme.css",
+  "description": "AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, ThemeToggle, theme.css",
   "files": [
     { "from": "AppShell.tsx", "to": "src/lib/ui/AppShell.tsx" },
     { "from": "AppHeader.tsx", "to": "src/lib/ui/AppHeader.tsx" },
@@ -9,6 +9,8 @@
     { "from": "primitives.tsx", "to": "src/lib/ui/primitives.tsx" },
     { "from": "InstallButton.tsx", "to": "src/lib/ui/InstallButton.tsx" },
     { "from": "useInstallPrompt.ts", "to": "src/lib/ui/useInstallPrompt.ts" },
+    { "from": "ThemeToggle.tsx", "to": "src/lib/ui/ThemeToggle.tsx" },
+    { "from": "useTheme.ts", "to": "src/lib/ui/useTheme.ts" },
     { "from": "theme.css", "to": "src/lib/ui/theme.css" },
     { "from": "index.ts", "to": "src/lib/ui/index.ts" }
   ],
@@ -19,6 +21,7 @@
     "Import theme: add `@import \"./lib/ui/theme.css\";` to your `src/index.css`",
     "Wrap your app in `<AppShell>...</AppShell>`",
     "Set the color accent: edit the `--accent-h` value in theme.css",
-    "Suggested accents: Hausverwaltung→250 (Slate-Blau), Tennisturnier→155 (Emerald), ErinnerMich→285 (Indigo)"
+    "Suggested accents: Hausverwaltung→250 (Slate-Blau), Tennisturnier→155 (Emerald), ErinnerMich→285 (Indigo)",
+    "Prevent theme flash: add this to <head> in index.html, before your stylesheet — <script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script> (also exported as `themeInitScript`)"
   ]
 }
