@@ -30,5 +30,6 @@
   "javascript": {
     "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
   },
+  "css": { "parser": { "tailwindDirectives": true } },
   "json": { "formatter": { "trailingCommas": "none" } }
 }

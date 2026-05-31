@@ -1,0 +1,30 @@
+name: web-base check
+
+# Reusable workflow: app repos call this to fail their CI when an owned
+# web-base building block has drifted from the base. Scaffold seams (theme
+# accent, db schema, routes, handlers) are ignored — only owned files are
+# guarded. See docs/specs/06-workflows.md for the caller pattern.
+
+on:
+  workflow_call:
+    inputs:
+      template:
+        description: "Baseline template to check against"
+        type: string
+        default: core
+      ref:
+        description: "web-base ref/tag to run the check with (pin to your app's webBase.version)"
+        type: string
+        default: main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+      - name: Check owned base files
+        run: bunx "github:daniel-rck/web-base#${{ inputs.ref }}" check "${{ inputs.template }}"

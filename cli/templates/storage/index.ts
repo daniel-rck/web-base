@@ -1,2 +1,2 @@
-export { clearAll, getDB, notifyMutation, type AppSchema } from "./db.ts";
-export { useLiveQuery, type LiveQueryResult } from "./useLiveQuery.ts";
+export { type AppSchema, clearAll, getDB, notifyMutation } from "./db.ts";
+export { type LiveQueryResult, useLiveQuery } from "./useLiveQuery.ts";

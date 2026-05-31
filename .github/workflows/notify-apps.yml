@@ -1,0 +1,70 @@
+name: Notify apps
+
+# Stage 2 (issue-notification): when a new web-base version is released, open an
+# "update available" issue in each consuming app repo. Updates stay manual — the
+# issue is the reminder to run `web-base update`. No write access to app *code*
+# is needed, only issues:write via the APP_NOTIFY_TOKEN secret (a PAT or GitHub
+# App token with access to the app repos). If the secret is absent, the workflow
+# no-ops. See docs/specs/06-workflows.md.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to announce (default: latest release tag)"
+        required: false
+        type: string
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo:
+          - daniel-rck/Hausverwaltung
+          - daniel-rck/Tennisturnier
+          - daniel-rck/ErinnerMich
+    steps:
+      - name: Open update-available issue
+        env:
+          GH_TOKEN: ${{ secrets.APP_NOTIFY_TOKEN }}
+          VERSION: ${{ github.event.release.tag_name || inputs.version }}
+          TARGET: ${{ matrix.repo }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "APP_NOTIFY_TOKEN not set — skipping notification for $TARGET."
+            exit 0
+          fi
+          if [ -z "${VERSION:-}" ]; then
+            echo "No version resolved (run from a release or pass the version input)." >&2
+            exit 1
+          fi
+          title="web-base ${VERSION} verfügbar"
+          # Avoid duplicates: skip if an open issue with this title already exists.
+          existing=$(gh issue list --repo "$TARGET" --state open --search "in:title \"$title\"" --json title --jq 'length')
+          if [ "$existing" != "0" ]; then
+            echo "Issue already open in $TARGET — skipping."
+            exit 0
+          fi
+          body=$(cat <<'EOF'
+          Eine neue web-base-Version ist veröffentlicht.
+
+          Diese App auf den neuen Stand bringen:
+
+          ```
+          bunx github:daniel-rck/web-base update core --apply
+          ```
+
+          Nur **owned**-Bausteine werden aktualisiert; **scaffold**-Nähte
+          (theme.css-Akzent, db.ts-Schema, routes, Worker-Handler) bleiben
+          unangetastet. Mit `bunx github:daniel-rck/web-base check` prüfst du
+          vorab, ob owned-Bausteine lokal abgewichen sind.
+
+          Changelog: https://github.com/daniel-rck/web-base/blob/main/CHANGELOG.md
+          EOF
+          )
+          gh issue create --repo "$TARGET" --title "$title" --body "$body"

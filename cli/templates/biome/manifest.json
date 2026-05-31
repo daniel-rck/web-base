@@ -13,6 +13,6 @@
     "Remove config files: eslint.config.js, .prettierrc*, .eslintrc*",
     "Remove devDeps: eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier",
     "Run: bun install",
-    "Run: bun run format && bun run lint"
+    "Run: bunx @biomejs/biome check --write . && bun run lint"
   ]
 }

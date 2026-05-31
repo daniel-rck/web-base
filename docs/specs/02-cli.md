@@ -103,7 +103,8 @@ type TemplateManifest = {
   files?: Array<{
     from: string;           // path inside the template dir
     to: string;             // destination path in the target repo
-    overwrite?: boolean;    // default false: skip if exists
+    overwrite?: boolean;    // default false: skip if exists (on `add`)
+    policy?: "owned" | "scaffold"; // default "owned"; see below
   }>;
 
   // Patched into the target's package.json
@@ -115,6 +116,27 @@ type TemplateManifest = {
   postInstall?: string[];
 };
 ```
+
+### File policy: owned vs scaffold
+
+Each file carries a `policy` (default `"owned"`) that decides how `update`
+treats it — this is what lets apps stay flexible while still being built from
+shared building blocks:
+
+- **`owned`** — a base building block (UI primitives, the layout shell, the
+  `idb`/`useLiveQuery` machinery, router/worker plumbing, `biome.json`). The app
+  should *not* hand-edit it; `update --apply` overwrites it so upstream fixes
+  flow in. If an owned file differs while the app is on the current version,
+  `update` flags it as a local edit that will be reverted.
+- **`scaffold`** — a per-app seam copied once as a starting point: `theme.css`
+  (the `--accent-h` accent), `db.ts` (the `AppSchema` + store setup),
+  `routes.ts`/`router.tsx` (the route table), `sw.ts`/`worker.ts` (app
+  handlers), `wrangler.toml` (app name + bindings), `LICENSE`/`SECURITY.md`.
+  `update` reports drift on these but **never** overwrites them, so per-app
+  customization survives.
+
+Customization happens by editing the scaffold seams and by composing the owned
+blocks from app code in `features/` — not by editing owned files in place.
 
 Example (`hygiene/manifest.json`):
 
@@ -255,17 +277,47 @@ Behavior:
    `webBase.version` against `WEB_BASE_VERSION`: `current` / `behind` / `ahead`
    / `unstamped`.
 3. For each file in `manifest.files`:
-   - If missing locally: report as `missing`.
    - If identical: report as `identical`.
-   - If differs: report as `differs` with line counts.
-4. Print a summary.
-5. If `--apply` is set, overwrite any differing/missing files with the template
-   source and stamp `webBase.version` (the stamp updates even when all files
-   were already identical, since `--apply` asserts the app pulled current source).
+   - Else if the file's `policy` is `scaffold`: report `scaffold, differs/missing
+     (left as-is)` — never queued for apply.
+   - Else (owned): report `missing`, or `differs` with line counts. An owned file
+     that differs while the app is on the current version is additionally flagged
+     as a local edit that `--apply` will revert.
+4. Print a summary (`N identical, N differs, N missing, N scaffold left as-is`).
+5. If `--apply` is set, overwrite the queued **owned** files (differing/missing)
+   with the template source and stamp `webBase.version` (the stamp updates even
+   when all files were already identical, since `--apply` asserts the app pulled
+   current source). Scaffold files are never overwritten.
 
 `update` does **not** patch `package.json` dependencies/scripts — only files
 (plus the `webBase.version` stamp on `--apply`). Dependency drift is visible
 through normal `bun outdated`.
+
+### `web-base check <template>`
+
+Read-only drift guard for CI. Verifies that the app's **owned** building blocks
+still match the template source; scaffold seams are ignored.
+
+```
+web-base check [template] [--cwd <dir>]
+```
+
+Behavior:
+
+1. Resolve the template (default `core`) including `extends`.
+2. For every **owned** file across the resolved templates:
+   - missing locally → the app doesn't use this block; skip (counted as absent).
+   - differs → record as drift and report line counts.
+   - identical → counts as matched.
+3. Scaffold files are never checked.
+4. If any owned file drifted, print an error and exit non-zero (so CI fails);
+   otherwise exit zero. Also warns when the app's stamped `webBase.version`
+   differs from the running CLI's version, since the comparison is against the
+   CLI's bundled templates.
+
+This is what makes the "owned files stay identical across apps" rule
+(`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`
+reusable workflow in `06-workflows.md`.
 
 ## File copy: behavior contract
 

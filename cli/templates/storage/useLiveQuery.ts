@@ -23,7 +23,6 @@ export function useLiveQuery<T>(
   const queryRef = useRef(query);
   queryRef.current = query;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deps are user-provided
   useEffect(() => {
     let cancelled = false;
 

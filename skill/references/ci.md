@@ -57,6 +57,33 @@ jobs:
 
 Don't fork the reusable workflow into a per-app copy.
 
+## Owned-drift guard (web-base-check.yml)
+
+Add this job so CI fails if an **owned** web-base building block was hand-edited
+in the app. Scaffold seams (theme accent, db schema, routes, handlers) are
+ignored, so per-app customization is fine.
+
+```yaml
+jobs:
+  ci:
+    uses: daniel-rck/web-base/.github/workflows/web-app-ci.yml@main
+
+  web-base-check:
+    uses: daniel-rck/web-base/.github/workflows/web-base-check.yml@main
+    with:
+      ref: v0.2.0   # pin to this app's webBase.version
+```
+
+When it fails, either `bunx github:daniel-rck/web-base update <template> --apply`
+to restore the base, or promote the change into the template upstream.
+
+## Update notifications (notify-apps.yml)
+
+This one lives **in web-base**, not in the apps. On a web-base release it opens
+an "update available" issue in each app repo (reminder to run
+`web-base update`). It needs an `APP_NOTIFY_TOKEN` secret with `issues:write` on
+the app repos; without it the workflow no-ops. See `06-workflows.md`.
+
 ## Deployment
 
 We do **not** deploy from GitHub Actions. Cloudflare Workers Builds is

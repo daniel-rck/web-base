@@ -78,10 +78,20 @@ postInstall:
 - "Remove config files: eslint.config.js, .prettierrc*, .eslintrc*"
 - "Remove devDeps: eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier"
 - "Run: bun install"
-- "Run: bun run format && bun run lint"
+- "Run: bunx @biomejs/biome check --write . && bun run lint"
+
+`check --write` (not `format`) is used for the setup step because `biome format`
+only reformats whitespace — it does not organize imports/exports, so a plain
+`format && lint` can still fail on import ordering. `biome check --write` applies
+formatting *and* the safe import-organization fixes in one pass.
 
 The per-app biome.json includes warnings for `noConsoleLog` and
 `noExplicitAny` — see `04-layout-system.md` for the full config.
+
+It also sets `css.parser.tailwindDirectives: true`. Without it Biome's CSS
+parser rejects the Tailwind 4 directives (`@theme`, `@apply`, `@custom-variant`,
+`@utility`) used by the `layout` template's `theme.css`, so `biome check` would
+fail on a freshly scaffolded app before any user code is written.
 
 ---
 
