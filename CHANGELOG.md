@@ -9,6 +9,22 @@ The version is bumped on every change (driven by the conventional-commit type:
 `web-base update <template> --apply`; the stamped `webBase.version` in an app's
 `package.json` records which base it last pulled.
 
+## [0.2.1] - 2026-06-12
+
+### Fixed
+
+- `bunx github:daniel-rck/web-base …` failed with `could not determine
+  executable to run`: the `bin` entry `cli/dist/index.js` was gitignored, and
+  Bun does not run `prepare` for Git dependencies, so the installed package
+  contained no executable. The bundled `cli/dist/index.js` is now committed;
+  `tools-ci.yml` fails when it drifts from a fresh build of `cli/src/`.
+
+### Added
+
+- Release process: every version bump gets a `vX.Y.Z` tag on `main` after
+  merge, so apps can pin `web-base-check.yml` (and `bunx`) to the version
+  recorded in their `webBase.version` stamp.
+
 ## [0.2.0] - 2026-05-31
 
 ### Added

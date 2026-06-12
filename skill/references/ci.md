@@ -71,7 +71,7 @@ jobs:
   web-base-check:
     uses: daniel-rck/web-base/.github/workflows/web-base-check.yml@main
     with:
-      ref: v0.2.0   # pin to this app's webBase.version
+      ref: v0.2.1   # pin to this app's webBase.version (tag must exist in web-base)
 ```
 
 When it fails, either `bunx github:daniel-rck/web-base update <template> --apply`

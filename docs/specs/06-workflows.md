@@ -204,8 +204,28 @@ jobs:
   web-base-check:
     uses: daniel-rck/web-base/.github/workflows/web-base-check.yml@main
     with:
-      ref: v0.2.0
+      ref: v0.2.1
 ```
+
+The `ref` is consumed as `bunx "github:daniel-rck/web-base#<ref>"`, so it must
+be an existing tag/branch in this repo **and** that ref must contain the
+committed `cli/dist/index.js` bundle (see `01-monorepo-structure.md` — Bun runs
+no `prepare` script for Git deps). Refs at or before `0.2.0` predate the
+committed bundle and cannot be executed via `bunx`; `v0.2.1` is the first
+usable pin.
+
+## Releasing web-base versions
+
+Every version bump (`package.json` + `cli/src/version.ts`, see `02-cli.md`)
+gets an annotated tag on `main` once the bump has merged:
+
+```
+git tag -a v0.2.1 -m "v0.2.1" && git push origin v0.2.1
+```
+
+The tags are what apps pin in `web-base-check.yml` (`ref:`) and what
+`notify-apps.yml` announces. Tag after merge, never on a feature branch —
+otherwise the tag points at a commit that may never reach `main`.
 
 ## notify-apps.yml (release → issue notifications)
 
