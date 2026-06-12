@@ -66,7 +66,7 @@ web-base carries one incrementing version, the single source of truth being
 `cli/src/version.ts`:
 
 ```typescript
-export const WEB_BASE_VERSION = "0.2.0";
+export const WEB_BASE_VERSION = "0.2.1";
 export function compareVersions(a: string, b: string): -1 | 0 | 1 { /* x.y.z */ }
 ```
 

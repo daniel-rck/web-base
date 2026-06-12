@@ -33,7 +33,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
     "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "bun run build"
+    "prepare": "bun run build"
   },
   "dependencies": {
     "citty": "^0.1.6",
@@ -55,6 +55,17 @@ github:daniel-rck/web-base`, Bun/npm clone the repo and execute the bin entry
 directly — having a single bundled file avoids the user needing to run
 `bun install` first. Templates under `cli/templates/` stay as files (not
 bundled) because the CLI reads them at runtime.
+
+**Decision: `cli/dist/index.js` is committed.** Bun installs Git dependencies
+from the repo tarball as-is and runs no lifecycle scripts (`prepare` is
+ignored), so if the bin entry only exists after a build step, `bunx
+github:daniel-rck/web-base` fails with `could not determine executable to run`.
+The bundled file is therefore checked in, and `tools-ci.yml` rebuilds it and
+fails on `git diff -- cli/dist` so the committed bundle can't drift from
+`cli/src/`. After changing CLI source, run `bun run build` and commit the
+updated bundle (the `prepare` script does this on every local `bun install`
+too). The alternative — publishing to npm so a packed tarball with a
+`prepublishOnly` build is served — was rejected; see below.
 
 **Decision: no npm publish.** Distribution is via `bunx github:...` only. The
 `files` array still exists for the future case where we decide to publish.
@@ -144,11 +155,14 @@ shipped to apps (only `biome.json` is listed in the template manifest).
 
 ```
 node_modules/
-cli/dist/
 .wrangler/
 *.log
 .DS_Store
 ```
+
+`cli/dist/` is intentionally **not** ignored — the committed bundle is what
+makes `bunx github:...` work (see the decision above). Biome skips it via
+`files.includes` in `biome.json`.
 
 ## File presence checklist
 

@@ -21,6 +21,14 @@ jobs:
       - run: bun run test
       - run: bun run build
 
+      - name: Verify committed cli/dist matches a fresh build
+        run: |
+          # cli/dist/index.js is committed because `bunx github:...` installs
+          # the repo tarball as-is — Bun runs no prepare script for Git deps,
+          # so the bin entry must already exist in the tree. Fail if the
+          # committed bundle drifted from cli/src/ (fix: bun run build, commit).
+          git diff --exit-code -- cli/dist
+
       - name: Verify CLI runs
         run: |
           chmod +x cli/dist/index.js
