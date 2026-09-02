@@ -12,8 +12,8 @@
     { "from": "ThemeToggle.tsx", "to": "src/lib/ui/ThemeToggle.tsx" },
     { "from": "useTheme.ts", "to": "src/lib/ui/useTheme.ts" },
     { "from": "theme.css", "to": "src/lib/ui/theme.css", "policy": "scaffold" },
-    { "from": "theme-init.js", "to": "public/theme-init.js" },
-    { "from": "index.ts", "to": "src/lib/ui/index.ts" }
+    { "from": "theme-init.js", "to": "public/theme-init.js", "policy": "scaffold" },
+    { "from": "index.ts", "to": "src/lib/ui/index.ts", "policy": "scaffold" }
   ],
   "dependencies": {
     "lucide-react": "^1.39.0"

@@ -45,6 +45,14 @@ The version is bumped on every change (driven by the conventional-commit type:
   Apps already on 0.3.0 rename their `biome.json` to `biome.base.json` and add
   a thin `biome.json` that extends it.
 
+- **`public/theme-init.js` and `src/lib/ui/index.ts` are `scaffold`**, for the
+  same reason. The theme-init script's own header says an app that persists the
+  theme elsewhere adapts the read — Tennisturnier carries a one-time migration
+  off its old storage key, Zeiterfassung reads a settings blob — so it was never
+  going to be byte-identical. And a barrel lists what the app actually has:
+  Tonspur exports `InstallButton` and `primitives` and nothing else, because it
+  has nothing else.
+
 - **`src/lib/db/index.ts` is `scaffold`.** The db barrel is the app's own
   public surface: Tonspur exports `getKV`/`setKV` and no `useLiveQuery` because
   it has none, Pizzateig re-exports its recipes module. A shared template cannot
