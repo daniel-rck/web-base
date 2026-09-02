@@ -133,6 +133,10 @@ that machinery first, then raises the baseline it distributes.
 
 ### Added
 
+- **`AppShell` takes an optional `themeToggle` slot.** The built-in toggle is
+  labelled in German, so an app with i18n previously had to either drop it from
+  the shell or ship a second control elsewhere — Tennisturnier did both.
+
 - **`SectionCard` and `Chip` primitives, and a `Card interactive` prop.**
   Promoted from Pizzateig, which had grown all three locally. A titled section
   wrapper and a selectable pill are needed in every app in the fleet, and

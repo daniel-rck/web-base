@@ -9,10 +9,23 @@ export type AppShellProps = {
   logo?: ReactNode;
   navItems: NavItem[];
   headerActions?: ReactNode;
+  /**
+   * Replaces the built-in theme toggle. The default is labelled in German;
+   * an app with i18n passes its own translated toggle here rather than
+   * shipping a second control somewhere else.
+   */
+  themeToggle?: ReactNode;
   children: ReactNode;
 };
 
-export function AppShell({ title, logo, navItems, headerActions, children }: AppShellProps) {
+export function AppShell({
+  title,
+  logo,
+  navItems,
+  headerActions,
+  themeToggle,
+  children,
+}: AppShellProps) {
   return (
     <div className="min-h-screen flex flex-col bg-surface text-fg">
       <AppHeader
@@ -20,7 +33,7 @@ export function AppShell({ title, logo, navItems, headerActions, children }: App
         logo={logo}
         actions={
           <>
-            <ThemeToggle />
+            {themeToggle ?? <ThemeToggle />}
             <InstallButton />
             {headerActions}
           </>
