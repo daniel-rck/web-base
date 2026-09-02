@@ -33,6 +33,18 @@ The version is bumped on every change (driven by the conventional-commit type:
   Apps already on 0.3.0 rename their `biome.json` to `biome.base.json` and add
   a thin `biome.json` that extends it.
 
+- **`CONTRIBUTING.md` and `.editorconfig` are `scaffold`**, joining `LICENSE`
+  and `SECURITY.md` — so every file in the `hygiene` template is now a per-app
+  starting point.
+
+  Same reasoning as the Biome split, found the same way. Four of the nine apps
+  had rewritten CONTRIBUTING.md substantially, and rightly: it documents the
+  app's real quality gates (`bun run verify` in one repo, `lint`/`typecheck`/
+  `test` in another) and its architecture warnings. `.editorconfig` likewise
+  grows sections for whatever languages a repo actually contains. As `owned`
+  files those read as permanent drift, and `check` would demand reverting
+  genuinely better content.
+
 ## [0.3.0] - 2026-09-02
 
 Fleet-alignment release. The nine app repos had drifted far enough that the

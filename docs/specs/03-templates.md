@@ -46,6 +46,18 @@ imports from storage (for `useLiveQuery` examples) and from router (for
 
 Installs repo-hygiene files. See `07-conventions.md` for the exact content.
 
+**Every file here is `scaffold`.** These four are per-repo by nature and the
+fleet proves it: the LICENSE carries a holder and year, SECURITY.md a scope,
+`.editorconfig` sections for whatever languages the repo actually contains, and
+CONTRIBUTING.md the app's real quality gates — `bun run verify` in one repo,
+`lint`/`typecheck`/`test` in another — plus its architecture warnings. Four of
+the nine apps had rewritten CONTRIBUTING.md substantially, and under an `owned`
+policy each of those read as permanent drift that `check` would demand be
+reverted, destroying genuinely better guidance.
+
+The template is therefore a starting point that `update` never overwrites, and
+the `hygiene` block contributes no guarantees to `web-base check`.
+
 > The app-facing Biome config is `cli/templates/biome/biome.json`. **Not** the
 > repo's own root `biome.json` — that one is tuned for a CLI repo
 > (`domains: { project }`, `!**/cli/dist` excludes) and copying it into an app
