@@ -46,6 +46,18 @@ imports from storage (for `useLiveQuery` examples) and from router (for
 
 Installs repo-hygiene files. See `07-conventions.md` for the exact content.
 
+**Every file here is `scaffold`.** These four are per-repo by nature and the
+fleet proves it: the LICENSE carries a holder and year, SECURITY.md a scope,
+`.editorconfig` sections for whatever languages the repo actually contains, and
+CONTRIBUTING.md the app's real quality gates — `bun run verify` in one repo,
+`lint`/`typecheck`/`test` in another — plus its architecture warnings. Four of
+the nine apps had rewritten CONTRIBUTING.md substantially, and under an `owned`
+policy each of those read as permanent drift that `check` would demand be
+reverted, destroying genuinely better guidance.
+
+The template is therefore a starting point that `update` never overwrites, and
+the `hygiene` block contributes no guarantees to `web-base check`.
+
 > The app-facing Biome config is `cli/templates/biome/biome.json`. **Not** the
 > repo's own root `biome.json` — that one is tuned for a CLI repo
 > (`domains: { project }`, `!**/cli/dist` excludes) and copying it into an app
@@ -70,10 +82,24 @@ postInstall:
 Replaces ESLint + Prettier with Biome.
 
 Files:
-- `biome.json` → `biome.json` (the per-app config, slightly less strict than the web-base repo's)
+- `biome.base.json` → `biome.base.json` — the shared rules. **owned**
+- `biome.json` → `biome.json` — `extends` the base, holds per-app `overrides`. **scaffold**
+
+**Decision: two files, not one.** A single owned config cannot survive contact
+with the fleet. Several apps have overrides that are load-bearing and correct —
+turning the formatter off for generated data modules whose generator would
+otherwise re-break lint on every run, scoping a `noRestrictedGlobals` deny-list
+to a purity-guarded directory, relaxing `noNonNullAssertion` in tests. Under one
+owned file each of those reads as permanent drift, leaving only bad options:
+disable the drift guard in exactly the repos that need it, or run them red
+forever. The split lets `check` guard the shared rules byte-for-byte while apps
+keep their seams.
+
+Apps put exceptions in `biome.json` and never touch `biome.base.json` — `update`
+overwrites it.
 
 devDependencies:
-- `@biomejs/biome`: `^2.4.15`
+- `@biomejs/biome`: `^2.5.11`
 
 scripts:
 - `lint`: `biome check .`
@@ -90,8 +116,14 @@ only reformats whitespace — it does not organize imports/exports, so a plain
 `format && lint` can still fail on import ordering. `biome check --write` applies
 formatting *and* the safe import-organization fixes in one pass.
 
-The per-app biome.json includes warnings for `noConsoleLog` and
-`noExplicitAny` — see `04-layout-system.md` for the full config.
+`biome.base.json` sets `noConsole` (allowing `error`/`warn`), `noExplicitAny`,
+`noNonNullAssertion` and `useExhaustiveDependencies` to `warn`, and enables the
+`react` and `test` lint domains. The full file is
+`cli/templates/biome/biome.base.json`.
+
+> Do not copy the web-base repo's **own** root `biome.json` into an app. It is
+> tuned for a CLI repo (`domains: { project }`, `!**/cli/dist` excludes) and
+> silently disables the React and test lint domains an app needs.
 
 It also sets `css.parser.tailwindDirectives: true`. Without it Biome's CSS
 parser rejects the Tailwind 4 directives (`@theme`, `@apply`, `@custom-variant`,

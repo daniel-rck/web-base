@@ -1,14 +1,16 @@
 {
   "name": "hygiene",
-  "description": "LICENSE, CONTRIBUTING, SECURITY, .editorconfig",
+  "description": "LICENSE, CONTRIBUTING, SECURITY, .editorconfig — all per-app starting points",
   "files": [
     { "from": "LICENSE", "to": "LICENSE", "policy": "scaffold" },
-    { "from": "CONTRIBUTING.md", "to": "CONTRIBUTING.md" },
+    { "from": "CONTRIBUTING.md", "to": "CONTRIBUTING.md", "policy": "scaffold" },
     { "from": "SECURITY.md", "to": "SECURITY.md", "policy": "scaffold" },
-    { "from": "editorconfig", "to": ".editorconfig" }
+    { "from": "editorconfig", "to": ".editorconfig", "policy": "scaffold" }
   ],
   "postInstall": [
     "Edit LICENSE to set the current year if needed",
-    "Verify SECURITY.md matches your disclosure preferences"
+    "Verify SECURITY.md matches your disclosure preferences",
+    "Adjust CONTRIBUTING.md to the app's actual quality gates and architecture notes",
+    "Add .editorconfig sections for any other languages the repo contains"
   ]
 }

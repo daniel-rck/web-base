@@ -9,6 +9,78 @@ The version is bumped on every change (driven by the conventional-commit type:
 `web-base update <template> --apply`; the stamped `webBase.version` in an app's
 `package.json` records which base it last pulled.
 
+## [0.3.1] - 2026-09-02
+
+### Fixed
+
+- **`check` treated a partially adopted block as drift.** Taking `primitives`
+  and `InstallButton` without `AppNav` is the right call for a single-route
+  app, and the guard called it a hole. Absence is now never drift — only
+  differing content is. An app that has adopted nothing at all still fails, and
+  `--strict` remains the opt-in for asserting full adoption.
+
+- **`useLiveQuery` could overwrite fresh data with stale data.** A mutation can
+  re-run the query while an earlier run is still awaiting, and IndexedDB gives
+  no ordering guarantee between them — so the slower, older query could resolve
+  last and win. The hook now tracks a run token and only lets the most recently
+  started run commit.
+
+  Found by wiring the drift guard into the apps for the first time: Pizzateig
+  had fixed this locally and the divergence showed up as drift. Promoted here
+  so every app gets it, which is what the owned/scaffold split is for.
+
+### Changed
+
+- **The Biome config is now two files.** `biome.base.json` carries the shared
+  rules and is `owned`; `biome.json` extends it, holds per-app `overrides`, and
+  is `scaffold`.
+
+  **Decision: a single owned `biome.json` cannot survive contact with the
+  fleet.** Four apps have overrides that are load-bearing and correct —
+  Tonspur turns the formatter off for two generated data modules whose
+  generator would otherwise re-break lint on every run, HamsterFlight scopes a
+  `noRestrictedGlobals` deny-list to `src/sim/**` as the lint half of its
+  sim-purity guard, and two apps relax `noNonNullAssertion` in tests. Under one
+  owned file each of those reads as permanent drift, which leaves only bad
+  options: turn the drift guard off in exactly the repos that need it, or run
+  them red forever. Splitting lets `check` guard the shared rules byte-for-byte
+  while apps keep their seams. Verified that Biome 2.5.11 resolves a
+  relative-path `extends` and layers app `overrides` on top of the inherited
+  rules.
+
+  Apps already on 0.3.0 rename their `biome.json` to `biome.base.json` and add
+  a thin `biome.json` that extends it.
+
+- **`tsconfig.sw.json` and `tsconfig.worker.json` are `scaffold`.** They carry
+  `include` paths, `types` and `tsBuildInfoFile` — Pizzateig's worker needs
+  `allowImportingTsExtensions`, Tennisturnier's compiles `functions/**` too.
+  The strictness they encode is the point; the file around it is per-app.
+
+- **`public/theme-init.js` and `src/lib/ui/index.ts` are `scaffold`**, for the
+  same reason. The theme-init script's own header says an app that persists the
+  theme elsewhere adapts the read — Tennisturnier carries a one-time migration
+  off its old storage key, Zeiterfassung reads a settings blob — so it was never
+  going to be byte-identical. And a barrel lists what the app actually has:
+  Tonspur exports `InstallButton` and `primitives` and nothing else, because it
+  has nothing else.
+
+- **`src/lib/db/index.ts` is `scaffold`.** The db barrel is the app's own
+  public surface: Tonspur exports `getKV`/`setKV` and no `useLiveQuery` because
+  it has none, Pizzateig re-exports its recipes module. A shared template cannot
+  own a list of what each app happens to contain.
+
+- **`CONTRIBUTING.md` and `.editorconfig` are `scaffold`**, joining `LICENSE`
+  and `SECURITY.md` — so every file in the `hygiene` template is now a per-app
+  starting point.
+
+  Same reasoning as the Biome split, found the same way. Four of the nine apps
+  had rewritten CONTRIBUTING.md substantially, and rightly: it documents the
+  app's real quality gates (`bun run verify` in one repo, `lint`/`typecheck`/
+  `test` in another) and its architecture warnings. `.editorconfig` likewise
+  grows sections for whatever languages a repo actually contains. As `owned`
+  files those read as permanent drift, and `check` would demand reverting
+  genuinely better content.
+
 ## [0.3.0] - 2026-09-02
 
 Fleet-alignment release. The nine app repos had drifted far enough that the

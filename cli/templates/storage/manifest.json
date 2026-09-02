@@ -4,7 +4,7 @@
   "files": [
     { "from": "db.ts", "to": "src/lib/db/db.ts", "policy": "scaffold" },
     { "from": "useLiveQuery.ts", "to": "src/lib/db/useLiveQuery.ts" },
-    { "from": "index.ts", "to": "src/lib/db/index.ts" }
+    { "from": "index.ts", "to": "src/lib/db/index.ts", "policy": "scaffold" }
   ],
   "dependencies": {
     "idb": "^8.0.3"

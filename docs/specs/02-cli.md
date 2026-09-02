@@ -330,22 +330,24 @@ Behavior:
 3. Then judge **per building block**, not per file:
    - Not one owned file of a template is present → the app does not use that
      block. Report it as `not adopted` and move on.
-   - The block *is* present but some owned files are missing → those missing
-     files are drift, because a half-installed block is a hole in the base.
+   - The block is present but incomplete → reported as partially adopted, not
+     as drift. Taking `primitives` and `InstallButton` without `AppNav` is a
+     legitimate choice for a single-route app; `--strict` is how an app that
+     means to be fully on the base turns that into a failure.
 4. If any owned file drifted, or no owned file matched anywhere, print an error
    and exit non-zero. `--strict` additionally fails when a block was never
    adopted. Also warns when the app's stamped `webBase.version` differs from
    the running CLI's version, since the comparison is against the CLI's bundled
    templates.
 
-**Decision: presence is judged per template, not per file.** Treating any
-missing owned file as drift would fail HamsterFlight on every layout, storage
-and router file — a pixi.js canvas game will never have them, and that is a
-recorded decision, not rot. Treating a missing file as always-fine was the
-opposite failure: an app that had adopted nothing at all passed the guard
-silently. Per-block presence separates "doesn't use this" from "installed it
-and then lost half of it". Use `--strict` in apps that assert full `core`
-adoption; never in HamsterFlight.
+**Decision: a missing owned file is never drift; only differing content is.**
+Treating absence as drift fails HamsterFlight on every layout, storage and
+router file — a pixi.js canvas game will never have them — and fails Tonspur
+for taking `primitives` without `AppNav`, which is the right call for a
+single-route app. The opposite failure, treating absence as always-fine, let an
+app that had adopted nothing pass silently; that is caught separately by
+failing when *no* owned file matches anywhere. `--strict` is the opt-in for an
+app that asserts full `core` adoption; never use it in HamsterFlight.
 
 This is what makes the "owned files stay identical across apps" rule
 (`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`

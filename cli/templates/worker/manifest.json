@@ -4,7 +4,7 @@
   "files": [
     { "from": "worker.ts", "to": "worker/index.ts", "policy": "scaffold" },
     { "from": "wrangler.toml", "to": "wrangler.toml", "policy": "scaffold" },
-    { "from": "tsconfig.worker.json", "to": "tsconfig.worker.json" }
+    { "from": "tsconfig.worker.json", "to": "tsconfig.worker.json", "policy": "scaffold" }
   ],
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260902.1",

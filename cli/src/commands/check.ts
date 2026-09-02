@@ -57,25 +57,25 @@ export const checkCommand = defineCommand({
       let matched = 0;
       const drifted: string[] = [];
       const unadopted: string[] = [];
+      const partial: string[] = [];
 
       for (const [leaf, r] of byLeaf) {
         matched += r.matched.length;
         drifted.push(...r.drifted);
+        if (r.missing.length === 0) continue;
         if (r.matched.length + r.drifted.length === 0) {
           // Not one owned file of this block is present: the app doesn't use it.
-          // HamsterFlight has no layout/storage/router and never will — that is
-          // a decision, not drift.
-          if (r.missing.length > 0) {
-            unadopted.push(leaf);
-            consola.info(`  ${leaf} — not adopted (${r.missing.length} owned files absent)`);
-          }
+          // HamsterFlight has no layout/storage/router and never will.
+          unadopted.push(leaf);
+          consola.info(`  ${leaf} — not adopted (${r.missing.length} owned files absent)`);
           continue;
         }
-        // The block *is* adopted, so a missing owned file is a hole in it.
-        for (const file of r.missing) {
-          drifted.push(file);
-          consola.warn(`  ${file} — missing (template "${leaf}" is otherwise adopted)`);
-        }
+        // Partial adoption is legitimate, not a hole: Tonspur takes primitives
+        // and InstallButton without AppNav or PageHeader, because a single-route
+        // game has no navigation. Report it, but let `--strict` decide whether
+        // an app that means to be fully on the base should fail.
+        partial.push(...r.missing);
+        consola.info(`  ${leaf} — partially adopted (${r.missing.length} owned files absent)`);
       }
 
       if (drifted.length > 0) {
@@ -93,15 +93,25 @@ export const checkCommand = defineCommand({
         process.exitCode = 1;
         return;
       }
-      if (strict && unadopted.length > 0) {
+      if (strict && (unadopted.length > 0 || partial.length > 0)) {
+        const detail = [
+          unadopted.length > 0 ? `${unadopted.length} block(s) not adopted` : "",
+          partial.length > 0 ? `${partial.length} owned file(s) absent` : "",
+        ]
+          .filter(Boolean)
+          .join(", ");
         consola.error(
-          `web-base check: ${unadopted.length} building block(s) not adopted: ${unadopted.join(", ")}. ` +
+          `web-base check: ${detail}. ` +
             "Run `web-base add <template>`, or drop --strict if the app deliberately does without them.",
         );
         process.exitCode = 1;
         return;
       }
-      const skipped = unadopted.length > 0 ? ` (${unadopted.join(", ")} not adopted)` : "";
+      const notes = [
+        unadopted.length > 0 ? `${unadopted.join(", ")} not adopted` : "",
+        partial.length > 0 ? `${partial.length} owned file(s) absent` : "",
+      ].filter(Boolean);
+      const skipped = notes.length > 0 ? ` (${notes.join("; ")})` : "";
       consola.success(`web-base check: ${matched} owned files match${skipped}.`);
     } catch (err) {
       consola.error((err as Error).message);
