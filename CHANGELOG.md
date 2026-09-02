@@ -45,6 +45,11 @@ The version is bumped on every change (driven by the conventional-commit type:
   Apps already on 0.3.0 rename their `biome.json` to `biome.base.json` and add
   a thin `biome.json` that extends it.
 
+- **`tsconfig.sw.json` and `tsconfig.worker.json` are `scaffold`.** They carry
+  `include` paths, `types` and `tsBuildInfoFile` — Pizzateig's worker needs
+  `allowImportingTsExtensions`, Tennisturnier's compiles `functions/**` too.
+  The strictness they encode is the point; the file around it is per-app.
+
 - **`public/theme-init.js` and `src/lib/ui/index.ts` are `scaffold`**, for the
   same reason. The theme-init script's own header says an app that persists the
   theme elsewhere adapts the read — Tennisturnier carries a one-time migration
