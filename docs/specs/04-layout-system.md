@@ -206,6 +206,8 @@ type AppShellProps = {
   logo?: ReactNode;
   navItems: NavItem[];
   headerActions?: ReactNode;
+  /** Replaces the built-in ThemeToggle — for apps with i18n. */
+  themeToggle?: ReactNode;
   children: ReactNode;
 };
 ```
