@@ -11,6 +11,18 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ## [0.3.1] - 2026-09-02
 
+### Fixed
+
+- **`useLiveQuery` could overwrite fresh data with stale data.** A mutation can
+  re-run the query while an earlier run is still awaiting, and IndexedDB gives
+  no ordering guarantee between them — so the slower, older query could resolve
+  last and win. The hook now tracks a run token and only lets the most recently
+  started run commit.
+
+  Found by wiring the drift guard into the apps for the first time: Pizzateig
+  had fixed this locally and the divergence showed up as drift. Promoted here
+  so every app gets it, which is what the owned/scaffold split is for.
+
 ### Changed
 
 - **The Biome config is now two files.** `biome.base.json` carries the shared
@@ -32,6 +44,11 @@ The version is bumped on every change (driven by the conventional-commit type:
 
   Apps already on 0.3.0 rename their `biome.json` to `biome.base.json` and add
   a thin `biome.json` that extends it.
+
+- **`src/lib/db/index.ts` is `scaffold`.** The db barrel is the app's own
+  public surface: Tonspur exports `getKV`/`setKV` and no `useLiveQuery` because
+  it has none, Pizzateig re-exports its recipes module. A shared template cannot
+  own a list of what each app happens to contain.
 
 - **`CONTRIBUTING.md` and `.editorconfig` are `scaffold`**, joining `LICENSE`
   and `SECURITY.md` — so every file in the `hygiene` template is now a per-app
