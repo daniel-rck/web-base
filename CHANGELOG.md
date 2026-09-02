@@ -9,6 +9,30 @@ The version is bumped on every change (driven by the conventional-commit type:
 `web-base update <template> --apply`; the stamped `webBase.version` in an app's
 `package.json` records which base it last pulled.
 
+## [0.3.1] - 2026-09-02
+
+### Changed
+
+- **The Biome config is now two files.** `biome.base.json` carries the shared
+  rules and is `owned`; `biome.json` extends it, holds per-app `overrides`, and
+  is `scaffold`.
+
+  **Decision: a single owned `biome.json` cannot survive contact with the
+  fleet.** Four apps have overrides that are load-bearing and correct —
+  Tonspur turns the formatter off for two generated data modules whose
+  generator would otherwise re-break lint on every run, HamsterFlight scopes a
+  `noRestrictedGlobals` deny-list to `src/sim/**` as the lint half of its
+  sim-purity guard, and two apps relax `noNonNullAssertion` in tests. Under one
+  owned file each of those reads as permanent drift, which leaves only bad
+  options: turn the drift guard off in exactly the repos that need it, or run
+  them red forever. Splitting lets `check` guard the shared rules byte-for-byte
+  while apps keep their seams. Verified that Biome 2.5.11 resolves a
+  relative-path `extends` and layers app `overrides` on top of the inherited
+  rules.
+
+  Apps already on 0.3.0 rename their `biome.json` to `biome.base.json` and add
+  a thin `biome.json` that extends it.
+
 ## [0.3.0] - 2026-09-02
 
 Fleet-alignment release. The nine app repos had drifted far enough that the

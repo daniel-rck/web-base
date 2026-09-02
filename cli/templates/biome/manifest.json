@@ -1,7 +1,10 @@
 {
   "name": "biome",
-  "description": "biome.json + lint/format scripts (replaces ESLint + Prettier)",
-  "files": [{ "from": "biome.json", "to": "biome.json" }],
+  "description": "biome.base.json (shared rules) + biome.json (per-app overrides) + lint/format scripts",
+  "files": [
+    { "from": "biome.base.json", "to": "biome.base.json" },
+    { "from": "biome.json", "to": "biome.json", "policy": "scaffold" }
+  ],
   "devDependencies": {
     "@biomejs/biome": "^2.5.11"
   },
@@ -12,6 +15,7 @@
   "postInstall": [
     "Remove config files: eslint.config.js, .prettierrc*, .eslintrc*",
     "Remove devDeps: eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier",
+    "Put per-app exceptions in biome.json's `overrides` — never edit biome.base.json, it is centrally managed and `update` overwrites it",
     "Run: bun install",
     "Run: bunx @biomejs/biome check --write . && bun run lint"
   ]

@@ -6,7 +6,7 @@
  * `init`/`add`/`update --apply` stamp this into a consuming app's package.json
  * (`webBase.version`), so `web-base update` can report whether an app is behind.
  */
-export const WEB_BASE_VERSION = "0.3.0";
+export const WEB_BASE_VERSION = "0.3.1";
 
 /** Compare two `x.y.z` version strings. Returns -1 (a<b), 0 (a==b), 1 (a>b). */
 export function compareVersions(a: string, b: string): -1 | 0 | 1 {
