@@ -1,6 +1,6 @@
 ---
 name: daniel-rck-web-app
-description: Conventions and patterns for the personal web apps under daniel-rck (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 6 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + Biome. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
+description: Conventions and patterns for the personal web apps under daniel-rck (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + Biome. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", "Minispiele", "Tankzettel", "Zeiterfassung", "Pizzateig", "Tonspur", "HamsterFlight", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ---
 
 # daniel-rck Web App Conventions
@@ -14,9 +14,20 @@ through `@daniel-rck/web-base`.
 
 | App | Domain | Hosted at |
 |---|---|---|
+| ErinnerMich | Erinnerungen, Habits, Mood | `erinnermich.daniel-rck.workers.dev` |
 | Hausverwaltung | Mieter-, Objekt- und Abrechnungsverwaltung | `hausverwaltung.daniel-rck.workers.dev` |
+| Minispiele | Browser-Minispiele | `minispiele.daniel-rck.workers.dev` |
+| Pizzateig | Teigrechner nach Bäcker-Prozent | `pizzateig.daniel-rck.workers.dev` |
+| Tankzettel | Tankbelege erfassen und auswerten | `tankzettel.daniel-rck.workers.dev` |
 | Tennisturnier | Turnierplanung, Spielpläne, Ergebnisse | `tennisturnier.daniel-rck.workers.dev` |
-| ErinnerMich | Erinnerungen, Push-Benachrichtigungen | `erinnermich.daniel-rck.workers.dev` |
+| Tonspur | Titelmelodie-Ratespiel | `tonspur.daniel-rck.workers.dev` |
+| Zeiterfassung | Timer, Projekte, Reports, Rechnungen | `zeiterfassung.daniel-rck.workers.dev` |
+| HamsterFlight | pixi.js-Portierung eines Flash-Spiels | `hamsterflight.daniel-rck.workers.dev` |
+
+**HamsterFlight is the deliberate exception**: a pixi.js canvas game with no
+React, no Tailwind, no router, no `src/lib/ui` and no PWA. It shares the
+tooling baseline (Bun, Biome, CI, hygiene) and nothing else. Don't "align" its
+rendering code — see `docs/specs/08-app-migrations.md`.
 
 Future apps follow the same shape unless the deviation is documented in their
 own `docs/specs/`.
@@ -24,7 +35,7 @@ own `docs/specs/`.
 ## The baseline stack
 
 - React 19, Vite 8, Tailwind 4
-- TypeScript 6, strict + `noUncheckedIndexedAccess`
+- TypeScript 7, strict + `noUncheckedIndexedAccess`
 - Bun as runtime + package manager (no npm/yarn/pnpm lockfiles)
 - Cloudflare Workers + Workers Assets (one Worker per app)
 - IndexedDB via `idb` + a small `useLiveQuery` hook
@@ -47,7 +58,17 @@ bunx github:daniel-rck/web-base init           # scaffold a new app
 bunx github:daniel-rck/web-base add core       # all shared pieces
 bunx github:daniel-rck/web-base add sync       # extras only some apps have
 bunx github:daniel-rck/web-base update layout  # diff local against template
+bunx github:daniel-rck/web-base update core --apply  # pull every owned block
+bunx github:daniel-rck/web-base check          # fail on drift in owned files
 ```
+
+`update` and `check` both expand a meta-template's `extends`, so `core` covers
+every building block in one call.
+
+**`check` is the authority on conformance, not the `webBase.version` stamp.**
+The stamp records which base an app last pulled *something* from — `add hygiene`
+alone stamps the full current version — so it is provenance, not proof. Apps
+wire `web-base-check.yml` into CI to keep owned blocks honest.
 
 ## Architecture invariants
 

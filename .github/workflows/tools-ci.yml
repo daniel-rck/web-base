@@ -59,7 +59,50 @@ jobs:
           git init -q && touch .gitignore   # biome.json uses vcs.useIgnoreFile
           echo '{"name":"scratch","version":"0.0.0"}' > package.json
           node ${{ github.workspace }}/cli/dist/index.js add core
-          bunx --bun @biomejs/biome@2.4.15 check .
+          bunx --bun @biomejs/biome@2.5.11 check .
+
+      - name: Smoke test - check passes on a fresh scaffold
+        run: |
+          # `check` is the drift guard nine app CIs call. If it can't come back
+          # clean against templates it just installed itself, it is worthless.
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
+          git init -q && touch .gitignore
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add core
+          node ${{ github.workspace }}/cli/dist/index.js check core
+          node ${{ github.workspace }}/cli/dist/index.js check core --strict
+
+      - name: Regression - update core is not a no-op
+        run: |
+          # `update` used to load a single manifest without expanding `extends`,
+          # so `update core --apply` — the command notify-apps.yml sends to every
+          # app — silently did nothing.
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
+          git init -q && touch .gitignore
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add core
+          rm src/lib/ui/primitives.tsx
+          node ${{ github.workspace }}/cli/dist/index.js update core --apply
+          test -f src/lib/ui/primitives.tsx
+
+      - name: Regression - --force must not clobber a scaffold seam
+        run: |
+          # wrangler.toml is a scaffold seam holding live Cloudflare R2/KV
+          # binding IDs. A --force that replaced it with the template's
+          # placeholders would take production sync down on the next deploy.
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
+          git init -q && touch .gitignore
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add core
+          echo 'id = "PRODUCTION-KV-ID"' >> wrangler.toml
+          node ${{ github.workspace }}/cli/dist/index.js add core --force
+          grep -q 'PRODUCTION-KV-ID' wrangler.toml
 
       - name: Verify skill/template alignment
         run: |

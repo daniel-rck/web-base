@@ -86,7 +86,7 @@ jobs:
 Or to pin to a tag (recommended for stability once web-base has releases):
 
 ```yaml
-    uses: daniel-rck/web-base/.github/workflows/web-app-ci.yml@v1
+    uses: daniel-rck/web-base/.github/workflows/web-app-ci.yml@main
 ```
 
 To override inputs:

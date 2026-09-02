@@ -17,7 +17,7 @@ skill/
     ├── worker.md
     ├── sync.md
     ├── ci.md
-    └── repo-hygiene.md
+    └── hygiene.md
 ```
 
 `SKILL.md` is loaded into Claude's context when the skill triggers. References
@@ -46,7 +46,7 @@ One-paragraph statement of purpose.
 
 ### `## The apps in scope`
 
-A table of the three apps with their URL and one-line description.
+A table of the nine apps with their URL and one-line description.
 
 ### `## The baseline stack`
 
@@ -84,7 +84,7 @@ A table mapping topics to reference files:
 | /api/* routing, R2/KV bindings, wrangler local dev | `worker.md` |
 | Hausverwaltung sync architecture | `sync.md` |
 | Reusable workflow caller pattern | `ci.md` |
-| LICENSE, CONTRIBUTING, SECURITY, package.json metadata | `repo-hygiene.md` |
+| LICENSE, CONTRIBUTING, SECURITY, package.json metadata | `hygiene.md` |
 
 The body says explicitly: "Don't read all references upfront. Pick what's
 relevant to the current task."
@@ -147,7 +147,7 @@ people *using* the layout day-to-day.
 ### `references/worker.md`
 
 - The `worker/index.ts` routing pattern
-- How `__STATIC_CONTENT_MANIFEST` works in Workers Assets
+- How the `ASSETS` binding serves static files in Workers Assets
 - R2 and KV binding conventions (`SYNC` for R2, `SYNC_KV` for KV, etc.)
 - Local dev with `wrangler dev`
 - Deployment via Workers Builds (Git integration in the Cloudflare dashboard)
@@ -169,7 +169,7 @@ The full Hausverwaltung-style sync architecture:
 - How to extend with additional jobs (e.g. deploy)
 - How to pin to a tag vs `@main`
 
-### `references/repo-hygiene.md`
+### `references/hygiene.md`
 
 - The LICENSE text (MIT, year placeholder)
 - The CONTRIBUTING.md template with branch strategy + PR checklist

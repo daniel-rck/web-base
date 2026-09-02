@@ -24,9 +24,15 @@ jobs:
       fail-fast: false
       matrix:
         repo:
-          - daniel-rck/Hausverwaltung
-          - daniel-rck/Tennisturnier
           - daniel-rck/ErinnerMich
+          - daniel-rck/HamsterFlight
+          - daniel-rck/Hausverwaltung
+          - daniel-rck/Minispiele
+          - daniel-rck/Pizzateig
+          - daniel-rck/Tankzettel
+          - daniel-rck/Tennisturnier
+          - daniel-rck/Tonspur
+          - daniel-rck/Zeiterfassung
     steps:
       - name: Open update-available issue
         env:

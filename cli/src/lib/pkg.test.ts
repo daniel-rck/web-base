@@ -142,3 +142,46 @@ describe("readWebBaseVersion", () => {
     expect(await readWebBaseVersion(resolve(scratch, "nope"))).toBeUndefined();
   });
 });
+
+describe("stampWebBaseVersion formatting", () => {
+  it("splices the stamp in without reformatting the rest of the file", async () => {
+    // Deliberately non-`JSON.stringify` formatting: an inline array and a
+    // nested object that a round-trip would reflow.
+    const raw = [
+      "{",
+      '  "name": "scratch",',
+      '  "version": "0.0.0",',
+      '  "keywords": ["a", "b", "c"],',
+      '  "lint-staged": { "*.ts": ["biome check --write"] }',
+      "}",
+      "",
+    ].join("\n");
+    await writeFile(resolve(scratch, "package.json"), raw, "utf8");
+
+    await stampWebBaseVersion({ targetDir: scratch, version: "0.3.0" });
+
+    const after = await readFile(resolve(scratch, "package.json"), "utf8");
+    expect(after).toContain('"keywords": ["a", "b", "c"],');
+    expect(after).toContain('"lint-staged": { "*.ts": ["biome check --write"] },');
+    expect(JSON.parse(after).webBase).toEqual({ version: "0.3.0" });
+  });
+
+  it("rewrites only the version literal when already stamped", async () => {
+    const raw = [
+      "{",
+      '  "name": "scratch",',
+      '  "keywords": ["a", "b"],',
+      '  "webBase": {',
+      '    "version": "0.1.0"',
+      "  }",
+      "}",
+      "",
+    ].join("\n");
+    await writeFile(resolve(scratch, "package.json"), raw, "utf8");
+
+    await stampWebBaseVersion({ targetDir: scratch, version: "0.3.0" });
+
+    const after = await readFile(resolve(scratch, "package.json"), "utf8");
+    expect(after).toBe(raw.replace('"0.1.0"', '"0.3.0"'));
+  });
+});

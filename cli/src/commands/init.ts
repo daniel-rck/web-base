@@ -16,12 +16,17 @@ export const initCommand = defineCommand({
   args: {
     cwd: { type: "string", description: "Target directory (default: current)" },
     name: { type: "string", description: "App name" },
-    force: { type: "boolean", description: "Overwrite existing files" },
+    force: { type: "boolean", description: "Overwrite existing owned files" },
+    "force-scaffold": {
+      type: "boolean",
+      description: "With --force, also overwrite scaffold seams (destroys per-app customization)",
+    },
     "dry-run": { type: "boolean", description: "Log actions without writing" },
   },
   async run({ args }) {
     const targetDir = resolve(args.cwd ?? process.cwd());
     const force = args.force === true;
+    const forceScaffold = args["force-scaffold"] === true;
     const dryRun = args["dry-run"] === true;
 
     try {
@@ -33,10 +38,16 @@ export const initCommand = defineCommand({
         return;
       }
 
+      // Only prompt when a human is there to answer: in CI (or any non-TTY
+      // pipeline) a blocking prompt hangs the job until it times out.
+      const interactive = process.stdin.isTTY === true;
       const name =
-        args.name ?? (await consola.prompt("App name?", { type: "text", placeholder: "my-app" }));
+        args.name ??
+        (interactive
+          ? await consola.prompt("App name?", { type: "text", placeholder: "my-app" })
+          : undefined);
       if (typeof name !== "string" || !name.trim()) {
-        consola.error("App name is required.");
+        consola.error("App name is required. Pass --name <app-name>.");
         process.exitCode = 1;
         return;
       }
@@ -59,6 +70,7 @@ export const initCommand = defineCommand({
             targetDir,
             template: manifest.name,
             force,
+            forceScaffold,
             dryRun,
           });
         }
@@ -76,10 +88,17 @@ export const initCommand = defineCommand({
 
       await stampWebBaseVersion({ targetDir, version: WEB_BASE_VERSION, dryRun });
 
+      // The shipped biome.json sets `vcs.useIgnoreFile: true`, so `bun run lint`
+      // misbehaves outside a Git repo. Scaffold one rather than leaving it to a
+      // next-step the user may skip.
+      const repoInitialized = await ensureGitRepo(targetDir, dryRun);
+
       const nextSteps = [
         ...postInstall,
         "Run: bun install",
-        "Initialize Git: git init && git add -A && git commit -m 'chore: initial scaffold'",
+        ...(repoInitialized
+          ? ["Commit the scaffold: git add -A && git commit -m 'chore: initial scaffold'"]
+          : ["Initialize Git: git init && git add -A && git commit -m 'chore: initial scaffold'"]),
       ];
       consola.box(["Next steps:", ...nextSteps.map((s) => `  - ${s}`)].join("\n"));
     } catch (err) {
@@ -88,6 +107,27 @@ export const initCommand = defineCommand({
     }
   },
 });
+
+/**
+ * Create a Git repo in `targetDir` unless one is already there. Returns whether
+ * the directory ends up under version control; a missing `git` binary is not
+ * fatal, the caller just falls back to telling the user to do it.
+ */
+async function ensureGitRepo(targetDir: string, dryRun: boolean): Promise<boolean> {
+  if (existsSync(resolve(targetDir, ".git"))) return true;
+  if (dryRun) {
+    consola.info("  .git — would initialize");
+    return true;
+  }
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync("git", ["init", "--quiet"], { cwd: targetDir, stdio: "ignore" });
+  if (result.status === 0) {
+    consola.success("  .git — initialized");
+    return true;
+  }
+  consola.warn("  git init failed — initialize the repo by hand (Biome reads .gitignore via VCS).");
+  return false;
+}
 
 function renderPackageJson(name: string): string {
   const pkg = {

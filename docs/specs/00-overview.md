@@ -1,7 +1,8 @@
 # 00 — Overview
 
 `daniel-rck/web-base` is a monorepo combining three concerns for personal
-web apps (Hausverwaltung, Tennisturnier, ErinnerMich):
+web apps (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig,
+Tankzettel, Tennisturnier, Tonspur, Zeiterfassung):
 
 1. A **CLI** (`cli/`) that copies templates into target app repos — shadcn-style,
    "distribution by copy, not by dependency."
@@ -49,12 +50,14 @@ web-base/
 ├── biome.json
 ├── .github/
 │   └── workflows/
-│       ├── web-app-ci.yml    # reusable workflow for apps
-│       └── tools-ci.yml      # CI for this repo
+│       ├── web-app-ci.yml      # reusable workflow for apps
+│       ├── web-base-check.yml  # reusable drift guard for apps
+│       ├── notify-apps.yml     # release → "update available" issue per app
+│       └── tools-ci.yml        # CI for this repo
 ├── cli/
 │   ├── src/
 │   │   ├── index.ts          # citty entry
-│   │   ├── commands/         # init.ts, add.ts, update.ts
+│   │   ├── commands/         # init.ts, add.ts, update.ts, check.ts
 │   │   └── lib/              # manifest.ts, copy.ts, pkg.ts
 │   └── templates/
 │       ├── core/             # meta-template: extends the others
@@ -76,7 +79,9 @@ web-base/
 │       ├── worker.md
 │       ├── sync.md
 │       ├── ci.md
-│       └── repo-hygiene.md
+│       ├── biome.md
+│       ├── router.md
+│       └── hygiene.md
 └── docs/
     └── specs/
         └── (this directory)
@@ -107,8 +112,8 @@ verifiable on its own:
    - `SKILL.md` + `references/*.md`. Mostly documentation, no execution to verify.
 
 6. **App migrations** → `08-app-migrations.md`
-   - One app at a time, smallest changes first. Hausverwaltung is the biggest
-     (Dexie → idb); do it last.
+   - One app at a time, smallest changes first. That spec records the actual
+     state of all nine apps and the deviations each has earned.
 
 ## Cross-cutting docs
 

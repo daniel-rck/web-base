@@ -46,6 +46,11 @@
   --color-fg-muted: oklch(0.45 0 0);
   --color-fg-subtle: oklch(0.6 0 0);
 
+  /* Foreground for text sitting on a saturated fill (accent/danger/success
+   * buttons and badges). `--color-fg` is near-black in light mode, so it is the
+   * wrong token there — this one stays light in both themes. */
+  --color-fg-on-accent: oklch(0.99 0 0);
+
   /* ── Semantic ──────────────────────────────────────────── */
   --color-success: oklch(0.65 0.17 150);
   --color-warning: oklch(0.75 0.15 80);

@@ -35,7 +35,9 @@ jobs:
 
 - `@main` — always the latest. Accept the breakage rate during early
   development.
-- `@v1` — pinned to a major tag. Recommended once web-base has tagged
+- `@v0.3.0` — pinned to a release tag. Recommended for the drift guard, so
+  an app is checked against the base it actually pulled. There is no `@v1`
+  major tag; releases are tagged `vX.Y.Z`. Formerly this said
   releases. Bump the `@vN` ref to opt into a major version.
 
 ## Extending with additional jobs

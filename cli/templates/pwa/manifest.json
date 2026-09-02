@@ -3,13 +3,13 @@
   "description": "Service worker (injectManifest) + workbox precache",
   "files": [
     { "from": "sw.ts", "to": "src/sw/index.ts", "policy": "scaffold" },
-    { "from": "vite.snippet.md", "to": "vite.snippet.md" },
+    { "from": "vite.snippet.md", "to": "vite.snippet.md", "policy": "scaffold" },
     { "from": "tsconfig.sw.json", "to": "tsconfig.sw.json" }
   ],
   "devDependencies": {
-    "vite-plugin-pwa": "^1.3",
-    "workbox-precaching": "^7.4.0",
-    "workbox-window": "^7.4.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "workbox-precaching": "^7.4.1",
+    "workbox-window": "^7.4.1"
   },
   "postInstall": [
     "Open vite.snippet.md and merge the VitePWA() config into your vite.config.ts",

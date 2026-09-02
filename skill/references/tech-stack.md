@@ -19,7 +19,7 @@ TypeScript configs.
 
 ```json
 {
-  "typescript": "~6.0.2",
+  "typescript": "^7.0.2",
   "vite": "^8",
   "@vitejs/plugin-react": "^6",
   "vite-plugin-pwa": "^1.3",
@@ -27,18 +27,18 @@ TypeScript configs.
   "workbox-window": "^7.4.0",
   "tailwindcss": "^4.2.4",
   "@tailwindcss/vite": "^4.2.4",
-  "@biomejs/biome": "^2.4.15",
+  "@biomejs/biome": "^2.5.11",
   "vitest": "^4.1.5",
   "@vitest/ui": "^4.1.5",
   "jsdom": "^29.1.0",
   "@testing-library/react": "^16.3.2",
   "@testing-library/user-event": "^14.6.1",
   "@testing-library/jest-dom": "^6.9.1",
-  "wrangler": "^4.87.0",
-  "@cloudflare/workers-types": "^4.20260504.1",
+  "wrangler": "^4.127.1",
+  "@cloudflare/workers-types": "^5.20260706.1",
   "@types/react": "^19.2.14",
   "@types/react-dom": "^19.2.3",
-  "@types/node": "^25.6.0"
+  "@types/node": "^26.4.0"
 }
 ```
 
