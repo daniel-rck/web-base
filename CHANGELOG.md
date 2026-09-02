@@ -13,6 +13,23 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ### Fixed
 
+- **`AppShell` broke `position: sticky` for the whole page.** `<main>` had
+  `overflow-y-auto`, which makes it the scroll container — and an overflow
+  container captures every descendant sticky element without ever scrolling
+  itself, so sticky headers and toolbars anywhere in the page silently stopped
+  working. The window is the scroll container now; `min-w-0` also stops wide
+  content from stretching the page past the viewport. Promoted from
+  Tennisturnier, which had diagnosed and fixed it locally.
+
+- **The shell ignored iOS safe-area insets.** The bottom nav sat under the home
+  indicator and the main region's bottom padding didn't account for it.
+  Promoted from Pizzateig.
+
+- **`useTheme` crashed where `localStorage` throws.** Safari's private mode and
+  "block all cookies" make the accessor itself throw rather than return null,
+  which took the whole app down at first paint. Reads and writes are guarded
+  now. Promoted from Pizzateig.
+
 - **`check` treated a partially adopted block as drift.** Taking `primitives`
   and `InstallButton` without `AppNav` is the right call for a single-route
   app, and the guard called it a hole. Absence is now never drift — only
@@ -115,6 +132,18 @@ that machinery first, then raises the baseline it distributes.
   checklist without shipping one. Added.
 
 ### Added
+
+- **`SectionCard` and `Chip` primitives, and a `Card interactive` prop.**
+  Promoted from Pizzateig, which had grown all three locally. A titled section
+  wrapper and a selectable pill are needed in every app in the fleet, and
+  writing them per repo is how design systems diverge. `Chip` uses
+  `text-fg-on-accent` rather than the hard-coded `text-white` it was promoted
+  with.
+
+- **The bottom nav marks its active item with a pill behind the icon**, not
+  just a tint on icon and label. At that size a tint alone is easy to miss.
+  Promoted from Pizzateig; the label keeps the template's `truncate`, which the
+  original had dropped.
 
 - `web-base check --strict` fails when an owned base file is *missing*, not only
   when it differs. Without it, an app that has adopted nothing passes the guard;
