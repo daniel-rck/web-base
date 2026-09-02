@@ -147,3 +147,30 @@ export async function readWebBaseVersion(targetDir: string): Promise<string | un
     return undefined;
   }
 }
+
+/**
+ * Files an app has deliberately taken off the base, from `package.json` →
+ * `webBase.unmanaged` (repo-relative paths, exactly as they appear in a
+ * template manifest's `to`).
+ *
+ * The escape hatch exists because `owned` vs `scaffold` is a property of the
+ * *template*, and one app can have a good reason to diverge on a file that is
+ * genuinely shared everywhere else — Hausverwaltung's `useLiveQuery`, whose 85
+ * call sites predate the template's per-store signature. Listing it here keeps
+ * the deviation visible and auditable in the app's own package.json instead of
+ * leaving `check` permanently red, which would train everyone to ignore it.
+ *
+ * Never throws — used for reporting.
+ */
+export async function readUnmanagedFiles(targetDir: string): Promise<Set<string>> {
+  const pkgPath = resolve(targetDir, "package.json");
+  if (!existsSync(pkgPath)) return new Set();
+  try {
+    const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as PackageJson;
+    const list = pkg.webBase?.unmanaged;
+    if (!Array.isArray(list)) return new Set();
+    return new Set(list.filter((entry): entry is string => typeof entry === "string"));
+  } catch {
+    return new Set();
+  }
+}

@@ -3,7 +3,7 @@ import { consola } from "consola";
 import { resolve } from "pathe";
 import { diffTemplateFile } from "../lib/copy.ts";
 import { filePolicy, loadManifest, resolveTemplate } from "../lib/manifest.ts";
-import { readWebBaseVersion } from "../lib/pkg.ts";
+import { readUnmanagedFiles, readWebBaseVersion } from "../lib/pkg.ts";
 import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
 
 type LeafResult = { matched: string[]; drifted: string[]; missing: string[] };
@@ -34,8 +34,10 @@ export const checkCommand = defineCommand({
         );
       }
 
+      const unmanaged = await readUnmanagedFiles(targetDir);
       const chain = await resolveTemplate(template);
       const byLeaf = new Map<string, LeafResult>();
+      const exempted: string[] = [];
 
       for (const leaf of chain) {
         const manifest = await loadManifest(leaf);
@@ -44,6 +46,11 @@ export const checkCommand = defineCommand({
         for (const spec of manifest.files) {
           // Only owned building blocks are guarded; scaffold seams are the app's.
           if (filePolicy(spec) !== "owned") continue;
+          // ...and an app can take a single owned file off the base explicitly.
+          if (unmanaged.has(spec.to)) {
+            exempted.push(spec.to);
+            continue;
+          }
           const diff = await diffTemplateFile(spec, { targetDir, template: leaf });
           if (diff.status === "missing") result.missing.push(spec.to);
           else if (diff.status === "differs") {
@@ -107,8 +114,12 @@ export const checkCommand = defineCommand({
         process.exitCode = 1;
         return;
       }
+      for (const file of exempted) {
+        consola.info(`  ${file} — unmanaged (opted out in package.json)`);
+      }
       const notes = [
         unadopted.length > 0 ? `${unadopted.join(", ")} not adopted` : "",
+        exempted.length > 0 ? `${exempted.length} unmanaged` : "",
         partial.length > 0 ? `${partial.length} owned file(s) absent` : "",
       ].filter(Boolean);
       const skipped = notes.length > 0 ? ` (${notes.join("; ")})` : "";
