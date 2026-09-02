@@ -13,6 +13,12 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ### Fixed
 
+- **`check` treated a partially adopted block as drift.** Taking `primitives`
+  and `InstallButton` without `AppNav` is the right call for a single-route
+  app, and the guard called it a hole. Absence is now never drift — only
+  differing content is. An app that has adopted nothing at all still fails, and
+  `--strict` remains the opt-in for asserting full adoption.
+
 - **`useLiveQuery` could overwrite fresh data with stale data.** A mutation can
   re-run the query while an earlier run is still awaiting, and IndexedDB gives
   no ordering guarantee between them — so the slower, older query could resolve
