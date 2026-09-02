@@ -101,9 +101,36 @@ export async function stampWebBaseVersion(options: {
     return;
   }
 
-  pkg.webBase = { ...pkg.webBase, version };
-  await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
+  // Prefer a surgical text edit: a JSON round-trip reflows the whole file, and
+  // an app's first stamp would then bury its real diff under a reformat of
+  // every inline array and key in package.json.
+  const spliced = spliceStamp(raw, version);
+  const next =
+    spliced ?? `${JSON.stringify({ ...pkg, webBase: { ...pkg.webBase, version } }, null, 2)}\n`;
+  await writeFile(pkgPath, next, "utf8");
+  if (!spliced) {
+    consola.warn("  package.json — reformatted (could not splice the stamp in place)");
+  }
   consola.success(`  package.json — webBase.version → ${version}`);
+}
+
+/**
+ * Write `webBase.version` into raw package.json text without reformatting the
+ * rest of the file. Returns `undefined` when the shape is unexpected, so the
+ * caller can fall back to a full re-serialization.
+ */
+function spliceStamp(raw: string, version: string): string | undefined {
+  // Already stamped: replace just the version literal.
+  const stamped = /("webBase"\s*:\s*\{[^{}]*?"version"\s*:\s*")([^"]*)(")/;
+  if (stamped.test(raw)) return raw.replace(stamped, `$1${version}$3`);
+  // A `webBase` key in some other shape — don't guess, re-serialize instead.
+  if (/"webBase"\s*:/.test(raw)) return undefined;
+  const end = raw.lastIndexOf("}");
+  if (end < 0) return undefined;
+  const head = raw.slice(0, end).replace(/\s*$/, "");
+  if (!head.endsWith("}") && !head.endsWith('"') && !head.endsWith("]")) return undefined;
+  const indent = /\n([ \t]+)"/.exec(raw)?.[1] ?? "  ";
+  return `${head},\n${indent}"webBase": {\n${indent}${indent}"version": "${version}"\n${indent}}\n${raw.slice(end)}`;
 }
 
 /**

@@ -10,7 +10,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
 {
   "name": "@daniel-rck/web-base",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Shared tooling, conventions, and templates for personal web apps",
   "keywords": ["cli", "scaffolding", "react", "vite", "pwa", "cloudflare-workers"],

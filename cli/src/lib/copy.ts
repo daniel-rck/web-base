@@ -2,12 +2,14 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { consola } from "consola";
 import { dirname, resolve } from "pathe";
-import { type TemplateFileSpec, templatesDir } from "./manifest.ts";
+import { filePolicy, type TemplateFileSpec, templatesDir } from "./manifest.ts";
 
 export type CopyOptions = {
   targetDir: string;
   template: string;
   force?: boolean;
+  /** Also overwrite scaffold seams. Destroys per-app customization — opt in. */
+  forceScaffold?: boolean;
   dryRun?: boolean;
 };
 
@@ -21,7 +23,7 @@ export async function copyTemplateFiles(
   files: TemplateFileSpec[],
   options: CopyOptions,
 ): Promise<void> {
-  const { targetDir, template, force = false, dryRun = false } = options;
+  const { targetDir, template, force = false, forceScaffold = false, dryRun = false } = options;
   const srcDir = resolve(templatesDir(), template);
   for (const spec of files) {
     const src = resolve(srcDir, spec.from);
@@ -29,11 +31,17 @@ export async function copyTemplateFiles(
     if (!existsSync(src)) {
       throw new Error(`Template file not found: ${template}/${spec.from}`);
     }
-    const allowOverwrite = force || spec.overwrite === true;
+    // `--force` re-pulls the centrally-managed blocks. Scaffold seams (schema,
+    // routes, accent, handlers, LICENSE) hold per-app work, so they survive it
+    // unless `--force-scaffold` is passed explicitly.
+    const scaffold = filePolicy(spec) === "scaffold";
+    const allowOverwrite = spec.overwrite === true || (force && (!scaffold || forceScaffold));
     if (existsSync(dst) && !allowOverwrite) {
       const same = await filesEqual(src, dst);
       if (same) {
         consola.info(`  ${spec.to} — exists (same), skipped`);
+      } else if (force && scaffold) {
+        consola.warn(`  ${spec.to} — exists (differs), scaffold kept (use --force-scaffold)`);
       } else {
         consola.warn(`  ${spec.to} — exists (differs), skipped`);
       }

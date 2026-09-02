@@ -15,7 +15,11 @@ export const addCommand = defineCommand({
   args: {
     template: { type: "positional", required: false, description: "Template name" },
     cwd: { type: "string", description: "Target directory (default: current)" },
-    force: { type: "boolean", description: "Overwrite existing files" },
+    force: { type: "boolean", description: "Overwrite existing owned files" },
+    "force-scaffold": {
+      type: "boolean",
+      description: "With --force, also overwrite scaffold seams (destroys per-app customization)",
+    },
     "dry-run": { type: "boolean", description: "Log actions without writing" },
   },
   async run({ args }) {
@@ -26,6 +30,7 @@ export const addCommand = defineCommand({
 
     const targetDir = resolve(args.cwd ?? process.cwd());
     const force = args.force === true;
+    const forceScaffold = args["force-scaffold"] === true;
     const dryRun = args["dry-run"] === true;
 
     try {
@@ -40,6 +45,7 @@ export const addCommand = defineCommand({
             targetDir,
             template: manifest.name,
             force,
+            forceScaffold,
             dryRun,
           });
         }

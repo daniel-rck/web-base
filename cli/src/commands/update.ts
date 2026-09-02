@@ -2,9 +2,19 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolve } from "pathe";
 import { diffTemplateFile, writeTemplateFile } from "../lib/copy.ts";
-import { filePolicy, loadManifest, templatesDir } from "../lib/manifest.ts";
+import {
+  filePolicy,
+  loadManifest,
+  resolveTemplate,
+  shouldApplyUpdate,
+  type TemplateFileSpec,
+  templatesDir,
+} from "../lib/manifest.ts";
 import { readWebBaseVersion, stampWebBaseVersion } from "../lib/pkg.ts";
 import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
+
+/** A file to update, tagged with the leaf template it came from. */
+type PendingUpdate = { template: string; spec: TemplateFileSpec };
 
 export const updateCommand = defineCommand({
   meta: {
@@ -21,8 +31,14 @@ export const updateCommand = defineCommand({
     const apply = args.apply === true;
 
     try {
-      const manifest = await loadManifest(args.template);
-      if (!manifest.files?.length) {
+      // Meta templates (`core`) carry no files of their own — expand `extends`
+      // so `update core` covers every leaf, matching what `add core` installs.
+      const leaves = await resolveTemplate(args.template);
+      const manifests = await Promise.all(
+        leaves.map(async (name) => ({ name, manifest: await loadManifest(name) })),
+      );
+      const hasFiles = manifests.some(({ manifest }) => manifest.files?.length);
+      if (!hasFiles) {
         consola.info(`Template "${args.template}" has no files to update.`);
         return;
       }
@@ -49,30 +65,36 @@ export const updateCommand = defineCommand({
       let identical = 0;
       let differs = 0;
       let scaffold = 0;
-      const toApply: typeof manifest.files = [];
+      const toApply: PendingUpdate[] = [];
 
-      for (const spec of manifest.files) {
-        const result = await diffTemplateFile(spec, { targetDir, template: args.template });
-        const isScaffold = filePolicy(spec) === "scaffold";
-        if (result.status === "identical") {
-          consola.info(`  ${spec.to} — identical`);
-          identical++;
-        } else if (isScaffold) {
-          // Scaffold files belong to the app: report drift but never overwrite.
-          const detail = result.status === "missing" ? "missing" : "differs";
-          consola.info(`  ${spec.to} — scaffold, ${detail} (left as-is)`);
-          scaffold++;
-        } else if (result.status === "missing") {
-          consola.warn(`  ${spec.to} — missing`);
-          missing++;
-          toApply.push(spec);
-        } else {
-          // An owned file that differs while the app is on the current version
-          // means it was hand-edited — flag it, since --apply will revert it.
-          const drift = atCurrent ? " [owned file edited locally — will be reverted]" : "";
-          consola.warn(`  ${spec.to} — differs (+${result.added} / -${result.removed})${drift}`);
-          differs++;
-          toApply.push(spec);
+      for (const { name, manifest } of manifests) {
+        if (!manifest.files?.length) continue;
+        if (leaves.length > 1) consola.info(`${name}:`);
+        for (const spec of manifest.files) {
+          const result = await diffTemplateFile(spec, { targetDir, template: name });
+          if (result.status === "identical") {
+            consola.info(`  ${spec.to} — identical`);
+            identical++;
+            continue;
+          }
+          if (filePolicy(spec) === "scaffold") {
+            // Scaffold files belong to the app: report drift but never overwrite.
+            const detail = result.status === "missing" ? "missing" : "differs";
+            consola.info(`  ${spec.to} — scaffold, ${detail} (left as-is)`);
+            scaffold++;
+            continue;
+          }
+          if (result.status === "missing") {
+            consola.warn(`  ${spec.to} — missing`);
+            missing++;
+          } else {
+            // An owned file that differs while the app is on the current version
+            // means it was hand-edited — flag it, since --apply will revert it.
+            const drift = atCurrent ? " [owned file edited locally — will be reverted]" : "";
+            consola.warn(`  ${spec.to} — differs (+${result.added} / -${result.removed})${drift}`);
+            differs++;
+          }
+          if (shouldApplyUpdate(spec, result.status)) toApply.push({ template: name, spec });
         }
       }
 
@@ -81,12 +103,10 @@ export const updateCommand = defineCommand({
       );
 
       if (apply) {
-        if (toApply.length > 0) {
-          const srcDir = resolve(templatesDir(), args.template);
-          for (const spec of toApply) {
-            await writeTemplateFile(resolve(srcDir, spec.from), resolve(targetDir, spec.to));
-            consola.success(`  ${spec.to} — applied`);
-          }
+        for (const { template, spec } of toApply) {
+          const src = resolve(templatesDir(), template, spec.from);
+          await writeTemplateFile(src, resolve(targetDir, spec.to));
+          consola.success(`  ${spec.to} — applied`);
         }
         // Stamp even when files were already identical: --apply asserts the app
         // has pulled the current template source.

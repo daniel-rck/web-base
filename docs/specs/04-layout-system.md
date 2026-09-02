@@ -12,7 +12,11 @@ only the color accent in `theme.css` changes per app.
 4. **No third-party UI library.** Custom primitives only. Shadcn-style means
    the code lives in the app after `web-base add layout`.
 5. **Dark mode defaults to `prefers-color-scheme`**, with a built-in manual
-   override. A `ThemeToggle` (auto-mounted in the header) cycles
+   override. **The contract is `data-theme` on `<html>`, and it is an
+   invariant** — a `.dark` class cannot express "follow the OS" without
+   JavaScript, so a class-based app always paints the wrong theme until its
+   first effect runs. Absent attribute = follow the OS; `data-theme="dark"` /
+   `"light"` = forced. A `ThemeToggle` (auto-mounted in the header) cycles
    system → light → dark; the choice persists in `localStorage` and is expressed
    as `data-theme` on `<html>`. An inline init script (`themeInitScript`) in
    `index.html` prevents a flash of the wrong theme on load.
@@ -23,13 +27,33 @@ The single variable that defines an app's accent is `--accent-h` (hue in
 degrees, 0–360). All accent shades derive from it via OKLCH lightness/chroma
 on the same hue.
 
-Per-app suggested hues:
+**Reserved hues.** The semantic tokens occupy fixed hues: `danger` 25,
+`warning` 80, `success` 150, `info` 230. An app accent must sit at least 25°
+away from each of them — otherwise a `Badge variant="success"` and an accent
+chip are indistinguishable — and at least 25° from every other app's accent.
+
+Per-app hues:
 
 | App | Accent name | `--accent-h` | Sample OKLCH |
 |---|---|---|---|
-| Hausverwaltung | Slate-Blau | `250` | `oklch(0.62 0.18 250)` |
+| Pizzateig | Orange | `50` | `oklch(0.62 0.18 50)` |
+| Tankzettel | Frischgrün | `110` | `oklch(0.62 0.18 110)` |
 | Tennisturnier | Emerald | `155` | `oklch(0.68 0.17 155)` |
+| Minispiele | Türkis | `195` | `oklch(0.62 0.18 195)` |
+| Zeiterfassung | Blau | `230` | `oklch(0.62 0.18 230)` |
+| Hausverwaltung | Slate-Blau | `250` | `oklch(0.62 0.18 250)` |
 | ErinnerMich | Indigo | `285` | `oklch(0.58 0.19 285)` |
+| Tonspur | Neon-Magenta | `320` | `oklch(0.62 0.18 320)` |
+| HamsterFlight | — | — | Not a Tailwind app: a pixi.js canvas game with no `theme.css`. Excluded by decision, not by omission. |
+
+**Decision: two of the three warm apps moved.** Pizzateig (50), Tankzettel (55)
+and Tonspur (45) previously sat inside a 10° band, and that band is itself
+squeezed between `danger` (25) and `warning` (80). Pizzateig kept 50 because its
+token set is tuned around it (warm-tinted surfaces, `--color-accent-warm`,
+`--shadow-warm`); Tankzettel and Tonspur are pure accent consumers, so moving
+them costs one line each. Minispiele's apparent collision with Hausverwaltung at
+250 was a stale scaffold — the app already overrode the hue to 195 in
+`index.css`; 195 is now written where it belongs.
 
 If different hues are wanted, swap the value of `--accent-h`. No other
 tokens need to change.
@@ -86,6 +110,11 @@ The full template file at `cli/templates/layout/theme.css`:
   --color-fg: oklch(0.18 0 0);
   --color-fg-muted: oklch(0.45 0 0);
   --color-fg-subtle: oklch(0.6 0 0);
+
+  /* Foreground for text sitting on a saturated fill (accent/danger/success
+   * buttons and badges). `--color-fg` is near-black in light mode, so it is the
+   * wrong token there — this one stays light in both themes. */
+  --color-fg-on-accent: oklch(0.99 0 0);
 
   /* ── Semantic ──────────────────────────────────────────── */
   --color-success: oklch(0.65 0.17 150);
@@ -347,15 +376,27 @@ Behavior:
   `matchMedia("(prefers-color-scheme: dark)")` listener while in `"system"` mode.
 - SSR-safe (`typeof window` guards).
 
-**FOUC prevention.** `themeInitScript` is an exported string to inline in
-`index.html` `<head>` before the stylesheet; it sets `data-theme` from
-`localStorage` before first paint:
+**FOUC prevention.** The canonical mechanism is the shipped
+`public/theme-init.js` (an `owned` file of the layout template), referenced from
+`index.html` `<head>` before the stylesheet:
 
 ```html
-<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="/theme-init.js"></script>
 ```
 
-This is listed in the layout template's `postInstall` instructions.
+**Decision: an external file, not an inline `<script>`.** An inline snippet
+forces any app with a Worker CSP to pin a `sha256-` hash of it, and that hash
+breaks the theme silently the moment the snippet changes — a trap two apps had
+already walked into. `script-src 'self'` is both simpler and stricter. As a real
+file it is also guardable by `web-base check`, which an inline `<head>` snippet
+can never be.
+
+`themeInitScript` stays exported from `useTheme.ts` for apps that must inline it
+anyway; the two must be kept in sync. An app that persists the theme somewhere
+other than `localStorage["theme"]` — inside a validated settings blob, say —
+adapts the read in its own `public/theme-init.js`. The contract is only that
+`data-theme` ends up on `<html>` for a forced choice and stays absent for
+"system".
 
 ### primitives.tsx
 

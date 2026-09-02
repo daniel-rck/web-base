@@ -6,7 +6,7 @@
     { "from": "routes.ts", "to": "src/lib/routes.ts", "policy": "scaffold" }
   ],
   "dependencies": {
-    "react-router-dom": "^7.14.2"
+    "react-router-dom": "^7.18.3"
   },
   "postInstall": [
     "Wrap your app in <RouterProvider router={router} /> in main.tsx",

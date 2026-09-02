@@ -16,6 +16,10 @@ on:
         description: "web-base ref/tag to run the check with (pin to your app's webBase.version)"
         type: string
         default: main
+      strict:
+        description: "Also fail when an owned base file is missing, not just when it differs"
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -27,4 +31,6 @@ jobs:
         with:
           bun-version: "1.3.11"
       - name: Check owned base files
-        run: bunx "github:daniel-rck/web-base#${{ inputs.ref }}" check "${{ inputs.template }}"
+        run: |
+          bunx "github:daniel-rck/web-base#${{ inputs.ref }}" check "${{ inputs.template }}" \
+            ${{ inputs.strict && '--strict' || '' }}

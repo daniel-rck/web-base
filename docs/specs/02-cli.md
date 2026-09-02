@@ -219,17 +219,22 @@ async function resolveTemplate(template: string, visited = new Set<string>()): P
 Scaffolds a new app from an empty directory.
 
 ```
-web-base init [--cwd <dir>] [--name <app-name>] [--force] [--dry-run]
+web-base init [--cwd <dir>] [--name <app-name>] [--force] [--force-scaffold] [--dry-run]
 ```
 
 Behavior:
 
-1. Prompt for app name if `--name` not given (use `consola.prompt`).
+1. Prompt for app name if `--name` not given (use `consola.prompt`) — but only
+   when `process.stdin.isTTY`. Without a TTY and without `--name`, fail with a
+   message rather than blocking a pipeline on a prompt nobody can answer.
 2. Write a fresh `package.json` using the template in `07-conventions.md`,
    substituting the name, description, homepage URL pattern, repo URL pattern.
 3. Resolve and apply `core` (calls the same code path as `add core`).
 4. Stamp `webBase.version` into the new `package.json`.
-5. Initialize a Git repo (`git init && git add -A && git commit -m "chore: initial scaffold"`).
+5. Run `git init` if the target is not already a repo. This is not cosmetic:
+   the `biome.json` the app receives sets `vcs.useIgnoreFile: true`, so linting
+   a non-repo directory misbehaves. A missing `git` binary is not fatal — the
+   command falls back to telling the user. Committing stays a next step.
 6. Print next steps (set the color accent in `theme.css`, fill in domain content).
 
 If the target already has a `package.json`, `init` aborts and suggests
@@ -240,7 +245,7 @@ If the target already has a `package.json`, `init` aborts and suggests
 Copies a single template (or expands a meta-template).
 
 ```
-web-base add <template> [--cwd <dir>] [--force] [--dry-run]
+web-base add <template> [--cwd <dir>] [--force] [--force-scaffold] [--dry-run]
 ```
 
 Behavior:
@@ -248,7 +253,18 @@ Behavior:
 1. Call `resolveTemplate(template)`.
 2. For each leaf in the chain:
    a. `copyTemplateFiles(manifest.files, ...)` — skip existing files unless
-      `--force`, log every action.
+      `--force`, log every action. **`--force` respects the file policy**: it
+      re-pulls `owned` building blocks but leaves `scaffold` seams alone.
+      `--force-scaffold` opts into overwriting those too.
+
+      **Decision: `--force` does not mean "overwrite everything".** Scaffold
+      seams are where the app's own work lives — and `wrangler.toml` is one of
+      them, carrying live Cloudflare R2 and KV binding IDs that the template
+      only has placeholders for. A `--force` that replaced those would take
+      production sync down on the next deploy, and would look like an app bug
+      rather than a tooling one. A file that is simply *absent* is still
+      installed regardless of policy; the protection is against clobbering, not
+      against installing.
    b. `patchPackageJson(...)` — additive merge of `dependencies`,
       `devDependencies`, `scripts`. Existing entries are overwritten only if
       the value differs.
@@ -272,7 +288,10 @@ web-base update <template> [--cwd <dir>] [--apply]
 
 Behavior:
 
-1. Load the manifest (no extends-expansion — `update` operates per-template).
+1. Resolve the template chain with `resolveTemplate` and load every leaf
+   manifest, so `update core` covers the same file set `add core` installs.
+   A meta-template with no files anywhere in its chain reports "has no files to
+   update" and exits.
 2. Report the app's base-version status by comparing its stamped
    `webBase.version` against `WEB_BASE_VERSION`: `current` / `behind` / `ahead`
    / `unstamped`.
@@ -284,7 +303,8 @@ Behavior:
      that differs while the app is on the current version is additionally flagged
      as a local edit that `--apply` will revert.
 4. Print a summary (`N identical, N differs, N missing, N scaffold left as-is`).
-5. If `--apply` is set, overwrite the queued **owned** files (differing/missing)
+5. If `--apply` is set, overwrite the queued **owned** files (differing/missing;
+   the queue decision is `shouldApplyUpdate` from `lib/manifest.ts`)
    with the template source and stamp `webBase.version` (the stamp updates even
    when all files were already identical, since `--apply` asserts the app pulled
    current source). Scaffold files are never overwritten.
@@ -299,21 +319,33 @@ Read-only drift guard for CI. Verifies that the app's **owned** building blocks
 still match the template source; scaffold seams are ignored.
 
 ```
-web-base check [template] [--cwd <dir>]
+web-base check [template] [--cwd <dir>] [--strict]
 ```
 
 Behavior:
 
 1. Resolve the template (default `core`) including `extends`.
-2. For every **owned** file across the resolved templates:
-   - missing locally → the app doesn't use this block; skip (counted as absent).
-   - differs → record as drift and report line counts.
-   - identical → counts as matched.
-3. Scaffold files are never checked.
-4. If any owned file drifted, print an error and exit non-zero (so CI fails);
-   otherwise exit zero. Also warns when the app's stamped `webBase.version`
-   differs from the running CLI's version, since the comparison is against the
-   CLI's bundled templates.
+2. For every **owned** file across the resolved templates, record whether it is
+   identical, differs, or is missing. Scaffold files are never checked.
+3. Then judge **per building block**, not per file:
+   - Not one owned file of a template is present → the app does not use that
+     block. Report it as `not adopted` and move on.
+   - The block *is* present but some owned files are missing → those missing
+     files are drift, because a half-installed block is a hole in the base.
+4. If any owned file drifted, or no owned file matched anywhere, print an error
+   and exit non-zero. `--strict` additionally fails when a block was never
+   adopted. Also warns when the app's stamped `webBase.version` differs from
+   the running CLI's version, since the comparison is against the CLI's bundled
+   templates.
+
+**Decision: presence is judged per template, not per file.** Treating any
+missing owned file as drift would fail HamsterFlight on every layout, storage
+and router file — a pixi.js canvas game will never have them, and that is a
+recorded decision, not rot. Treating a missing file as always-fine was the
+opposite failure: an app that had adopted nothing at all passed the guard
+silently. Per-block presence separates "doesn't use this" from "installed it
+and then lost half of it". Use `--strict` in apps that assert full `core`
+adoption; never in HamsterFlight.
 
 This is what makes the "owned files stay identical across apps" rule
 (`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`

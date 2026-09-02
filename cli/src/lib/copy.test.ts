@@ -129,3 +129,46 @@ describe("diffTemplateFile", () => {
     ).rejects.toThrow("Template file not found: hygiene/MISSING");
   });
 });
+
+describe("copyTemplateFiles file policy", () => {
+  it("--force re-pulls an owned file", async () => {
+    await writeFile(resolve(target, "LICENSE"), "local edit", "utf8");
+    await copyTemplateFiles([{ from: "LICENSE", to: "LICENSE", policy: "owned" }], {
+      targetDir: target,
+      template: "hygiene",
+      force: true,
+    });
+    expect(await readFile(resolve(target, "LICENSE"), "utf8")).toBe("MIT 2026");
+  });
+
+  it("--force leaves a scaffold seam alone", async () => {
+    // The real hazard: a scaffold wrangler.toml carries live Cloudflare
+    // bindings that the template only has placeholders for.
+    await writeFile(resolve(target, "LICENSE"), "local edit", "utf8");
+    await copyTemplateFiles([{ from: "LICENSE", to: "LICENSE", policy: "scaffold" }], {
+      targetDir: target,
+      template: "hygiene",
+      force: true,
+    });
+    expect(await readFile(resolve(target, "LICENSE"), "utf8")).toBe("local edit");
+  });
+
+  it("--force-scaffold overwrites a scaffold seam", async () => {
+    await writeFile(resolve(target, "LICENSE"), "local edit", "utf8");
+    await copyTemplateFiles([{ from: "LICENSE", to: "LICENSE", policy: "scaffold" }], {
+      targetDir: target,
+      template: "hygiene",
+      force: true,
+      forceScaffold: true,
+    });
+    expect(await readFile(resolve(target, "LICENSE"), "utf8")).toBe("MIT 2026");
+  });
+
+  it("still installs a scaffold file that is simply absent", async () => {
+    await copyTemplateFiles([{ from: "LICENSE", to: "LICENSE", policy: "scaffold" }], {
+      targetDir: target,
+      template: "hygiene",
+    });
+    expect(await readFile(resolve(target, "LICENSE"), "utf8")).toBe("MIT 2026");
+  });
+});

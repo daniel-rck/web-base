@@ -1,239 +1,168 @@
 # 08 — App Migrations
 
-Migration plans for the three existing apps. Each is a sequence of PRs, ordered
-by risk (low-risk first) and by dependency (e.g. Biome before layout, because
-the layout template files must lint cleanly under the new Biome config).
+The state of every app on the web-base baseline, the gaps that remain, and the
+deviations each app has earned.
 
-After each PR, the app should:
-- `bun install && bun run lint && bun run typecheck && bun run test && bun run build`
-- Deploy preview and smoke-test in a browser
+**This is a living record, not a forward-looking plan.** Its previous form
+described three apps and a migration sequence, and by the time anyone read it
+the work it described was done (Hausverwaltung had left Dexie; Tennisturnier had
+a router) while six apps it never mentioned had drifted in their own directions.
+When you change an app's relationship to the base, update the row here in the
+same PR.
 
-## Migration sequence (all apps)
+## Migration sequence (for a new or newly-adopted app)
 
 The general order, applied per app:
 
 1. **Tooling baseline.** `web-base add hygiene` + `web-base add biome`. Switch
-   CI to the reusable workflow. Add `packageManager` field. Fill in
-   package.json metadata.
-2. **Router.** If the app doesn't have `react-router-dom` yet, `web-base add
-   router`. Wrap the existing app in `<RouterProvider>` with a single index
-   route initially.
-3. **Storage.** Migrate to idb. The biggest per-app difference — see below.
-4. **PWA.** Migrate from generateSW to injectManifest where applicable.
-5. **Worker.** Align with the worker template (only minor changes for most apps).
-6. **Layout.** `web-base add layout`, then refactor existing screens to use
-   `<AppShell>`. This is the most user-visible change.
-7. **Color accent.** Set `--accent-h` in `theme.css` to the app's hue.
+   CI to the reusable workflow. Add `packageManager`. Fill in package.json
+   metadata and the pin table from `07-conventions.md`.
+2. **Router.** `web-base add router` if the app has no `react-router-dom`.
+3. **Storage.** idb via `web-base add storage`.
+4. **PWA.** `injectManifest`, never `generateSW`.
+5. **Worker.** Align with the worker template.
+6. **Layout.** `web-base add layout`, then refactor screens onto `<AppShell>`.
+7. **Color accent.** Set `--accent-h` per the table in `04-layout-system.md`.
 
-The order is not absolute — for example, layout can land before worker if
-there's a reason. But Biome must come before any template that ships TypeScript
-files, because those files are written against Biome's formatting rules.
+Biome must land before any template that ships TypeScript, because those files
+are written against Biome's formatting rules.
 
 ---
 
-## Hausverwaltung
+## Fleet state
 
-The most complex migration because of Dexie → idb and the existing R2+KV sync.
+As of web-base 0.3.0.
 
-### Current state (relevant facts)
+| App | Stamp | Router | Storage | PWA | Worker | CI | Layout |
+|---|---|---|---|---|---|---|---|
+| ErinnerMich | 0.3.0 | react-router 7 (`BrowserRouter`) | idb | injectManifest | Assets + `/api` | reusable | own shell over base tokens |
+| HamsterFlight | 0.3.0 | — | — | — | Assets only | reusable + own gates | — (canvas game) |
+| Hausverwaltung | 0.3.0 | react-router 7 (`HashRouter`) | idb + query layer | injectManifest | Assets + R2/KV sync | reusable | own design system |
+| Minispiele | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + e2e | base |
+| Pizzateig | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable | base + warm fork |
+| Tankzettel | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + guard | **base, zero drift** |
+| Tennisturnier | 0.3.0 | react-router 7 | idb | injectManifest | Assets + KV sync | reusable | base |
+| Tonspur | 0.3.0 | react-router 7 | idb | injectManifest | Assets | reusable | base + game skin |
+| Zeiterfassung | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable | base |
 
-- React 19, Vite 8, Tailwind 4, TypeScript ~6.0
-- ESLint 9 (must migrate to Biome)
-- **Dexie** with 16 stores and `dexie-react-hooks`
-- react-router-dom 7 ✅
-- chart.js + react-chartjs-2, lucide-react, pako
-- vite-plugin-pwa with **generateSW** (must migrate to injectManifest)
-- Cloudflare Worker with R2 + KV sync (E2E-encrypted) — the reference
-  implementation for the `sync` template
-- `packageManager` field already present ✅
-- LICENSE in README only — needs a `LICENSE` file
-
-### Migration PRs
-
-**PR 1: Tooling baseline**
-- `web-base add hygiene` — adds LICENSE file, CONTRIBUTING.md, SECURITY.md, .editorconfig
-- `web-base add biome` — adds biome.json, biome devDep, lint/format scripts
-- Remove: `eslint.config.js`, `@eslint/js`, `eslint-plugin-react-hooks`,
-  `eslint-plugin-react-refresh`, `typescript-eslint`, `globals`
-- Run `bun run format` to apply Biome formatting
-- Fix Biome lint findings manually
-- Switch `.github/workflows/ci.yml` to call `daniel-rck/web-base/.github/workflows/web-app-ci.yml@main`
-- Fill in package.json metadata: `description`, `keywords`, `author`, `homepage`, `repository`, `bugs`
-
-**PR 2: Storage — Dexie → idb (the big one)**
-- `web-base add storage` — installs `src/lib/db/db.ts` (placeholder schema) and
-  `useLiveQuery.ts`
-- Map the 16 Dexie tables to idb object stores. We will produce a separate
-  migration spec for this (`docs/specs/migration-dexie-to-idb.md`) — it's the
-  only file that should be created mid-migration, because the schema is
-  app-specific.
-- For each `useLiveQuery` from dexie-react-hooks: replace with the new
-  `useLiveQuery` from `src/lib/db/`. The hook shape matches deliberately, so
-  most call sites should change only the import.
-- Data migration: write a one-time migration script that reads from Dexie's
-  IndexedDB databases and writes to the new idb schema. Run it on app start
-  with a "migrated" flag stored in idb to prevent re-runs.
-- Remove `dexie` and `dexie-react-hooks` from package.json.
-- Tests: write a vitest suite covering the migration script with `fake-indexeddb`.
-
-**PR 3: PWA — generateSW → injectManifest**
-- `web-base add pwa` — installs sw.ts, vite.snippet.md, tsconfig.sw.json
-- Merge the snippet into vite.config.ts (or replace the generateSW block).
-- The Hausverwaltung sw.ts may need additional caching strategies for the
-  R2-synced data — document in `docs/specs/sw-strategy.md`.
-- Delete vite.snippet.md.
-
-**PR 4: Worker alignment**
-- Compare the current `worker/index.ts` against the worker template. They
-  should be very close.
-- Only diff: Hausverwaltung's worker includes the sync handlers from the sync
-  template. Run `web-base add sync` to ensure the sync code matches the
-  current source-of-truth. If the current Hausverwaltung sync is newer than
-  the template, this PR is the moment to **promote** the current
-  implementation into the template (separate PR to web-base).
-
-**PR 5: Layout**
-- `web-base add layout` — installs the UI components.
-- Refactor existing pages to use `<AppShell>` with `navItems` for the existing
-  modules (Mieter, Nebenkosten, Versorger, …).
-- Set `--accent-h: 250` (Slate-Blau).
-- This PR will be large because every page touches it. Consider doing it
-  module-by-module if needed.
-
-### Risk notes
-
-- The Dexie → idb migration is the biggest risk. Real user data exists in
-  Dexie databases on devices in production. The migration script must be
-  conservative: dry-run mode, log every write, abort on any error, never
-  delete the Dexie data until the user explicitly confirms.
-- Backup-first: trigger an automatic JSON export to the user's downloads
-  before running the migration script.
+**Tankzettel is the reference implementation.** Its `src/lib/ui/` is
+byte-identical to the template except for the `--accent-h` line, and it was the
+first app to wire the `web-base-check.yml` drift guard. When a question about
+"what should this look like" comes up, look there first.
 
 ---
 
-## Tennisturnier
+## Accepted deviations
 
-Smaller migration. Currently uses localStorage and lacks react-router-dom.
+A deviation is accepted when the app's version is *better for that app*, not
+merely different. Each one is also recorded in the app's own `CLAUDE.md`.
 
-### Current state
+### ErinnerMich — own app shell
 
-- React 19, Vite 8, Tailwind 4, TypeScript 5.9 (must bump to 6.0)
-- ESLint 9 (must migrate to Biome)
-- **localStorage only** (for tournament data)
-- **No react-router-dom**
-- @dnd-kit/*, @formkit/auto-animate, canvas-confetti, qrcode
-- vite-plugin-pwa with generateSW (must migrate to injectManifest)
-- Cloudflare Worker with **KV only** sync (simpler than Hausverwaltung's)
-- No `packageManager` field
-- No LICENSE file
-- Has `.claude/` directory (preserve)
+`src/components/AppShell.tsx` replaces the template's `AppShell`: a greeting
+header, a centre floating action button and safe-area padding. These are product
+decisions, not drift. The app composes the base's `AppHeader`, `AppNav`,
+`primitives`, `useTheme` and `InstallButton` rather than duplicating them.
 
-### Migration PRs
+### Hausverwaltung — own design system
 
-**PR 1: Tooling baseline**
-- Same as Hausverwaltung PR 1.
-- Additionally: bump TypeScript to `~6.0.2`.
-- Add `packageManager: "bun@1.3.11"`.
+`src/lib/ui/{layout,ui,shared,charts,sync}/` is a ~30-component design system
+(Modal, Drawer, Tabs, DataTable, Wizard, FormField, Toast, KpiTile …) that
+substantially exceeds the layout scaffold. Its `AppShell` and `PageHeader` are
+rewritten; `AppHeader` and `AppNav` are replaced by `layout/Nav.tsx`.
 
-**PR 2: Router**
-- `web-base add router`.
-- Add a `<RouterProvider>` wrapper around the existing single view.
-- Define one route initially (`/`). Subsequent features can add more.
+Also: `HashRouter` rather than `createBrowserRouter`, because the app shares
+data through hash-encoded URLs (`#/import/:payload`) and wants zero server
+config. Its worker sync (OTP pairing, R2 snapshots with `If-Match`, KV,
+rate-limit) is the source the `sync` template was derived from and stays ahead
+of it. Its `vitest.config.ts` uses `@cloudflare/vitest-pool-workers` projects.
 
-**PR 3: Storage — localStorage → idb**
-- `web-base add storage`.
-- Define the tournament schema in `src/lib/db/db.ts` (tournaments, matches,
-  players, rounds).
-- Migration script: read existing `localStorage` keys, write to idb, delete
-  the localStorage keys. One-time.
-- Tests with fake-indexeddb.
+### Pizzateig — warm theme fork
 
-**PR 4: PWA — generateSW → injectManifest**
-- Same as Hausverwaltung PR 3.
+`theme.css` keeps hue-65 warm-tinted surfaces, `--color-accent-warm`,
+`--shadow-warm` and `.slider-warm`. That palette is the product's identity. The
+generally-useful parts of its fork (the `--animate-*` keyframes, `--radius-2xl`,
+the `prefers-reduced-motion` reset) were promoted upstream in 0.3.0 instead of
+staying app-local.
 
-**PR 5: Worker alignment**
-- The current sync is **simpler than `web-base add sync`** (KV-only, no
-  E2E encryption). Two options:
-  - (a) Upgrade to the full sync template — overkill for tournament data
-        that's already shared via the share-code mechanism.
-  - (b) Document the simpler sync as a deviation in
-        `Tennisturnier/docs/specs/sync.md`. Leave the worker mostly as-is.
-- **Decision: option (b).** Tournament data is opt-in shared, not
-  privacy-sensitive in the same way; the existing simpler protocol fits.
+### Tennisturnier — KV-only sync
 
-**PR 6: Layout**
-- `web-base add layout`.
-- Refactor the current view into pages reachable via `navItems` (Setup,
-  Spielplan, Ergebnisse, Siegerehrung).
-- Set `--accent-h: 155` (Emerald).
+Tournament data is opt-in shared through a share-code, not privacy-sensitive in
+the way the `sync` template's E2E encryption is built for. The simpler KV-only
+protocol stays; see `Tennisturnier/docs/specs/sync.md`. The `TOURNAMENTS` KV
+binding name is hard-wired in `functions/_shared/kv.ts` — do not rename it.
 
----
+### Tonspur — dark-only, single route
 
-## ErinnerMich
+A cinema-themed quiz with one route. `AppNav` would be pure overhead, and the
+app deliberately runs dark-only (`color-scheme: dark`), so it ships no
+`ThemeToggle`. Its `.tonspur` palette aliases the base tokens rather than
+forking them.
 
-The closest to the target baseline already.
+### HamsterFlight — not a React app at all
 
-### Current state
+A faithful pixi.js port of a Flash game, reconstructed from bytecode analysis.
+It has one runtime dependency (`pixi.js`), no React, no Tailwind, no router, no
+`src/lib/ui`, no `src/lib/db`, no PWA, and its worker serves static assets with
+`not_found_handling: "404-page"` — correct for a single-page game, where the SPA
+fallback would be wrong.
 
-- React 19, Vite 8, Tailwind 4, TypeScript ~6.0 ✅
-- ESLint 10 (must migrate to Biome)
-- **idb already** ✅ — but verify the schema matches the template pattern
-- react-router-dom 7 ✅
-- framer-motion, @formkit/auto-animate, canvas-confetti, lucide-react
-- **vite-plugin-pwa with injectManifest already** ✅
-- No sync yet (planned)
-- LICENSE, CONTRIBUTING, SECURITY all present ✅
-- package.json metadata complete ✅
-- No `packageManager` field
+It shares the *tooling* baseline (Bun, Biome, the reusable CI job, hygiene
+files) and nothing else. `web-base check` reports layout/storage/router/pwa as
+"not adopted" for this repo, which is the intended answer, so **do not run
+`check --strict` here**.
 
-### Migration PRs
-
-**PR 1: Tooling baseline**
-- `web-base add biome` only (hygiene already done).
-- Add `packageManager: "bun@1.3.11"`.
-- Remove ESLint config and deps.
-- Switch CI to the reusable workflow.
-
-**PR 2: Storage alignment**
-- Compare `src/lib/db.ts` to the storage template. If the patterns match,
-  no change needed. If `useLiveQuery` differs from the template, decide whether
-  to:
-  - (a) update ErinnerMich to match the template (typical), or
-  - (b) update the template to match ErinnerMich (if its implementation is
-        cleaner — promote via a web-base PR first).
-
-**PR 3: PWA alignment**
-- Compare `src/sw/index.ts` to the PWA template. ErinnerMich already uses
-  injectManifest, but the structure may differ. Align if reasonable; document
-  deviations.
-
-**PR 4: Layout**
-- `web-base add layout`.
-- Refactor pages to use `<AppShell>` with `navItems` for Today, Habits, Mood,
-  Stats.
-- Set `--accent-h: 285` (Indigo).
-
-**PR 5: Sync (future)**
-- When sync is wanted, `web-base add sync`.
-- Reuse Hausverwaltung's R2+KV pattern as-is.
+Two further deviations: its README is English (it is a technical port write-up
+whose audience is the emulation community, not an end-user app README), and its
+CI keeps its own `guards`, `actionlint`, `smoke`, `dependency-review` and
+`gate`/`deploy` jobs alongside the reusable one. The `gate` job converts the
+`CLOUDFLARE_API_TOKEN` secret into a job output because `secrets` cannot be
+referenced from a job-level `if` — it must survive verbatim.
 
 ---
 
-## Cross-app checklist after migration
+## Deferred — known gaps, not yet scheduled
 
-When all three apps complete migration, verify across the board:
+**Worker runtime settings.** `compatibility_date` currently spans 2025-10-01
+(ErinnerMich, Minispiele) to 2026-08-31 (HamsterFlight), and
+`compatibility_flags = ["nodejs_compat"]` is set in five of nine apps with no
+discernible rule.
 
-- [ ] All three repos have identical `biome.json`
-- [ ] All three repos have identical `src/lib/ui/` (except `theme.css`'s `--accent-h`)
-- [ ] All three repos have identical `src/lib/db/useLiveQuery.ts`
-- [ ] All three repos have identical `src/sw/index.ts` (except app-specific handlers)
-- [ ] All three repos call the reusable workflow
-- [ ] All three repos have `packageManager: "bun@1.3.11"`
-- [ ] All three repos have full package.json metadata
-- [ ] All three repos have LICENSE, CONTRIBUTING.md, SECURITY.md
-- [ ] All three repos have docs/specs/
-- [ ] Each app's `--accent-h` differs (250 / 155 / 285)
+**Decision: these are deliberately out of scope for a fleet-wide alignment
+pass.** Both change Cloudflare Workers *runtime* semantics, and eight of nine
+apps auto-deploy on merge to `main` through Workers Builds — so a batch bump
+would ship nine simultaneous runtime changes with no per-app smoke test. Each
+app raises its own `compatibility_date` in its own PR, with a deploy check.
+The same applies to `nodejs_compat`: add it where a worker actually needs a Node
+built-in, remove it where nothing does, one app at a time.
 
-Run `web-base update layout` (and the others) on each app and verify the
-output is "All in sync." If not, either bring the app in line or update the
-template to match the better version.
+**`web-base pins`.** The CLI cannot apply the pin table: `patchPackageJson` is
+additive-only and the templates declare only nine packages, so React, Vite,
+TypeScript, Tailwind, Vitest, jsdom and every `@types/*` are unmanaged. Pins are
+applied by hand today. A read-only `web-base pins` report (compare an app's
+`package.json` against a machine-readable form of the `07-conventions.md` table,
+exit non-zero on mismatch) is the next step; `--apply` after that.
+
+**`init` produces a scaffold that does not build.** `router.tsx` lazy-imports
+`../features/home/HomePage.tsx`, which no template ships, and `init` writes no
+React/Vite/TS/Tailwind dependencies, no `vite.config.ts`, `index.html`,
+`main.tsx`, `index.css` or `tsconfig.app.json`. `tools-ci.yml` only lints the
+scaffold, never typechecks or builds it. None of the nine apps run `init`, so
+this blocks nothing — but a new app cannot be scaffolded end to end today.
+
+---
+
+## Cross-app checklist
+
+Re-verify after any base change:
+
+- [ ] All nine repos have the same `biome.json` (modulo documented overrides)
+- [ ] All nine repos have identical `src/lib/db/useLiveQuery.ts`
+- [ ] All React repos have identical `src/lib/ui/` except `theme.css`'s `--accent-h`
+- [ ] All nine repos call `web-app-ci.yml` and wire `web-base-check.yml`
+- [ ] All nine repos have `packageManager: "bun@1.3.11"` and a `bun.lock`
+- [ ] All nine repos match the pin table in `07-conventions.md`
+- [ ] All nine repos have LICENSE, CONTRIBUTING.md, SECURITY.md, `.editorconfig`
+- [ ] All nine repos have `CLAUDE.md` and `docs/specs/`
+- [ ] Every app's `--accent-h` is distinct and ≥25° from the reserved semantic hues
+- [ ] `bunx github:daniel-rck/web-base#vX.Y.Z check core` is clean in all nine

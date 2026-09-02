@@ -13,11 +13,11 @@ flows into apps via `web-base update`).
 
 ```json
 {
-  "react": "^19.2.5",
-  "react-dom": "^19.2.5",
-  "react-router-dom": "^7.14.2",
+  "react": "^19.2.8",
+  "react-dom": "^19.2.8",
+  "react-router-dom": "^7.18.3",
   "idb": "^8.0.3",
-  "lucide-react": "^1.16.0"
+  "lucide-react": "^1.39.0"
 }
 ```
 
@@ -25,28 +25,42 @@ flows into apps via `web-base update`).
 
 ```json
 {
-  "typescript": "~6.0.2",
-  "vite": "^8",
-  "@vitejs/plugin-react": "^6",
-  "vite-plugin-pwa": "^1.3",
-  "workbox-precaching": "^7.4.0",
-  "workbox-window": "^7.4.0",
-  "tailwindcss": "^4.2.4",
-  "@tailwindcss/vite": "^4.2.4",
-  "@biomejs/biome": "^2.4.15",
-  "vitest": "^4.1.5",
-  "@vitest/ui": "^4.1.5",
-  "jsdom": "^29.1.0",
-  "@testing-library/react": "^16.3.2",
-  "@testing-library/user-event": "^14.6.1",
-  "@testing-library/jest-dom": "^6.9.1",
-  "wrangler": "^4.87.0",
-  "@cloudflare/workers-types": "^4.20260504.1",
-  "@types/react": "^19.2.14",
-  "@types/react-dom": "^19.2.3",
-  "@types/node": "^25.6.0"
+  "typescript": "~7.0.2",
+  "vite": "^8.2.2",
+  "@vitejs/plugin-react": "^6.1.1",
+  "vite-plugin-pwa": "^1.3.0",
+  "workbox-precaching": "^7.4.1",
+  "workbox-window": "^7.4.1",
+  "tailwindcss": "^4.3.3",
+  "@tailwindcss/vite": "^4.3.3",
+  "@biomejs/biome": "^2.5.11",
+  "vitest": "^4.1.11",
+  "@vitest/ui": "^4.1.11",
+  "jsdom": "^30.0.1",
+  "fake-indexeddb": "^6.2.5",
+  "@testing-library/react": "^16.3.3",
+  "@testing-library/user-event": "^14.6.7",
+  "@testing-library/jest-dom": "^7.0.1",
+  "wrangler": "^4.128.0",
+  "@cloudflare/workers-types": "^5.20260902.1",
+  "@types/react": "^19.2.18",
+  "@types/react-dom": "^19.2.5",
+  "@types/node": "^26.4.1"
 }
 ```
+
+`typescript` keeps a tilde, not a caret: TypeScript minors routinely break
+builds, and the fleet has always pinned it that way. Everything else takes a
+caret.
+
+`workbox-routing`, `workbox-strategies` and `workbox-expiration` follow
+`workbox-precaching` at `^7.4.1` in the apps that use them.
+
+Domain dependencies stay per-app and out of this table: `chart.js`,
+`react-chartjs-2`, `@dnd-kit/*`, `framer-motion`, `qrcode`, `canvas-confetti`,
+`jspdf`, `pako`, `zod`, `ulid`, `@formkit/auto-animate`, `pixi.js`,
+`@fontsource-variable/*`, `@playwright/test`, `@cloudflare/vitest-pool-workers`,
+`@vite-pwa/assets-generator`.
 
 ### Package manager
 

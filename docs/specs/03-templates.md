@@ -46,6 +46,11 @@ imports from storage (for `useLiveQuery` examples) and from router (for
 
 Installs repo-hygiene files. See `07-conventions.md` for the exact content.
 
+> The app-facing Biome config is `cli/templates/biome/biome.json`. **Not** the
+> repo's own root `biome.json` — that one is tuned for a CLI repo
+> (`domains: { project }`, `!**/cli/dist` excludes) and copying it into an app
+> silently disables the React and test lint domains.
+
 Files:
 - `LICENSE` → `LICENSE` (MIT)
 - `CONTRIBUTING.md` → `CONTRIBUTING.md`
@@ -228,7 +233,7 @@ scripts:
 - `worker:deploy`: `wrangler deploy`
 
 The worker template ships a 30-40 line `index.ts` that:
-- Imports `manifest` from `__STATIC_CONTENT_MANIFEST` (Workers Static Assets)
+- Serves static assets via the `ASSETS` binding (`env.ASSETS.fetch(request)`)
 - Routes `/api/*` to a `handleApi(request, env, ctx)` stub
 - Falls through to static-asset serving via Workers Assets
 - Has a `/healthz` endpoint returning `{ ok: true }`
