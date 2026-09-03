@@ -138,6 +138,35 @@ shared building blocks:
 Customization happens by editing the scaffold seams and by composing the owned
 blocks from app code in `features/` — not by editing owned files in place.
 
+#### The per-app escape hatch: `webBase.unmanaged`
+
+`owned` vs `scaffold` is a property of the *template*, and it is occasionally
+wrong for exactly one app. An app can then take a single owned file off the
+base by listing its repo-relative path in `package.json`:
+
+```json
+"webBase": {
+  "version": "0.3.1",
+  "unmanaged": ["src/lib/db/useLiveQuery.ts"]
+}
+```
+
+`check` skips a listed file and reports it as `unmanaged`; `update --apply`
+still overwrites it, so an app that opts out is choosing to maintain that file
+itself and to not run `update` for the block that owns it.
+
+The current — and only — user is Hausverwaltung's `useLiveQuery`. Six of seven
+apps carry the template version byte-for-byte, so demoting it to `scaffold`
+would stop guarding a file that genuinely is shared; Hausverwaltung's 85 call
+sites predate the template's per-store signature and several query across
+stores, which that signature cannot express.
+
+**This is a last resort, not a way to keep a local edit.** The bar is: the
+template file is right for the other apps, *and* converging this one would be a
+rewrite rather than a re-sync. Prefer, in order: fix the app, promote the app's
+version into the template, or split the template file. An entry here is a
+standing debt and belongs in `08-app-migrations.md` with the reason.
+
 Example (`hygiene/manifest.json`):
 
 ```json
@@ -334,7 +363,9 @@ Behavior:
      as drift. Taking `primitives` and `InstallButton` without `AppNav` is a
      legitimate choice for a single-route app; `--strict` is how an app that
      means to be fully on the base turns that into a failure.
-4. If any owned file drifted, or no owned file matched anywhere, print an error
+4. Files listed in the app's `webBase.unmanaged` are skipped before any of
+   this and reported as `unmanaged` (see *The per-app escape hatch* above).
+5. If any owned file drifted, or no owned file matched anywhere, print an error
    and exit non-zero. `--strict` additionally fails when a block was never
    adopted. Also warns when the app's stamped `webBase.version` differs from
    the running CLI's version, since the comparison is against the CLI's bundled

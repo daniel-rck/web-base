@@ -74,6 +74,36 @@ jobs:
           node ${{ github.workspace }}/cli/dist/index.js check core
           node ${{ github.workspace }}/cli/dist/index.js check core --strict
 
+      - name: Regression - webBase.unmanaged exempts one owned file
+        run: |
+          # An app can take a single owned file off the base (Hausverwaltung's
+          # useLiveQuery has 85 call sites predating the template signature).
+          # Without the opt-out its CI stays red forever, which trains everyone
+          # to ignore the guard. The exemption must be narrow: the listed file
+          # is skipped, every other drift still fails.
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
+          git init -q && touch .gitignore
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add core
+          echo '// local fork' >> src/lib/db/useLiveQuery.ts
+          if node ${{ github.workspace }}/cli/dist/index.js check core; then
+            echo "FAIL: drift on an owned file was not reported"; exit 1
+          fi
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.webBase = { ...pkg.webBase, unmanaged: ["src/lib/db/useLiveQuery.ts"] };
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+          node ${{ github.workspace }}/cli/dist/index.js check core
+          # A second, unlisted file must still fail the guard.
+          echo '// local fork' >> src/lib/ui/primitives.tsx
+          if node ${{ github.workspace }}/cli/dist/index.js check core; then
+            echo "FAIL: the exemption leaked to an unlisted file"; exit 1
+          fi
+
       - name: Regression - update core is not a no-op
         run: |
           # `update` used to load a single manifest without expanding `extends`,

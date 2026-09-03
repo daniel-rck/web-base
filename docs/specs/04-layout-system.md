@@ -206,6 +206,8 @@ type AppShellProps = {
   logo?: ReactNode;
   navItems: NavItem[];
   headerActions?: ReactNode;
+  /** Replaces the built-in ThemeToggle — for apps with i18n. */
+  themeToggle?: ReactNode;
   children: ReactNode;
 };
 ```
@@ -233,12 +235,21 @@ type AppHeaderProps = {
   title: string;
   logo?: ReactNode;
   actions?: ReactNode;
+  /** Tailwind max-w-* for the inner container. Default `max-w-4xl`. */
+  maxWidthClass?: string;
 };
 ```
 
 Structure:
-- `<header class="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-surface/95 backdrop-blur">`
-- Inside: `container mx-auto max-w-4xl h-full px-4 flex items-center justify-between gap-4`
+- `<header class="sticky top-0 z-20 shrink-0 border-b border-border bg-surface/95 backdrop-blur">`
+  with `style={{ paddingTop: "env(safe-area-inset-top)" }}`
+- Inside: `container mx-auto {maxWidthClass} h-14 px-4 flex items-center justify-between gap-4`
+
+The `h-14` sits on the inner container, not on the `<header>`. On a notched
+phone the header also absorbs the status-bar inset; a fixed height on the
+`<header>` itself would push the title up under the notch. And `maxWidthClass`
+exists because an app with a wider content column (Minispiele's card grid) would
+otherwise get a header narrower than the page beneath it.
 - Left group: logo (if any, `text-accent-600`) + `<h1 class="text-base font-semibold tracking-tight truncate">{title}</h1>`
 - Right group: `<div class="flex items-center gap-2 shrink-0">{actions}</div>`
 
