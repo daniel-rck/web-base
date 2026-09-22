@@ -14,7 +14,7 @@ same PR.
 
 The general order, applied per app:
 
-1. **Tooling baseline.** `web-base add hygiene` + `web-base add biome`. Switch
+1. **Tooling baseline.** `web-base add hygiene` + `web-base add oxc`. Switch
    CI to the reusable workflow. Add `packageManager`. Fill in package.json
    metadata and the pin table from `07-conventions.md`.
 2. **Router.** `web-base add router` if the app has no `react-router-dom`.
@@ -24,8 +24,8 @@ The general order, applied per app:
 6. **Layout.** `web-base add layout`, then refactor screens onto `<AppShell>`.
 7. **Color accent.** Set `--accent-h` per the table in `04-layout-system.md`.
 
-Biome must land before any template that ships TypeScript, because those files
-are written against Biome's formatting rules.
+oxc (oxlint + oxfmt) must land before any template that ships TypeScript,
+because those files are written against oxfmt's formatting rules.
 
 ---
 
@@ -107,7 +107,7 @@ It has one runtime dependency (`pixi.js`), no React, no Tailwind, no router, no
 `not_found_handling: "404-page"` — correct for a single-page game, where the SPA
 fallback would be wrong.
 
-It shares the *tooling* baseline (Bun, Biome, the reusable CI job, hygiene
+It shares the *tooling* baseline (Bun, oxlint + oxfmt, the reusable CI job, hygiene
 files) and nothing else. `web-base check` reports layout/storage/router/pwa as
 "not adopted" for this repo, which is the intended answer, so **do not run
 `check --strict` here**.
@@ -156,7 +156,8 @@ this blocks nothing — but a new app cannot be scaffolded end to end today.
 
 Re-verify after any base change:
 
-- [ ] All nine repos have the same `biome.json` (modulo documented overrides)
+- [ ] All nine repos have the same `oxlint.base.json` and `.oxfmtrc.json` (per-app
+  overrides live in `.oxlintrc.json` / `.prettierignore`)
 - [ ] All nine repos have identical `src/lib/db/useLiveQuery.ts`
 - [ ] All React repos have identical `src/lib/ui/` except `theme.css`'s `--accent-h`
 - [ ] All nine repos call `web-app-ci.yml` and wire `web-base-check.yml`

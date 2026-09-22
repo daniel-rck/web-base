@@ -95,9 +95,9 @@ function lineDiff(before: string, after: string): { added: number; removed: numb
   const b = after.split("\n");
   const m = b.length;
   // prev[j] = length of LCS of a[i+1:] and b[j:]; built bottom-up.
-  let prev = new Array<number>(m + 1).fill(0);
+  let prev = Array.from({ length: m + 1 }, () => 0);
   for (let i = a.length - 1; i >= 0; i--) {
-    const curr = new Array<number>(m + 1).fill(0);
+    const curr = Array.from({ length: m + 1 }, () => 0);
     for (let j = m - 1; j >= 0; j--) {
       curr[j] = a[i] === b[j] ? (prev[j + 1] ?? 0) + 1 : Math.max(prev[j] ?? 0, curr[j + 1] ?? 0);
     }

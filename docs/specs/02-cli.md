@@ -124,7 +124,7 @@ treats it — this is what lets apps stay flexible while still being built from
 shared building blocks:
 
 - **`owned`** — a base building block (UI primitives, the layout shell, the
-  `idb`/`useLiveQuery` machinery, router/worker plumbing, `biome.json`). The app
+  `idb`/`useLiveQuery` machinery, router/worker plumbing, `oxlint.base.json`, `.oxfmtrc.json`). The app
   should *not* hand-edit it; `update --apply` overwrites it so upstream fixes
   flow in. If an owned file differs while the app is on the current version,
   `update` flags it as a local edit that will be reverted.
@@ -189,7 +189,7 @@ Example meta-template (`core/manifest.json`):
 {
   "name": "core",
   "description": "Everything every daniel-rck web app shares",
-  "extends": ["hygiene", "biome", "router", "storage", "pwa", "worker", "layout"]
+  "extends": ["hygiene", "oxc", "router", "storage", "pwa", "worker", "layout"]
 }
 ```
 
@@ -261,8 +261,8 @@ Behavior:
 3. Resolve and apply `core` (calls the same code path as `add core`).
 4. Stamp `webBase.version` into the new `package.json`.
 5. Run `git init` if the target is not already a repo. This is not cosmetic:
-   the `biome.json` the app receives sets `vcs.useIgnoreFile: true`, so linting
-   a non-repo directory misbehaves. A missing `git` binary is not fatal — the
+   oxlint and oxfmt skip what `.gitignore` lists, and the drift guard and CI
+   assume a repo. A missing `git` binary is not fatal — the
    command falls back to telling the user. Committing stays a next step.
 6. Print next steps (set the color accent in `theme.css`, fill in domain content).
 
@@ -418,7 +418,7 @@ try `../templates` first (built layout: `cli/dist/index.js` →
 
 The patcher does NOT remove existing keys — it only adds/updates. Removing old
 deps is a manual step listed in the `postInstall` messages of templates that
-replace existing setups (e.g. the `biome` template tells the user which ESLint
+replace existing setups (e.g. the `oxc` template tells the user which Biome/ESLint
 packages to remove).
 
 ## Tests

@@ -50,16 +50,17 @@ jobs:
       - name: Smoke test - scaffold core and lint
         run: |
           # Scaffold a full app from the templates and lint the result with the
-          # shipped biome.json. The repo's own `bun run lint` skips cli/templates,
-          # so this is the only guard that a freshly scaffolded app is lint-clean
-          # (Tailwind directives parse, a11y rules pass, imports organized).
+          # shipped oxlint/oxfmt configs. The repo's own `bun run lint` skips
+          # cli/templates, so this is the only guard that a freshly scaffolded app
+          # is lint-clean (a11y and hooks rules pass, imports sorted, formatted).
           SCRATCH=$(mktemp -d)
           trap 'rm -rf "$SCRATCH"' EXIT
           cd "$SCRATCH"
-          git init -q && touch .gitignore   # biome.json uses vcs.useIgnoreFile
+          git init -q && touch .gitignore   # oxfmt reads .gitignore
           echo '{"name":"scratch","version":"0.0.0"}' > package.json
           node ${{ github.workspace }}/cli/dist/index.js add core
-          bunx --bun @biomejs/biome@2.5.11 check .
+          bunx oxlint@1.85.0
+          bunx oxfmt@0.70.0 --check
 
       - name: Smoke test - check passes on a fresh scaffold
         run: |

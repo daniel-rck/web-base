@@ -1,0 +1,26 @@
+{
+  "name": "oxc",
+  "description": "oxlint (oxlint.base.json shared rules + .oxlintrc.json per-app overrides) + oxfmt (.oxfmtrc.json + .prettierignore) + lint/format scripts",
+  "files": [
+    { "from": "oxlint.base.json", "to": "oxlint.base.json" },
+    { "from": "oxlintrc.json", "to": ".oxlintrc.json", "policy": "scaffold" },
+    { "from": "oxfmtrc.json", "to": ".oxfmtrc.json" },
+    { "from": "prettierignore", "to": ".prettierignore", "policy": "scaffold" }
+  ],
+  "devDependencies": {
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0"
+  },
+  "scripts": {
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt"
+  },
+  "postInstall": [
+    "Remove config files: biome.json, biome.base.json, eslint.config.js, .prettierrc*, .eslintrc*",
+    "Remove devDeps: @biomejs/biome, eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier",
+    "Move per-app Biome overrides: lint rules into .oxlintrc.json's `overrides`, formatter exclusions into .prettierignore — never edit oxlint.base.json or .oxfmtrc.json, they are centrally managed and `update` overwrites them",
+    "Rewrite `// biome-ignore` comments as `// oxlint-disable-next-line <rule> -- <reason>`",
+    "Run: bun install",
+    "Run: bunx oxlint --fix && bunx oxfmt && bun run lint"
+  ]
+}

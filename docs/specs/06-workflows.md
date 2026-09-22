@@ -42,7 +42,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint (biome)
+      - name: Lint (oxlint + oxfmt)
         run: bun run lint
 
       - name: Typecheck
@@ -147,10 +147,11 @@ jobs:
           SCRATCH=$(mktemp -d)
           trap 'rm -rf "$SCRATCH"' EXIT
           cd "$SCRATCH"
-          git init -q && touch .gitignore   # biome.json uses vcs.useIgnoreFile
+          git init -q && touch .gitignore   # oxfmt reads .gitignore
           echo '{"name":"scratch","version":"0.0.0"}' > package.json
           node ${{ github.workspace }}/cli/dist/index.js add core
-          bunx --bun @biomejs/biome@2.4.15 check .
+          bunx oxlint@1.85.0
+          bunx oxfmt@0.70.0 --check
 
       - name: Verify skill/template alignment
         run: |
@@ -176,11 +177,11 @@ have a matching skill reference (so conventions stay documented).
 
 The "scaffold core and lint" step is the guard for template correctness. The
 repo's own `bun run lint` excludes `cli/templates` (templates are authored to
-pass their *own* shipped `biome.json`, not the repo's), so without this step a
-lint error inside a template — a missing Tailwind directive in the CSS parser
-config, a decorative SVG without `aria-hidden`, unorganized imports — would
-reach consumer apps unnoticed. Scaffolding a full app and running `biome check`
-on the result lints the templates with their shipped config, the only faithful
+pass their *own* shipped oxlint/oxfmt configs, not the repo's), so without
+this step a lint error inside a template — a hooks-rule violation, a decorative
+SVG without `aria-hidden`, unsorted imports — would reach consumer apps
+unnoticed. Scaffolding a full app and running `oxlint` + `oxfmt --check` on the
+result lints the templates with their shipped config, the only faithful
 check. Typecheck/build of the scaffolded app are intentionally left out: they
 need a full dependency install (React, idb, lucide-react, Vite …) and would be
 slow and flaky; revisit if template type errors start slipping through.

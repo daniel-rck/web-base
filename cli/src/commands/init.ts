@@ -88,9 +88,9 @@ export const initCommand = defineCommand({
 
       await stampWebBaseVersion({ targetDir, version: WEB_BASE_VERSION, dryRun });
 
-      // The shipped biome.json sets `vcs.useIgnoreFile: true`, so `bun run lint`
-      // misbehaves outside a Git repo. Scaffold one rather than leaving it to a
-      // next-step the user may skip.
+      // oxlint and oxfmt skip what .gitignore lists, and the rest of the
+      // workflow (drift guard, CI) assumes a Git repo. Scaffold one rather than
+      // leaving it to a next-step the user may skip.
       const repoInitialized = await ensureGitRepo(targetDir, dryRun);
 
       const nextSteps = [
@@ -125,7 +125,7 @@ async function ensureGitRepo(targetDir: string, dryRun: boolean): Promise<boolea
     consola.success("  .git — initialized");
     return true;
   }
-  consola.warn("  git init failed — initialize the repo by hand (Biome reads .gitignore via VCS).");
+  consola.warn("  git init failed — initialize the repo by hand (oxlint/oxfmt and CI assume one).");
   return false;
 }
 
@@ -150,8 +150,8 @@ function renderPackageJson(name: string): string {
       dev: "vite",
       build: "tsc -b && vite build",
       preview: "vite preview",
-      lint: "biome check .",
-      format: "biome format --write .",
+      lint: "oxlint && oxfmt --check",
+      format: "oxfmt",
       typecheck: "tsc -b --noEmit",
       test: "vitest run",
       "test:watch": "vitest",

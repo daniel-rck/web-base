@@ -25,7 +25,7 @@ We use spec-driven development:
 
 1. **Specs are the source of truth.** Code follows the spec, not the other way around.
 2. **Specs are living documents.** When the design changes, update the spec in the same change. Don't archive specs; use Git for history.
-3. **The compiler / Biome / tests are the gatekeepers.** After any change run:
+3. **The compiler / oxlint + oxfmt / tests are the gatekeepers.** After any change run:
    - `bun run typecheck`
    - `bun run lint`
    - `bun run test`
@@ -35,7 +35,7 @@ We use spec-driven development:
 
 - TypeScript strict, including `noUncheckedIndexedAccess`. Don't disable rules globally.
 - One concern per file. Helpers that have grown past ~150 lines probably want splitting.
-- Biome formats and lints — don't add ESLint or Prettier configs.
+- oxlint lints, oxfmt formats — don't add ESLint, Prettier or Biome configs.
 - Bun is the runtime + package manager. Don't introduce npm/yarn/pnpm lock files.
 - The CLI must run via `bunx github:daniel-rck/web-base ...` after `bun run build`. Verify with the `tools-ci.yml` workflow.
 

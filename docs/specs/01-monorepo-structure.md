@@ -29,8 +29,8 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
     "build:shebang": "sed -i '1i#!/usr/bin/env node' cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
-    "format": "biome format --write .",
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "bun run build"
@@ -41,8 +41,9 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
     "pathe": "^1.1.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
     "@types/node": "^25.6.0",
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.5"
   }
@@ -101,55 +102,57 @@ too). The alternative — publishing to npm so a packed tarball with a
 `import { foo } from "./bar.ts"`. Bun resolves this natively; the bundler
 strips the extension. Don't drop the `.ts` suffix on imports.
 
-## biome.json
+## .oxlintrc.json / .oxfmtrc.json
 
-The web-base repo uses Biome's strict settings since the CLI is a small, focused
-codebase:
+The web-base repo lints with oxlint and formats with oxfmt (see `07-conventions.md`).
+The lint config is tuned for a small Node CLI — no React/a11y plugins, and
+`no-explicit-any` is an error rather than a warn:
 
 ```json
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": {
-    "ignoreUnknown": true,
-    "includes": ["**", "!**/dist", "!**/cli/dist", "!**/node_modules", "!**/cli/templates"]
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
   },
-  "assist": {
-    "enabled": true,
-    "actions": {
-      "source": { "organizeImports": "on" }
-    }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100,
-    "lineEnding": "lf"
-  },
-  "linter": {
-    "enabled": true,
-    "domains": { "project": "recommended" },
-    "rules": {
-      "recommended": true,
-      "correctness": { "useExhaustiveDependencies": "warn" },
-      "style": { "noNonNullAssertion": "warn" }
-    }
-  },
-  "javascript": {
-    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
-  },
-  "json": { "formatter": { "trailingCommas": "none" } }
+  "env": { "builtin": true, "node": true, "es2024": true },
+  "ignorePatterns": ["cli/dist/**", "cli/templates/**"],
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "warn",
+    "no-console": ["warn", { "allow": ["error", "warn"] }]
+  }
 }
 ```
 
-**Decision: templates are biome-ignored.** Files under `cli/templates/` are
+The formatter config matches the one shipped to apps (`03-templates.md`, `oxc`),
+minus the app-only ignores. Markdown is excluded to keep the specs and
+changelog hand-wrapped:
+
+```json
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "endOfLine": "lf",
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "sortImports": { "newlinesBetween": false },
+  "sortPackageJson": false,
+  "ignorePatterns": ["cli/dist/**", "cli/templates/**", "bun.lock", "**/*.md"]
+}
+```
+
+**Decision: templates are lint- and format-ignored.** Files under `cli/templates/` are
 *source material to be copied verbatim* into target apps. Linting them here
 would either force them to match this repo's rules (wrong scope) or require
-double maintenance. They're checked by the consuming app's CI instead. The
-nested `cli/templates/biome/.gitignore` is a placeholder that anchors Biome
-v2's `vcs.useIgnoreFile` discovery for the nested template config — it's not
-shipped to apps (only `biome.json` is listed in the template manifest).
+double maintenance. They're checked with their *shipped* config by the
+"scaffold core and lint" step in `tools-ci.yml` instead. The template's own
+config files are stored without their leading dot (`oxlintrc.json`,
+`oxfmtrc.json`) so neither tool discovers them as nested configs here.
 
 ## .gitignore
 
@@ -161,8 +164,8 @@ node_modules/
 ```
 
 `cli/dist/` is intentionally **not** ignored — the committed bundle is what
-makes `bunx github:...` work (see the decision above). Biome skips it via
-`files.includes` in `biome.json`.
+makes `bunx github:...` work (see the decision above). oxlint and oxfmt skip it
+via `ignorePatterns`.
 
 ## File presence checklist
 
@@ -174,10 +177,11 @@ web-base/
 │   ├── tools-ci.yml
 │   └── web-app-ci.yml
 ├── .gitignore
+├── .oxfmtrc.json
+├── .oxlintrc.json
 ├── CLAUDE.md
 ├── LICENSE
 ├── README.md
-├── biome.json
 ├── docs/specs/
 │   └── (these files)
 ├── package.json

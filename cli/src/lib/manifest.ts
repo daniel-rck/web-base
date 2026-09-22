@@ -62,7 +62,9 @@ function parseManifest(raw: string, path: string): TemplateManifest {
   try {
     return JSON.parse(raw) as TemplateManifest;
   } catch (cause) {
-    throw new Error(`Malformed manifest.json at ${path}: ${(cause as Error).message}`);
+    throw new Error(`Malformed manifest.json at ${path}: ${(cause as Error).message}`, {
+      cause,
+    });
   }
 }
 
@@ -126,5 +128,5 @@ export async function listTemplates(): Promise<TemplateManifest[]> {
     const raw = await readFile(path, "utf8");
     manifests.push(parseManifest(raw, path));
   }
-  return manifests.sort((a, b) => a.name.localeCompare(b.name));
+  return manifests.toSorted((a, b) => a.name.localeCompare(b.name));
 }

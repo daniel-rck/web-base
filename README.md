@@ -30,7 +30,7 @@ bunx github:daniel-rck/web-base add sync    # extras only some apps have
 
 ## What's in `core`
 
-Everything every app of this family has: repo hygiene, Biome, the layout system
+Everything every app of this family has: repo hygiene, oxlint + oxfmt, the layout system
 (AppShell + theme tokens), idb storage, injectManifest PWA, react-router-dom,
 Cloudflare Worker routing.
 

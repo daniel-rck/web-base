@@ -1,6 +1,6 @@
 # Tech stack reference
 
-Version pins, the per-app `package.json` template, and the per-app Biome and
+Version pins, the per-app `package.json` template, and the per-app oxlint/oxfmt and
 TypeScript configs.
 
 ## Production dependencies
@@ -27,7 +27,8 @@ TypeScript configs.
   "workbox-window": "^7.4.0",
   "tailwindcss": "^4.2.4",
   "@tailwindcss/vite": "^4.2.4",
-  "@biomejs/biome": "^2.5.11",
+  "oxlint": "^1.85.0",
+  "oxfmt": "^0.70.0",
   "vitest": "^4.1.5",
   "@vitest/ui": "^4.1.5",
   "jsdom": "^29.1.0",
@@ -70,8 +71,8 @@ Required in every app's `package.json`. Bun's corepack integration uses it.
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "biome check .",
-    "format": "biome format --write .",
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -81,51 +82,11 @@ Required in every app's `package.json`. Bun's corepack integration uses it.
 }
 ```
 
-## Per-app Biome config
+## Per-app oxlint / oxfmt config
 
-```json
-{
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": {
-    "ignoreUnknown": true,
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.wrangler"]
-  },
-  "assist": {
-    "enabled": true,
-    "actions": {
-      "source": { "organizeImports": "on" }
-    }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100,
-    "lineEnding": "lf"
-  },
-  "linter": {
-    "enabled": true,
-    "domains": {
-      "react": "recommended",
-      "test": "recommended"
-    },
-    "rules": {
-      "recommended": true,
-      "correctness": { "useExhaustiveDependencies": "warn" },
-      "style": { "noNonNullAssertion": "warn" },
-      "suspicious": {
-        "noExplicitAny": "warn",
-        "noConsole": { "level": "warn", "options": { "allow": ["error", "warn"] } }
-      }
-    }
-  },
-  "javascript": {
-    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
-  },
-  "json": { "formatter": { "trailingCommas": "none" } }
-}
-```
+Shipped by the `oxc` template: `oxlint.base.json` + `.oxfmtrc.json` (owned) and
+`.oxlintrc.json` + `.prettierignore` (per-app seams). The full content is in
+`oxc.md`.
 
 ## tsconfig.app.json (per app)
 

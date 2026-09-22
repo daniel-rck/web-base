@@ -10,9 +10,9 @@ templates only have an `extends` array.
 
 | Template | Kind | What it installs |
 |---|---|---|
-| `core` | meta | hygiene + biome + router + storage + pwa + worker + layout |
+| `core` | meta | hygiene + oxc + router + storage + pwa + worker + layout |
 | `hygiene` | leaf | LICENSE, CONTRIBUTING, SECURITY, .editorconfig |
-| `biome` | leaf | biome.json + lint/format scripts + biome devDep |
+| `oxc` | leaf | oxlint + oxfmt configs + lint/format scripts + devDeps |
 | `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, theme.css |
 | `storage` | leaf | idb wrapper + useLiveQuery hook |
 | `pwa` | leaf | sw.ts (injectManifest) + vite config snippet + workbox deps |
@@ -32,7 +32,7 @@ templates only have an `extends` array.
 {
   "name": "core",
   "description": "Everything every daniel-rck web app shares",
-  "extends": ["hygiene", "biome", "router", "storage", "pwa", "worker", "layout"]
+  "extends": ["hygiene", "oxc", "router", "storage", "pwa", "worker", "layout"]
 }
 ```
 
@@ -58,10 +58,9 @@ reverted, destroying genuinely better guidance.
 The template is therefore a starting point that `update` never overwrites, and
 the `hygiene` block contributes no guarantees to `web-base check`.
 
-> The app-facing Biome config is `cli/templates/biome/biome.json`. **Not** the
-> repo's own root `biome.json` — that one is tuned for a CLI repo
-> (`domains: { project }`, `!**/cli/dist` excludes) and copying it into an app
-> silently disables the React and test lint domains.
+> The app-facing lint config is `cli/templates/oxc/oxlint.base.json`. **Not**
+> the repo's own root `.oxlintrc.json` — that one is tuned for a Node CLI and
+> copying it into an app silently disables the React and a11y rules.
 
 Files:
 - `LICENSE` → `LICENSE` (MIT)
@@ -77,58 +76,80 @@ postInstall:
 
 ---
 
-## biome
+## oxc
 
-Replaces ESLint + Prettier with Biome.
+Replaces ESLint + Prettier (and, since 0.4.0, Biome) with the oxc toolchain:
+oxlint lints, oxfmt formats.
 
 Files:
-- `biome.base.json` → `biome.base.json` — the shared rules. **owned**
-- `biome.json` → `biome.json` — `extends` the base, holds per-app `overrides`. **scaffold**
+- `oxlint.base.json` → `oxlint.base.json` — the shared lint rules. **owned**
+- `oxlintrc.json` → `.oxlintrc.json` — `extends` the base, holds per-app `overrides`. **scaffold**
+- `oxfmtrc.json` → `.oxfmtrc.json` — the formatter settings. **owned**
+- `prettierignore` → `.prettierignore` — per-app formatter exclusions. **scaffold**
 
-**Decision: two files, not one.** A single owned config cannot survive contact
-with the fleet. Several apps have overrides that are load-bearing and correct —
-turning the formatter off for generated data modules whose generator would
-otherwise re-break lint on every run, scoping a `noRestrictedGlobals` deny-list
-to a purity-guarded directory, relaxing `noNonNullAssertion` in tests. Under one
-owned file each of those reads as permanent drift, leaving only bad options:
-disable the drift guard in exactly the repos that need it, or run them red
-forever. The split lets `check` guard the shared rules byte-for-byte while apps
-keep their seams.
+(The leading dots are in the destination only, same as `hygiene`'s
+`editorconfig`. Undotted sources also keep oxlint/oxfmt from discovering the
+template configs as nested configs when this repo lints itself.)
 
-Apps put exceptions in `biome.json` and never touch `biome.base.json` — `update`
-overwrites it.
+**Decision: two lint files, not one.** A single owned config cannot survive
+contact with the fleet. Several apps have overrides that are load-bearing and
+correct — scoping a `no-restricted-globals` deny-list to a purity-guarded
+directory, relaxing `no-non-null-assertion` in tests. Under one owned file each
+of those reads as permanent drift, leaving only bad options: disable the drift
+guard in exactly the repos that need it, or run them red forever. The split
+lets `check` guard the shared rules byte-for-byte while apps keep their seams.
+
+**Decision: the formatter config is one owned file plus `.prettierignore`.**
+oxfmt has no `extends`, and the one per-app formatter need seen in the fleet is
+excluding generated files (Tonspur's data modules). oxfmt reads
+`.prettierignore` next to `.gitignore`, so that file is the seam; `*.generated.ts`
+is excluded in the owned config already. A JS/TS oxfmt config that imports a
+base was rejected — it needs a Node runtime to load and is experimental.
+
+Apps put exceptions in `.oxlintrc.json` / `.prettierignore` and never touch
+`oxlint.base.json` or `.oxfmtrc.json` — `update` overwrites them.
 
 devDependencies:
-- `@biomejs/biome`: `^2.5.11`
+- `oxlint`: `^1.85.0`
+- `oxfmt`: `^0.70.0`
 
 scripts:
-- `lint`: `biome check .`
-- `format`: `biome format --write .`
+- `lint`: `oxlint && oxfmt --check`
+- `format`: `oxfmt`
 
 postInstall:
-- "Remove config files: eslint.config.js, .prettierrc*, .eslintrc*"
-- "Remove devDeps: eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier"
+- "Remove config files: biome.json, biome.base.json, eslint.config.js, .prettierrc*, .eslintrc*"
+- "Remove devDeps: @biomejs/biome, eslint, typescript-eslint, @eslint/js, eslint-plugin-*, prettier"
+- "Move per-app Biome overrides: lint rules into .oxlintrc.json's `overrides`, formatter exclusions into .prettierignore — never edit oxlint.base.json or .oxfmtrc.json, they are centrally managed and `update` overwrites them"
+- "Rewrite `// biome-ignore` comments as `// oxlint-disable-next-line <rule> -- <reason>`"
 - "Run: bun install"
-- "Run: bunx @biomejs/biome check --write . && bun run lint"
+- "Run: bunx oxlint --fix && bunx oxfmt && bun run lint"
 
-`check --write` (not `format`) is used for the setup step because `biome format`
-only reformats whitespace — it does not organize imports/exports, so a plain
-`format && lint` can still fail on import ordering. `biome check --write` applies
-formatting *and* the safe import-organization fixes in one pass.
+`lint` runs both tools so it stays the single gate Biome's `check` was: lint
+errors *and* unformatted files fail it. Import sorting is part of oxfmt
+(`sortImports`, with `newlinesBetween: false` to match the ungrouped order
+Biome produced), so `oxfmt` alone fixes ordering. `sortPackageJson` is off —
+the CLI patches `package.json` surgically and a reordering formatter would
+fight it.
 
-`biome.base.json` sets `noConsole` (allowing `error`/`warn`), `noExplicitAny`,
-`noNonNullAssertion` and `useExhaustiveDependencies` to `warn`, and enables the
-`react` and `test` lint domains. The full file is
-`cli/templates/biome/biome.base.json`.
+`oxlint.base.json` enables the `typescript`, `unicorn`, `oxc`, `import`,
+`react`, `jsx-a11y` and `vitest` plugins, makes the `correctness` category an
+error and `suspicious` a warn, and sets `no-console` (allowing `error`/`warn`),
+`typescript/no-explicit-any`, `typescript/no-non-null-assertion` and
+`react/exhaustive-deps` to `warn`. Three rules are off because they misfire on
+the templates themselves: `no-underscore-dangle` (`self.__WB_MANIFEST`),
+`unicorn/require-post-message-target-origin` (`BroadcastChannel.postMessage`
+has no target origin) and `jsx-a11y/prefer-tag-over-role` (`role="status"` on
+the spinner is correct; `<output>` is for computed results). The full file is
+`cli/templates/oxc/oxlint.base.json`.
 
-> Do not copy the web-base repo's **own** root `biome.json` into an app. It is
-> tuned for a CLI repo (`domains: { project }`, `!**/cli/dist` excludes) and
-> silently disables the React and test lint domains an app needs.
+> Do not copy the web-base repo's **own** root `.oxlintrc.json` into an app. It
+> is tuned for a Node CLI (no `react`/`jsx-a11y` plugins, Node env) and
+> silently disables the React and a11y rules an app needs.
 
-It also sets `css.parser.tailwindDirectives: true`. Without it Biome's CSS
-parser rejects the Tailwind 4 directives (`@theme`, `@apply`, `@custom-variant`,
-`@utility`) used by the `layout` template's `theme.css`, so `biome check` would
-fail on a freshly scaffolded app before any user code is written.
+oxlint does not lint CSS or JSON. oxfmt formats both, and parses the Tailwind 4
+directives (`@theme`, `@apply`, `@custom-variant`, `@utility`) in the `layout`
+template's `theme.css` without extra config.
 
 ---
 
