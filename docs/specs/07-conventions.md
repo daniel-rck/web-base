@@ -7,7 +7,9 @@ template. When in doubt, fall back here.
 
 These are the versions every app targets after migration. The CLI templates
 ship with these. Bump them as a group through a PR to this repo (which then
-flows into apps via `web-base update`).
+flows into apps via `web-base update`). `cli/src/docs.test.ts` fails when a pin
+here disagrees with a template manifest, or when the skill's `tech-stack.md`
+disagrees with this file — bump all three together.
 
 ### Production dependencies
 
@@ -33,7 +35,8 @@ flows into apps via `web-base update`).
   "workbox-window": "^7.4.1",
   "tailwindcss": "^4.3.3",
   "@tailwindcss/vite": "^4.3.3",
-  "@biomejs/biome": "^2.5.11",
+  "oxlint": "^1.85.0",
+  "oxfmt": "^0.70.0",
   "vitest": "^4.1.11",
   "@vitest/ui": "^4.1.11",
   "jsdom": "^30.0.1",
@@ -95,8 +98,8 @@ The `init` command generates this shape for new apps:
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "biome check .",
-    "format": "biome format --write .",
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -162,7 +165,8 @@ Rejected approaches with the reason and the replacement:
 
 | Rejected | Reason | Replacement |
 |---|---|---|
-| ESLint + Prettier | Two tools, two configs, slower | Biome (one tool, one config) |
+| ESLint + Prettier | Two tools, two configs, slower | oxlint + oxfmt |
+| Biome | Own rule names and formatting dialect; ESLint plugin rules (`react-hooks`, `jsx-a11y`, `unicorn`) only partly ported | oxlint + oxfmt (ESLint-compatible rule names, Prettier-compatible output) |
 | Dexie | Too magical, IndexedDB abstraction unneeded for these use cases | idb + custom `useLiveQuery` (~50 lines) |
 | localStorage for app data | Synchronous, size-limited, no queries | idb |
 | generateSW (vite-plugin-pwa) | Can't add message handlers / push handlers / background sync | injectManifest + hand-written sw.ts |
@@ -194,11 +198,11 @@ For consistency:
 - Prefer `type` over `interface` unless you need declaration merging.
 - Imports use `.ts` extension explicitly (allowed by `allowImportingTsExtensions`).
 - `verbatimModuleSyntax: true` — use `import type` for type-only imports.
-- No `any`. Use `unknown` and narrow. Biome warns on `any`.
+- No `any`. Use `unknown` and narrow. oxlint warns on `any`.
 - No `!` non-null assertion unless followed by a comment explaining why it's
-  safe. Biome warns on `!`.
+  safe. oxlint warns on `!`.
 - No `console.log` in production code paths. `console.error`/`warn` are fine
-  for genuine errors. Biome warns on `console.log`.
+  for genuine errors. oxlint warns on `console.log`.
 
 ## File organization
 
@@ -227,7 +231,7 @@ worker/
 This maps onto the file `policy` in the template manifests (`02-cli.md`):
 
 - **owned** building blocks should remain identical across apps — `primitives`,
-  the layout shell, `useLiveQuery`, router/worker plumbing, `biome.json`. Diff
+  the layout shell, `useLiveQuery`, router/worker plumbing, `oxlint.base.json`, `.oxfmtrc.json`. Diff
   drift here is a signal something's wrong: either the convention changes (update
   the template) or the app runs `web-base update --apply` to pull the base back.
 - **scaffold** seams are expected to differ per app — `theme.css` (`--accent-h`),

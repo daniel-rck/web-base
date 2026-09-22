@@ -32,7 +32,9 @@ export async function patchPackageJson(options: PatchOptions): Promise<void> {
   try {
     pkg = JSON.parse(raw) as PackageJson;
   } catch (cause) {
-    throw new Error(`Malformed package.json at ${pkgPath}: ${(cause as Error).message}`);
+    throw new Error(`Malformed package.json at ${pkgPath}: ${(cause as Error).message}`, {
+      cause,
+    });
   }
 
   let changed = false;
@@ -89,7 +91,9 @@ export async function stampWebBaseVersion(options: {
   try {
     pkg = JSON.parse(raw) as PackageJson;
   } catch (cause) {
-    throw new Error(`Malformed package.json at ${pkgPath}: ${(cause as Error).message}`);
+    throw new Error(`Malformed package.json at ${pkgPath}: ${(cause as Error).message}`, {
+      cause,
+    });
   }
 
   if (pkg.webBase?.version === version) {

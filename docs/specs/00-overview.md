@@ -47,7 +47,8 @@ web-base/
 ├── CLAUDE.md
 ├── package.json          # bin: web-base → cli/dist/index.js
 ├── tsconfig.json
-├── biome.json
+├── .oxlintrc.json
+├── .oxfmtrc.json
 ├── .github/
 │   └── workflows/
 │       ├── web-app-ci.yml      # reusable workflow for apps
@@ -62,7 +63,7 @@ web-base/
 │   └── templates/
 │       ├── core/             # meta-template: extends the others
 │       ├── hygiene/          # LICENSE, CONTRIBUTING, SECURITY, .editorconfig
-│       ├── biome/            # biome.json + scripts
+│       ├── oxc/              # oxlint + oxfmt configs + scripts
 │       ├── layout/           # AppShell + theme.css + design tokens
 │       ├── storage/          # idb + useLiveQuery
 │       ├── pwa/              # injectManifest + sw.ts
@@ -79,7 +80,7 @@ web-base/
 │       ├── worker.md
 │       ├── sync.md
 │       ├── ci.md
-│       ├── biome.md
+│       ├── oxc.md
 │       ├── router.md
 │       └── hygiene.md
 └── docs/
@@ -93,7 +94,7 @@ If implementing this repo from scratch, build in this order so each step is
 verifiable on its own:
 
 1. **Monorepo scaffolding** → `01-monorepo-structure.md`
-   - Root `package.json`, `tsconfig.json`, `biome.json`, `README.md`, `CLAUDE.md`.
+   - Root `package.json`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `README.md`, `CLAUDE.md`.
    - Verify: `bun install`, `bun run typecheck`, `bun run lint` succeed on an empty CLI.
 
 2. **CLI core** → `02-cli.md`
@@ -102,7 +103,7 @@ verifiable on its own:
 
 3. **Templates** → `03-templates.md`
    - One template at a time. Each ships with `manifest.json` + its files.
-   - Start with `hygiene` (smallest), then `biome`, then `layout`, then the rest.
+   - Start with `hygiene` (smallest), then `oxc`, then `layout`, then the rest.
    - Verify per template: create a scratch repo, run `bunx . add <template>`, inspect output.
 
 4. **Reusable workflow** → `06-workflows.md`

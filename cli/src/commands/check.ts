@@ -2,7 +2,13 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { resolve } from "pathe";
 import { diffTemplateFile } from "../lib/copy.ts";
-import { filePolicy, loadManifest, resolveTemplate } from "../lib/manifest.ts";
+import {
+  filePolicy,
+  loadManifest,
+  resolveTemplate,
+  type TemplateManifest,
+} from "../lib/manifest.ts";
+import { findObsolete } from "../lib/obsolete.ts";
 import { readUnmanagedFiles, readWebBaseVersion } from "../lib/pkg.ts";
 import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
 
@@ -18,7 +24,8 @@ export const checkCommand = defineCommand({
     cwd: { type: "string", description: "Target directory (default: current)" },
     strict: {
       type: "boolean",
-      description: "Also fail when a building block has not been adopted at all",
+      description:
+        "Also fail when a building block has not been adopted at all, or a superseded setup is left over",
     },
   },
   async run({ args }) {
@@ -38,9 +45,11 @@ export const checkCommand = defineCommand({
       const chain = await resolveTemplate(template);
       const byLeaf = new Map<string, LeafResult>();
       const exempted: string[] = [];
+      const manifests: TemplateManifest[] = [];
 
       for (const leaf of chain) {
         const manifest = await loadManifest(leaf);
+        manifests.push(manifest);
         if (!manifest.files?.length) continue;
         const result: LeafResult = { matched: [], drifted: [], missing: [] };
         for (const spec of manifest.files) {
@@ -85,6 +94,14 @@ export const checkCommand = defineCommand({
         consola.info(`  ${leaf} — partially adopted (${r.missing.length} owned files absent)`);
       }
 
+      // Leftovers of a setup a template replaced (biome.json after the switch to
+      // oxc). Not drift — the base files can all match — but a half-finished
+      // migration: two linters' configs, one of them dead.
+      const obsolete = await findObsolete(targetDir, manifests);
+      for (const item of obsolete) {
+        consola.warn(`  ${item.name} — obsolete ${item.kind}, superseded by ${item.template}`);
+      }
+
       if (drifted.length > 0) {
         consola.error(
           `web-base check: ${drifted.length} owned file(s) drifted from the base. ` +
@@ -100,16 +117,17 @@ export const checkCommand = defineCommand({
         process.exitCode = 1;
         return;
       }
-      if (strict && (unadopted.length > 0 || partial.length > 0)) {
+      if (strict && (unadopted.length > 0 || partial.length > 0 || obsolete.length > 0)) {
         const detail = [
           unadopted.length > 0 ? `${unadopted.length} block(s) not adopted` : "",
           partial.length > 0 ? `${partial.length} owned file(s) absent` : "",
+          obsolete.length > 0 ? `${obsolete.length} obsolete leftover(s)` : "",
         ]
           .filter(Boolean)
           .join(", ");
         consola.error(
           `web-base check: ${detail}. ` +
-            "Run `web-base add <template>`, or drop --strict if the app deliberately does without them.",
+            "Run `web-base add <template>` and remove obsolete leftovers, or drop --strict if the app deliberately does without the blocks.",
         );
         process.exitCode = 1;
         return;
@@ -121,6 +139,7 @@ export const checkCommand = defineCommand({
         unadopted.length > 0 ? `${unadopted.join(", ")} not adopted` : "",
         exempted.length > 0 ? `${exempted.length} unmanaged` : "",
         partial.length > 0 ? `${partial.length} owned file(s) absent` : "",
+        obsolete.length > 0 ? `${obsolete.length} obsolete leftover(s)` : "",
       ].filter(Boolean);
       const skipped = notes.length > 0 ? ` (${notes.join("; ")})` : "";
       consola.success(`web-base check: ${matched} owned files match${skipped}.`);

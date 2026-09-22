@@ -32,7 +32,7 @@ phrasing per the skill-creator guidelines.
 ```yaml
 ---
 name: daniel-rck-web-app
-description: Conventions and patterns for the personal web apps under daniel-rck (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 6 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + Biome. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
+description: Conventions and patterns for the personal web apps under daniel-rck (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ---
 ```
 
@@ -77,7 +77,7 @@ A table mapping topics to reference files:
 
 | Working on… | Reference |
 |---|---|
-| Dependency versions, package.json template, biome config | `tech-stack.md` |
+| Dependency versions, package.json template, oxlint/oxfmt config | `tech-stack.md` |
 | AppShell, design tokens, per-app accent | `layout-system.md` |
 | idb patterns, useLiveQuery, migration recipes | `storage.md` |
 | injectManifest, sw.ts skeleton, Workbox precache | `pwa.md` |
@@ -93,7 +93,7 @@ relevant to the current task."
 
 A list of rejected approaches with one-line rationale each:
 
-- ESLint + Prettier → Biome (one tool, faster)
+- ESLint + Prettier, Biome → oxlint + oxfmt (ESLint-compatible rules, Prettier-compatible output)
 - Dexie → idb (lighter, less magic)
 - localStorage for app data → idb (only settings in localStorage)
 - generateSW → injectManifest (custom message handlers needed)
@@ -114,9 +114,10 @@ under `cli/templates/<name>/`.
 
 ### `references/tech-stack.md`
 
-- Exact version pins for production deps and devDeps
+- Exact version pins for production deps and devDeps — identical to
+  `07-conventions.md`, guarded by `cli/src/docs.test.ts`
 - The full `package.json` template (with `<placeholders>`)
-- The `biome.json` content (matches `cli/templates/biome/biome.json`)
+- The oxlint/oxfmt config content (matches `cli/templates/oxc/`)
 - The `tsconfig.app.json` content (strict, `noUncheckedIndexedAccess`)
 - The `vite.config.ts` skeleton with VitePWA injectManifest config
 

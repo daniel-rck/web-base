@@ -1,6 +1,6 @@
 ---
 name: daniel-rck-web-app
-description: Conventions and patterns for the personal web apps under daniel-rck (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + Biome. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", "Minispiele", "Tankzettel", "Zeiterfassung", "Pizzateig", "Tonspur", "HamsterFlight", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
+description: Conventions and patterns for the personal web apps under daniel-rck (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", "Minispiele", "Tankzettel", "Zeiterfassung", "Pizzateig", "Tonspur", "HamsterFlight", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ---
 
 # daniel-rck Web App Conventions
@@ -26,7 +26,7 @@ through `@daniel-rck/web-base`.
 
 **HamsterFlight is the deliberate exception**: a pixi.js canvas game with no
 React, no Tailwind, no router, no `src/lib/ui` and no PWA. It shares the
-tooling baseline (Bun, Biome, CI, hygiene) and nothing else. Don't "align" its
+tooling baseline (Bun, oxlint + oxfmt, CI, hygiene) and nothing else. Don't "align" its
 rendering code — see `docs/specs/08-app-migrations.md`.
 
 Future apps follow the same shape unless the deviation is documented in their
@@ -41,7 +41,7 @@ own `docs/specs/`.
 - IndexedDB via `idb` + a small `useLiveQuery` hook
 - PWA via `vite-plugin-pwa` with `injectManifest`
 - `react-router-dom` 7 with typed route constants
-- Biome (replaces ESLint + Prettier)
+- oxlint + oxfmt (replace ESLint + Prettier and Biome)
 - Optional: R2 + KV E2E-encrypted sync (see `sync` template)
 
 Exact version pins live in `references/tech-stack.md`.
@@ -96,7 +96,7 @@ pick what's relevant to the current task.
 | Working on… | Reference |
 |---|---|
 | Dependency versions, package.json template, vite config | `tech-stack.md` |
-| Biome config (linter rules, formatter settings) | `biome.md` |
+| oxlint + oxfmt config (linter rules, formatter settings) | `oxc.md` |
 | LICENSE, CONTRIBUTING, SECURITY, .editorconfig | `hygiene.md` |
 | AppShell, design tokens, per-app accent | `layout-system.md` |
 | idb patterns, useLiveQuery, migration recipes | `storage.md` |
@@ -108,7 +108,7 @@ pick what's relevant to the current task.
 
 ## Anti-patterns
 
-- **ESLint + Prettier** → Biome (one tool, faster, one config).
+- **ESLint + Prettier, Biome** → oxlint + oxfmt (ESLint-compatible rules, Prettier-compatible output, one shared base config).
 - **Dexie** → idb (lighter, less magic, our `useLiveQuery` is ~50 lines).
 - **localStorage for app data** → idb (synchronous, no queries, size-limited).
 - **generateSW** → injectManifest (custom message handlers needed).

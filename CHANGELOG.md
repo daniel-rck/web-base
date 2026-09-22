@@ -9,6 +9,60 @@ The version is bumped on every change (driven by the conventional-commit type:
 `web-base update <template> --apply`; the stamped `webBase.version` in an app's
 `package.json` records which base it last pulled.
 
+## [0.5.0] - 2026-09-22
+
+### Added
+
+- **`check` and `update` report leftovers of a superseded setup.** Manifests
+  can declare `obsolete` files and packages; the `oxc` template lists
+  `biome.json`, `biome.base.json` and `@biomejs/biome`. Both commands warn,
+  `check --strict` fails, nothing is deleted automatically — a leftover config
+  may still hold overrides that need porting first.
+- **`docs.test.ts` guards the version pins in the docs.** `07-conventions.md`
+  and the skill's `tech-stack.md` must match the template manifests and each
+  other, `01-monorepo-structure.md` must show the current version and root
+  pins, and the skill spec's stack line must equal `SKILL.md`'s.
+
+### Fixed
+
+- **The skill's `tech-stack.md` was a round of bumps behind** (jsdom 29 vs 30,
+  `@testing-library/jest-dom` 6 vs 7, and most other pins).
+  `01-monorepo-structure.md` showed version 0.3.0 and `05-skill.md` TypeScript 6.
+- **The 0.4.0 migration note named the wrong command.** `update` never patches
+  `package.json`; apps switch to oxlint + oxfmt with `web-base add oxc`.
+
+## [0.4.0] - 2026-09-22
+
+### Changed
+
+- **Biome is replaced by oxlint + oxfmt.** The `biome` template is now `oxc`
+  (and `core` extends it). It ships `oxlint.base.json` (owned, shared rules),
+  `.oxlintrc.json` (scaffold, `extends` the base and holds per-app
+  `overrides`), `.oxfmtrc.json` (owned) and `.prettierignore` (scaffold,
+  per-app formatter exclusions — oxfmt has no `extends`). `lint` becomes
+  `oxlint && oxfmt --check`, `format` becomes `oxfmt`. The web-base repo itself
+  switched too.
+
+  **Decision:** oxlint uses ESLint rule names and ports the `react-hooks`,
+  `jsx-a11y`, `unicorn` and `vitest` plugins; oxfmt is Prettier-compatible and
+  sorts imports. `sortImports.newlinesBetween: false` keeps Biome's ungrouped
+  import order, so switching reformats very little.
+
+  Three rules are off in the base because they misfire on the templates:
+  `no-underscore-dangle` (`self.__WB_MANIFEST`),
+  `unicorn/require-post-message-target-origin` (`BroadcastChannel` has no
+  target origin) and `jsx-a11y/prefer-tag-over-role` (the spinner's
+  `role="status"`). `useLiveQuery` suppresses `react/refs` and
+  `react/exhaustive-deps` on its latest-ref and forwarded-`deps` lines, and
+  listens with `addEventListener` instead of `onmessage`.
+
+  Apps migrate with `web-base add oxc` (copies the new configs, switches the
+  scripts, adds the devDeps; `update` only touches files), then: delete `biome.json`
+  and `biome.base.json`, drop `@biomejs/biome`, move Biome `overrides` into
+  `.oxlintrc.json` (lint) or `.prettierignore` (format), rewrite
+  `// biome-ignore` as `// oxlint-disable-next-line <rule> -- <reason>`, and
+  run `bunx oxlint --fix && bunx oxfmt && bun run lint`.
+
 ## [0.3.1] - 2026-09-02
 
 ### Fixed
