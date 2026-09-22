@@ -2,10 +2,24 @@
   "name": "oxc",
   "description": "oxlint (oxlint.base.json shared rules + .oxlintrc.json per-app overrides) + oxfmt (.oxfmtrc.json + .prettierignore) + lint/format scripts",
   "files": [
-    { "from": "oxlint.base.json", "to": "oxlint.base.json" },
-    { "from": "oxlintrc.json", "to": ".oxlintrc.json", "policy": "scaffold" },
-    { "from": "oxfmtrc.json", "to": ".oxfmtrc.json" },
-    { "from": "prettierignore", "to": ".prettierignore", "policy": "scaffold" }
+    {
+      "from": "oxlint.base.json",
+      "to": "oxlint.base.json"
+    },
+    {
+      "from": "oxlintrc.json",
+      "to": ".oxlintrc.json",
+      "policy": "scaffold"
+    },
+    {
+      "from": "oxfmtrc.json",
+      "to": ".oxfmtrc.json"
+    },
+    {
+      "from": "prettierignore",
+      "to": ".prettierignore",
+      "policy": "scaffold"
+    }
   ],
   "devDependencies": {
     "oxfmt": "^0.70.0",
@@ -22,5 +36,9 @@
     "Rewrite `// biome-ignore` comments as `// oxlint-disable-next-line <rule> -- <reason>`",
     "Run: bun install",
     "Run: bunx oxlint --fix && bunx oxfmt && bun run lint"
-  ]
+  ],
+  "obsolete": {
+    "files": ["biome.json", "biome.base.json"],
+    "devDependencies": ["@biomejs/biome"]
+  }
 }

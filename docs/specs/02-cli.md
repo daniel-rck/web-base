@@ -114,8 +114,22 @@ type TemplateManifest = {
 
   // Shown to the user after install completes
   postInstall?: string[];
+
+  // What this template superseded. `check` and `update` report leftovers.
+  obsolete?: {
+    files?: string[];           // paths relative to the target repo root
+    dependencies?: string[];    // package names, looked up in both
+    devDependencies?: string[]; // dependencies and devDependencies
+  };
 };
 ```
+
+**Decision: superseded setups are declared, reported, never deleted.** When a
+template replaces a tool (`oxc` replaced Biome), the manifest lists the old
+files and packages under `obsolete` (`lib/obsolete.ts`, `findObsolete`). The
+CLI never removes them: a leftover `biome.json` can still carry per-app
+overrides that have to be ported to `.oxlintrc.json` first. Reporting them is
+what keeps nine half-finished migrations from lingering unnoticed.
 
 ### File policy: owned vs scaffold
 
@@ -331,7 +345,9 @@ Behavior:
    - Else (owned): report `missing`, or `differs` with line counts. An owned file
      that differs while the app is on the current version is additionally flagged
      as a local edit that `--apply` will revert.
-4. Print a summary (`N identical, N differs, N missing, N scaffold left as-is`).
+4. Print a summary (`N identical, N differs, N missing, N scaffold left as-is`),
+   then warn about every `obsolete` leftover of the resolved templates (see
+   *Manifest format*), with a hint to remove it by hand.
 5. If `--apply` is set, overwrite the queued **owned** files (differing/missing;
    the queue decision is `shouldApplyUpdate` from `lib/manifest.ts`)
    with the template source and stamp `webBase.version` (the stamp updates even
@@ -340,7 +356,9 @@ Behavior:
 
 `update` does **not** patch `package.json` dependencies/scripts — only files
 (plus the `webBase.version` stamp on `--apply`). Dependency drift is visible
-through normal `bun outdated`.
+through normal `bun outdated`. A template that changes scripts or adds devDeps
+(e.g. the switch to `oxc`) is picked up with `web-base add <template>`, which
+skips existing files and patches `package.json`.
 
 ### `web-base check <template>`
 
@@ -365,9 +383,11 @@ Behavior:
      means to be fully on the base turns that into a failure.
 4. Files listed in the app's `webBase.unmanaged` are skipped before any of
    this and reported as `unmanaged` (see *The per-app escape hatch* above).
+   `obsolete` leftovers of the resolved templates are warned about; they are
+   not drift.
 5. If any owned file drifted, or no owned file matched anywhere, print an error
    and exit non-zero. `--strict` additionally fails when a block was never
-   adopted. Also warns when the app's stamped `webBase.version` differs from
+   adopted or an `obsolete` leftover is present. Also warns when the app's stamped `webBase.version` differs from
    the running CLI's version, since the comparison is against the CLI's bundled
    templates.
 
@@ -434,6 +454,13 @@ Vitest tests live in `cli/src/**/*.test.ts`:
   alone, overwrites existing differing keys; `stampWebBaseVersion` adds/updates
   `webBase.version` and preserves other fields; `readWebBaseVersion` reads or
   returns undefined.
+- `lib/obsolete.test.ts`: `findObsolete` reports leftover files and
+  dependencies (either section), ignores manifests without `obsolete`,
+  tolerates a missing or malformed `package.json`.
+- `docs.test.ts`: version pins in `07-conventions.md` and the skill's
+  `tech-stack.md` match the template manifests (and each other);
+  `01-monorepo-structure.md` shows the current version and root pins; the
+  "Stack is …" line of `05-skill.md` equals `SKILL.md`'s.
 - `version.test.ts`: `WEB_BASE_VERSION` matches the root `package.json` version
   (drift guard); `compareVersions` ordering.
 

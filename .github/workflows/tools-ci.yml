@@ -105,6 +105,25 @@ jobs:
             echo "FAIL: the exemption leaked to an unlisted file"; exit 1
           fi
 
+      - name: Regression - check reports a leftover Biome setup
+        run: |
+          # After the switch to oxc, a biome.json left behind means a migration
+          # was never finished. Plain `check` warns (the base files still match);
+          # `--strict` must fail until the leftover is gone.
+          SCRATCH=$(mktemp -d)
+          trap 'rm -rf "$SCRATCH"' EXIT
+          cd "$SCRATCH"
+          git init -q && touch .gitignore
+          echo '{"name":"scratch","version":"0.0.0"}' > package.json
+          node ${{ github.workspace }}/cli/dist/index.js add core
+          echo '{}' > biome.json
+          node ${{ github.workspace }}/cli/dist/index.js check core
+          if node ${{ github.workspace }}/cli/dist/index.js check core --strict; then
+            echo "FAIL: --strict passed with an obsolete biome.json"; exit 1
+          fi
+          rm biome.json
+          node ${{ github.workspace }}/cli/dist/index.js check core --strict
+
       - name: Regression - update core is not a no-op
         run: |
           # `update` used to load a single manifest without expanding `extends`,

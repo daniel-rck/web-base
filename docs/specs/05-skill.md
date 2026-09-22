@@ -32,7 +32,7 @@ phrasing per the skill-creator guidelines.
 ```yaml
 ---
 name: daniel-rck-web-app
-description: Conventions and patterns for the personal web apps under daniel-rck (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 6 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
+description: Conventions and patterns for the personal web apps under daniel-rck (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ---
 ```
 
@@ -114,7 +114,8 @@ under `cli/templates/<name>/`.
 
 ### `references/tech-stack.md`
 
-- Exact version pins for production deps and devDeps
+- Exact version pins for production deps and devDeps — identical to
+  `07-conventions.md`, guarded by `cli/src/docs.test.ts`
 - The full `package.json` template (with `<placeholders>`)
 - The oxlint/oxfmt config content (matches `cli/templates/oxc/`)
 - The `tsconfig.app.json` content (strict, `noUncheckedIndexedAccess`)

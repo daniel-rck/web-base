@@ -46,6 +46,17 @@ export type TemplateManifest = {
   devDependencies?: Record<string, string>;
   scripts?: Record<string, string>;
   postInstall?: string[];
+  obsolete?: ObsoleteSpec;
+};
+
+/**
+ * What a template superseded (e.g. `oxc` replaced Biome). `check` and `update`
+ * report leftovers so a half-finished migration doesn't linger unnoticed.
+ */
+export type ObsoleteSpec = {
+  files?: string[];
+  dependencies?: string[];
+  devDependencies?: string[];
 };
 
 export function templatesDir(): string {

@@ -83,7 +83,9 @@ bunx github:daniel-rck/web-base add oxc
 
 ## Migrating from Biome (or ESLint + Prettier)
 
-After running `add oxc` (or `update core --apply`):
+After running `add oxc` (`update` alone won't do: it copies files but never
+patches `package.json` scripts or devDeps). `web-base check` lists what is
+left over; `check --strict` fails until it is gone.
 
 1. Remove `biome.json`, `biome.base.json`, `eslint.config.js`, `.eslintrc*`,
    `.prettierrc*`.

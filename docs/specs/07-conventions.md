@@ -7,7 +7,9 @@ template. When in doubt, fall back here.
 
 These are the versions every app targets after migration. The CLI templates
 ship with these. Bump them as a group through a PR to this repo (which then
-flows into apps via `web-base update`).
+flows into apps via `web-base update`). `cli/src/docs.test.ts` fails when a pin
+here disagrees with a template manifest, or when the skill's `tech-stack.md`
+disagrees with this file — bump all three together.
 
 ### Production dependencies
 

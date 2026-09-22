@@ -7,11 +7,11 @@ TypeScript configs.
 
 ```json
 {
-  "react": "^19.2.5",
-  "react-dom": "^19.2.5",
-  "react-router-dom": "^7.14.2",
+  "react": "^19.2.8",
+  "react-dom": "^19.2.8",
+  "react-router-dom": "^7.18.3",
   "idb": "^8.0.3",
-  "lucide-react": "^1.16.0"
+  "lucide-react": "^1.39.0"
 }
 ```
 
@@ -19,27 +19,27 @@ TypeScript configs.
 
 ```json
 {
-  "typescript": "^7.0.2",
-  "vite": "^8",
-  "@vitejs/plugin-react": "^6",
-  "vite-plugin-pwa": "^1.3",
-  "workbox-precaching": "^7.4.0",
-  "workbox-window": "^7.4.0",
-  "tailwindcss": "^4.2.4",
-  "@tailwindcss/vite": "^4.2.4",
+  "typescript": "~7.0.2",
+  "vite": "^8.2.2",
+  "@vitejs/plugin-react": "^6.1.1",
+  "vite-plugin-pwa": "^1.3.0",
+  "workbox-precaching": "^7.4.1",
+  "workbox-window": "^7.4.1",
+  "tailwindcss": "^4.3.3",
+  "@tailwindcss/vite": "^4.3.3",
   "oxlint": "^1.85.0",
   "oxfmt": "^0.70.0",
-  "vitest": "^4.1.5",
-  "@vitest/ui": "^4.1.5",
-  "jsdom": "^29.1.0",
-  "@testing-library/react": "^16.3.2",
-  "@testing-library/user-event": "^14.6.1",
-  "@testing-library/jest-dom": "^6.9.1",
-  "wrangler": "^4.127.1",
-  "@cloudflare/workers-types": "^5.20260706.1",
-  "@types/react": "^19.2.14",
-  "@types/react-dom": "^19.2.3",
-  "@types/node": "^26.4.0"
+  "vitest": "^4.1.11",
+  "@vitest/ui": "^4.1.11",
+  "jsdom": "^30.0.1",
+  "@testing-library/react": "^16.3.3",
+  "@testing-library/user-event": "^14.6.7",
+  "@testing-library/jest-dom": "^7.0.1",
+  "wrangler": "^4.128.0",
+  "@cloudflare/workers-types": "^5.20260902.1",
+  "@types/react": "^19.2.18",
+  "@types/react-dom": "^19.2.5",
+  "@types/node": "^26.4.1"
 }
 ```
 

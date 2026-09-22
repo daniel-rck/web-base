@@ -10,6 +10,7 @@ import {
   type TemplateFileSpec,
   templatesDir,
 } from "../lib/manifest.ts";
+import { findObsolete } from "../lib/obsolete.ts";
 import { readWebBaseVersion, stampWebBaseVersion } from "../lib/pkg.ts";
 import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
 
@@ -101,6 +102,18 @@ export const updateCommand = defineCommand({
       consola.info(
         `Summary: ${identical} identical, ${differs} differs, ${missing} missing, ${scaffold} scaffold left as-is`,
       );
+
+      // `update` never deletes: a leftover config may still hold overrides the
+      // app has to port first. Name them so the migration gets finished.
+      const obsolete = await findObsolete(
+        targetDir,
+        manifests.map(({ manifest }) => manifest),
+      );
+      for (const item of obsolete) {
+        consola.warn(
+          `  ${item.name} — obsolete ${item.kind}, superseded by ${item.template}; remove it by hand`,
+        );
+      }
 
       if (apply) {
         for (const { template, spec } of toApply) {
