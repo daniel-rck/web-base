@@ -10,6 +10,9 @@
 | `release.yml` | push to `main`, `workflow_dispatch` | web-base | tag + GitHub release for the `package.json` version |
 | `notify-apps.yml` | `workflow_call` from `release.yml`, `workflow_dispatch` | web-base | "update available" issue per app |
 
+`.github/dependabot.yml` keeps the actions they use current (see
+*Dependabot*).
+
 The workflow files are the reference for their YAML. This spec describes the
 contract (inputs, behavior) and the decisions behind it, and deliberately does
 not copy the YAML: copies drift. The only YAML here is the app-side caller
@@ -52,7 +55,9 @@ rules:
 2025 `tj-actions/changed-files` incident, the action's tags were rewritten to a
 commit that printed CI secrets into the logs of every workflow that used it.
 The reusable workflows here run in nine repos, so one moved tag upstream would
-reach all of them at once. A full commit SHA cannot be moved.
+reach all of them at once. A full commit SHA cannot be moved. Dependabot
+bumps the SHA and its comment together (see *Dependabot*), so pinning costs a
+weekly PR to review, not manual upkeep.
 
 ## web-app-ci.yml
 
@@ -426,6 +431,19 @@ permissions **Issues: read and write** and **Metadata: read** (no code
 access), or a GitHub App installation token with the same permissions. Opening
 `web-base update --apply` PRs instead of issues would need code-write access
 to every app; the issue path was chosen to avoid granting that.
+
+## Dependabot
+
+`.github/dependabot.yml` has one entry: `package-ecosystem: github-actions`
+for directory `/` (which covers `.github/workflows/`), checked weekly, with
+all updates in one group so they arrive as a single PR. Its commits are
+`chore(deps): …` (`prefix: chore`, `include: scope`), matching the
+conventional-commit rule. `cooldown.default-days: 7` holds back a release
+until it is a week old, so a compromised release has time to be noticed and
+pulled before it reaches nine repos.
+
+Dependabot understands the `uses: owner/repo@<sha> # vX.Y.Z` form and updates
+both. Local `./` references are left alone.
 
 ## Recommended repository settings
 
