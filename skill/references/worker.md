@@ -8,9 +8,9 @@ static SPA bundle (via Workers Assets) and handles any `/api/*` endpoints.
 ```typescript
 export interface Env {
   ASSETS: Fetcher;
-  // Add bindings here as needed:
+  // Add bindings here as needed, e.g. for the sync template:
   // SYNC: R2Bucket;
-  // SYNC_KV: KVNamespace;
+  // SYNC_RATE_LIMIT?: RateLimit;
 }
 
 export default {
@@ -42,19 +42,30 @@ binding = "ASSETS"
 The build pipeline produces `./dist` via `vite build`, then `wrangler deploy`
 uploads both the worker code and the assets directory.
 
-## Bindings (R2, KV)
+## Bindings (R2, rate limiting, KV)
 
-Sync (or any other R2/KV feature) binds buckets and namespaces:
+The `sync` template needs one R2 bucket and, optionally, a Rate Limiting
+binding. It uses no KV namespace.
 
 ```toml
 [[r2_buckets]]
 binding = "SYNC"
 bucket_name = "<app-name>-sync"
 
-[[kv_namespaces]]
-binding = "SYNC_KV"
-id = "<kv-namespace-id>"
+# Optional: limits requests per sync object (never per IP).
+[[ratelimits]]
+name = "SYNC_RATE_LIMIT"
+namespace_id = "1001"   # any positive integer, unique within the account
+
+[ratelimits.simple]
+limit = 60
+period = 60             # seconds; must be 10 or 60
 ```
+
+Route `/api/sync/*` to `handleSync(request, env)` from `worker/sync.ts`, and
+set `"allowImportingTsExtensions": true` in `tsconfig.worker.json` (the sync
+worker files import each other with `.ts` extensions). Other features may bind
+KV under `[[kv_namespaces]]` as usual.
 
 Add the binding fields to the `Env` interface in `worker/index.ts` so
 they're typed at the call site.

@@ -13,7 +13,7 @@
     { "from": "client/index.ts", "to": "src/lib/sync/index.ts", "policy": "scaffold" },
     { "from": "worker/sync.ts", "to": "worker/sync.ts" },
     { "from": "worker/sync-http.ts", "to": "worker/sync-http.ts" },
-    { "from": "sync.md", "to": "docs/sync.md" }
+    { "from": "sync.md", "to": "docs/sync.md", "policy": "scaffold" }
   ],
   "postInstall": [
     "wrangler.toml: bind an R2 bucket as `SYNC` ([[r2_buckets]] binding = \"SYNC\", bucket_name = \"<app-name>-sync\")",

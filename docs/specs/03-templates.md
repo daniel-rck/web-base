@@ -19,7 +19,7 @@ templates only have an `extends` array.
 | `pwa` | leaf | service worker (injectManifest: precache, offline navigation, prompt-based updates) + `useAppUpdate`/`UpdatePrompt` |
 | `router` | leaf | router.tsx with the root layout route (`src/App.tsx`), error/404 pages, a starter `HomePage` |
 | `worker` | leaf | worker/index.ts + wrangler.toml + Cloudflare types |
-| `sync` | leaf (extra) | client + worker handlers for R2+KV E2E-encrypted sync |
+| `sync` | leaf (extra) | client + worker for R2 end-to-end encrypted sync with QR/link pairing |
 
 `core` is the meta-template every app uses; `app` is `core` plus the entry
 files a brand-new app needs (`init`). `sync` is opt-in.
@@ -402,27 +402,182 @@ postInstall:
 
 ## sync
 
-The Hausverwaltung-style E2E-encrypted sync. **Extra**, not in `core`.
+End-to-end encrypted device sync of one JSON document over R2, paired by QR
+link or typed code. **Extra**, not in `core`. Protocol v2.
 
-Files:
-- `sync/client.ts` → `src/lib/sync/client.ts` — encryption, pairing, push/pull
-- `sync/crypto.ts` → `src/lib/sync/crypto.ts` — AES-GCM key derivation, HKDF
-- `sync/types.ts` → `src/lib/sync/types.ts`
-- `worker/sync.ts` → `worker/sync.ts` — R2 + KV handlers
-- `sync/README.md` → `docs/sync.md` — architecture summary
+Files (the template keeps `client/` and `worker/` subdirectories so the
+relative `.ts` imports resolve the same in this repo, where the tests import
+them, and in the app):
 
-No dependencies (uses Web Crypto API).
+| Source | Destination | Policy | Contents |
+|---|---|---|---|
+| `client/types.ts` | `src/lib/sync/types.ts` | owned | `SyncEnvelope`, `SyncState`, `PullResult<T>`, `StorageLike`, `SyncClientOptions`, `RequestOptions` |
+| `client/errors.ts` | `src/lib/sync/errors.ts` | owned | `SyncErrorCode`, `SyncError` (`code`, `status`, `retryAfter`), `syncErrorMessage()` (German), `isSyncError()` |
+| `client/encoding.ts` | `src/lib/sync/encoding.ts` | owned | Crockford base32 (lenient decode), base64url without padding |
+| `client/crypto.ts` | `src/lib/sync/crypto.ts` | owned | `deriveKeys()`, `seal()`, `open()` |
+| `client/pairing.ts` | `src/lib/sync/pairing.ts` | owned | code encode/decode/format, `pairingUrl()`, `readPairingCode()`, `consumePairingFragment()` |
+| `client/storage.ts` | `src/lib/sync/storage.ts` | owned | `guardStorage()`, `safeLocalStorage()`, `SyncStore` |
+| `client/http.ts` | `src/lib/sync/http.ts` | owned | `send()` (timeout + abort), status → code, `readEnvelope()` |
+| `client/client.ts` | `src/lib/sync/client.ts` | owned | `SyncClient` |
+| `client/index.ts` | `src/lib/sync/index.ts` | **scaffold** | barrel + `export const syncClient = new SyncClient()` — the place to configure it |
+| `worker/sync.ts` | `worker/sync.ts` | owned | `handleSync(request, env, { maxBytes? })`, `SyncEnv` |
+| `worker/sync-http.ts` | `worker/sync-http.ts` | owned | `respond()`, `error()`, `bearer()`, `authHash()`, `sameHash()`, `normalizeEtag()`, `parseEnvelope()` |
+| `sync.md` | `docs/sync.md` | **scaffold** | protocol, threat model, wiring, merge and QR recipes; the app adds its schema notes |
+
+No dependencies (Web Crypto only). No enums or parameter properties
+(`erasableSyntaxOnly`); imports carry explicit `.ts` extensions.
 
 postInstall:
-- "Bind R2 bucket as `SYNC` and KV namespace as `SYNC_KV` in wrangler.toml"
-- "Mount sync handlers in worker/index.ts at /api/sync/*"
-- "Initialize sync via `await syncClient.enable()` (generates a device secret)"
+- "wrangler.toml: bind an R2 bucket as `SYNC` ([[r2_buckets]] binding = \"SYNC\", bucket_name = \"<app-name>-sync\")"
+- "Optional rate limit: [[ratelimits]] name = \"SYNC_RATE_LIMIT\", namespace_id = \"1001\" with [ratelimits.simple] limit = 60, period = 60 (period must be 10 or 60)"
+- "worker/index.ts: add `SYNC: R2Bucket` (and `SYNC_RATE_LIMIT?: RateLimit`) to Env and route /api/sync/* to `handleSync(request, env)` from ./sync.ts"
+- "tsconfig.worker.json: set \"allowImportingTsExtensions\": true (worker/sync.ts imports ./sync-http.ts)"
+- "src/main.tsx: before the router mounts, call `consumePairingFragment()` and pass a returned code to `syncClient.importPairingCode(code)` (handle `already_enabled` with a confirmation, see docs/sync.md)"
+- "Use `syncClient.enable()` on the first device, `syncClient.sync(local, merge)` to sync and `syncClient.pairingUrl()` / `pairingCode()` to pair (merge recipe in docs/sync.md)"
+- "Render the pairing QR code yourself, e.g. `bun add uqr` and `renderSVG(syncClient.pairingUrl())` (example in docs/sync.md)"
+- "Apps with their own sync implementation (Hausverwaltung) must not run `web-base add sync` or `web-base check sync`"
 
-Architecture summary (full text in the file):
-- R2 object key: `objects/<sha256(secret).slice(0,16)>/data.json` (Crockford b32)
-- Conflict detection: R2 ETag with `If-Match` (upload) / `If-None-Match` (download)
-- Pairing: 6-digit OTP code, KV slot with TTL 300s, AES-GCM-wrapped secret transit
-- Rate limit: KV token-buckets, 5 pair/min, 10 claim/15min, 60 data-ops/min per IP
+### Protocol v2
+
+**Keys.** The root secret is 16 random bytes. HKDF-SHA256 with salt
+`daniel-rck/web-base sync v2` and `info` = salt + `/enc`, `/id`, `/auth`
+derives a non-extractable AES-GCM-256 key, 80 bits encoded as 16 Crockford
+base32 characters (the `objectId`), and 256 bits encoded as 43 base64url
+characters (the bearer token).
+
+**Envelope.** `{ "v": 2, "iv": b64url(12 bytes), "ct": b64url(AES-GCM) }` over
+`JSON.stringify(document)`, with AAD = UTF-8 `web-base-sync/v2/<objectId>`.
+Readers require `v === 2` (else `unsupported_version`); `v` versions the wire
+format, the app's schema version lives inside the document.
+
+**Pairing code.** Crockford base32 of `0x02 | secret | checksum`, where the
+checksum is the first two bytes of SHA-256(UTF-8 `web-base-sync pairing` |
+`0x02` | secret): 19 bytes, 31 characters, displayed in groups of four.
+Decoding strips whitespace and hyphens, upper-cases, reads `I`/`L` as `1` and
+`O` as `0`, and requires zero padding bits; a wrong length, version or
+checksum is `invalid_code`. The link is `<page>#sync=<code without hyphens>` —
+the same string, one parser; `readPairingCode()` also accepts HashRouter's
+`#/route?sync=<code>`. `consumePairingFragment(win = globalThis.window)` reads
+the code and removes it with `history.replaceState(history.state, "", cleaned)`,
+keeping `history.state` (React Router stores its index there); it must run in
+`main.tsx` before the router mounts and is a no-op without a window.
+
+**Routes.** `/api/sync/<objectId>` only; `GET`, `PUT`, `DELETE`; other methods
+`405` with `Allow: GET, PUT, DELETE`; unknown paths `404`; every response
+`cache-control: no-store`; errors `{ "error": "<code>" }`. The handler checks,
+in order: route → method → `SYNC_RATE_LIMIT?.limit({ key: objectId })` (`429`,
+`retry-after: 60`) → bearer token (`401`). R2 key `v2/<objectId>`; the object's
+`customMetadata.auth` holds hex(SHA-256(token)), compared in constant time.
+
+- `GET`: `get(key)`, or with `If-None-Match` `get(key, { onlyIf: { etagDoesNotMatch } })`
+  on the normalized ETag. `null` → `404`; wrong `auth` → `403`, checked before
+  `304`/`200`; no body → `304` with `etag`; else `200` with the stored bytes,
+  `etag: httpEtag`, `content-type: application/json`, `x-content-type-options: nosniff`.
+- `PUT`: `content-length` over `maxBytes` (default 8 MiB) → `413`, re-checked
+  on the bytes read; not a v2 envelope → `400 bad_envelope`; neither `If-Match`
+  nor `If-None-Match: *` → `428`. Create (`*`): existing object → `412`, else
+  `put(…, { onlyIf: { etagDoesNotMatch: "*" }, customMetadata: { auth } })`,
+  `null` → `412`. Update: missing → `412`, wrong `auth` → `403`, normalized
+  `If-Match` ≠ `head.etag` → `412`, else `put(…, { onlyIf: { etagMatches: head.etag }, customMetadata })`,
+  `null` → `412`. Success is `204` with `etag: httpEtag`.
+- `DELETE`: missing → `204`; wrong `auth` → `403`; else delete → `204`.
+
+`normalizeEtag()` strips `W/` (Cloudflare weakens ETags when it compresses a
+response) and the quotes `httpEtag` carries.
+
+**Client.** State `{ v: 2, code, etag }` lives in `localStorage["web-base-sync"]`
+behind the `StorageLike` seam; reads that throw count as "nothing stored",
+writes that throw are `storage_unavailable`, and an invalid or v1 state is
+removed. Every public method reads the state fresh. No ETag sends
+`If-None-Match: *` on `PUT`, otherwise `If-Match`; a `GET` with an ETag sends
+`If-None-Match`. Pull `404` → `missing` and clears the ETag; `304` →
+`unchanged`; `412` → `conflict`. Every request carries `Authorization: Bearer
+<token>`; the secret and the code never appear in a URL or header. Requests
+use `cache: "no-store"` and a timeout covering the body (default 30 s),
+combined with the caller's `AbortSignal` (`AbortSignal.any`, with a listener
+fallback). Failures map to codes: `TypeError` → `offline`, deadline →
+`timeout`, caller abort → `aborted`, `401` `unauthorized`, `403` `forbidden`,
+`404` `not_found`, `409`/`412` `conflict`, `413` `too_large`, `429`
+`rate_limited` (with `retryAfter`), other `4xx` `bad_request`, `5xx`
+`server_error`, unparseable or ETag-less success `bad_response`.
+
+```typescript
+class SyncClient {
+  constructor(options?: { endpoint?: string; storage?: StorageLike; fetch?: typeof fetch; timeoutMs?: number; storageKey?: string });
+  isEnabled(): boolean;                        // never throws
+  enable(): Promise<void>;                     // never replaces an existing secret
+  pairingCode(): string;                       // grouped; throws not_enabled
+  pairingUrl(base?: string): string;           // `${base}#sync=${code}`
+  importPairingCode(code: string, options?: { replace?: boolean }): Promise<void>;
+  pull<T>(options?: RequestOptions): Promise<{ status: "unchanged" } | { status: "missing" } | { status: "updated"; data: T }>;
+  push(payload: unknown, options?: RequestOptions): Promise<void>;
+  sync<T>(local: T, merge: (local: T, remote: T) => T | Promise<T>, options?: RequestOptions & { maxAttempts?: number }): Promise<T>;
+  disable(options?: { deleteRemote?: boolean } & RequestOptions): Promise<void>;
+}
+```
+
+`importPairingCode()` throws `already_enabled` while a different secret is
+stored unless `replace` is set (the same code again is a no-op) and resets the
+ETag. `sync()` is pull → merge → push, retried on `conflict` up to
+`maxAttempts` (default 3); it skips the push when the merged document equals
+the pulled one. `disable({ deleteRemote: true })` sends `DELETE` first and only
+then forgets the secret.
+
+**Decision: pairing hands over the secret in a URL fragment, not through an
+OTP slot.** The v1 docs described a 6-digit OTP that was both the server slot
+id and the HKDF input of the key wrapping the secret: the server, which sees
+the slot id, could unwrap the secret, and anyone else only had to hit one of
+10⁶ slot ids while it was live — per-IP rate limits do not stop a botnet.
+(The routes were never implemented.) The
+second device now gets the root secret directly — QR link or typed code — and
+the fragment never reaches the server. A PAKE-based handshake was rejected:
+more code and a server round trip, for no gain when the user holds both devices.
+
+**Decision: a 128-bit secret.** It keeps the code typeable (31 characters
+instead of 55 for v1's 32 bytes) and matches a 128-bit security target; the
+derived AES key is 256 bits, but brute force is bounded by the secret, and
+2¹²⁸ is out of reach.
+
+**Decision: the client stores the pairing code, not raw secret bytes.** The
+checksum needs SHA-256, which Web Crypto only offers asynchronously; storing
+the code keeps `pairingCode()` synchronous. The state is still the raw secret
+in `localStorage` behind `StorageLike`: a script injected into the origin could
+use a non-extractable key just as well as read the code, so the defence is a
+strict CSP (`script-src 'self'`), not a different store.
+
+**Decision: no QR dependency.** `patchPackageJson` is additive-only, so a
+template dependency would be forced on every adopter and never removed by
+`update`. Rendering the QR code is a per-app UI choice; `docs/sync.md` shows it
+with `uqr`.
+
+**Decision: KV dropped; rate limiting by object id through the Rate Limiting
+binding.** The v1 KV token bucket was not atomic (read-modify-write on an
+eventually consistent store) and kept raw client IPs as keys — personal data
+at rest. Cloudflare advises against IP keys (shared NAT, rotating IPv6), and
+keying by `objectId` limits each dataset without storing anything about the
+person. The binding is optional; without it every request passes.
+
+**Decision: the bearer token is derived from the secret.** HKDF gives the
+server a credential that reveals nothing about the encryption key, so a leaked
+`objectId` (logs, analytics) grants neither read nor write. The first `PUT`
+binds `SHA-256(token)` to the object; that trust-on-first-use is safe because
+only secret holders know the 80-bit `objectId`.
+
+**Decision: no v1 migration.** A code search found no app using the template's
+sync code (Hausverwaltung runs its own implementation, Tennisturnier a KV-only
+protocol), so v2 changes route, envelope, key schedule and state without a
+migration path. A v1 state in `localStorage` is not read (different key and
+shape); a v1 envelope is `unsupported_version`.
+
+**Decision: the R2 key is `v2/<objectId>`.** The version prefix lets a future
+wire format live next to v2 in the same bucket during a transition.
+
+Not verified against Cloudflare: whether `R2Conditional.etagDoesNotMatch: "*"`
+acts as a wildcard on `put`. The worker therefore checks with `head()` first
+and relies on the condition only to close the race; if R2 compares `*`
+literally, two simultaneous creates both succeed and the loser's next push gets
+`412`, after which `sync()` merges — no data is lost while devices keep their
+local copy.
 
 ---
 
