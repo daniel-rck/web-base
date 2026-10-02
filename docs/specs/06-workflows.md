@@ -198,92 +198,32 @@ jobs:
 
 ## tools-ci.yml
 
-CI for this repo. Runs on push to main and on PRs.
+CI for this repo, on push to `main` and on pull requests. It follows the
+*Rules for every workflow*; Bun comes from the root `package.json`
+`packageManager`. Four jobs run in parallel:
 
-```yaml
-name: Tools CI
+| Job | Does |
+|---|---|
+| `ci` | `bun install --frozen-lockfile`, `lint`, `typecheck` (root + `tsconfig.templates.json`), `test` (unit, doc guards, the sync suite, and the e2e suite against the rebuilt bundle), `build`, then fails if `git status --porcelain -- cli/dist` is non-empty |
+| `bunx-install` | `bunx github:<repo>#<sha> --version` must print the `package.json` version — the real distribution path, which a bundle can fail even when it builds |
+| `scaffold` | `init` a new app, `add backup` and `add sync`, copy `cli/template-tests/` into `src/__base_tests__/`; then in the app: `bun install`, `lint` (the shipped oxlint/oxfmt configs), `typecheck` (app, node, service worker, worker), `test` (the testing template's setup), `build`; `check app/backup/sync --strict` and `pins`; `wrangler deploy --dry-run` |
+| `workflow-lint` | actionlint (checksum-verified release binary; runs shellcheck on every `run:` script) and zizmor's offline audits |
 
-on:
-  push:
-    branches: [main]
-  pull_request:
+**Decision: the smoke tests live in vitest.** The regressions this workflow
+used to run as shell steps (`add hygiene`, `check --strict` on a fresh
+scaffold, the `webBase.unmanaged` exemption, a leftover `biome.json`,
+`update core` restoring files, `--force` keeping `wrangler.toml`, the
+skill/template alignment) are tests in `cli/src/e2e/dist.test.ts` and
+`cli/src/templates.test.ts`, so they run locally with `bun run test` too.
 
-jobs:
-  ci:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - run: bun install --frozen-lockfile
-      - run: bun run lint
-      - run: bun run typecheck
-      - run: bun run test
-      - run: bun run build
-
-      - name: Verify CLI runs
-        run: |
-          chmod +x cli/dist/index.js
-          node cli/dist/index.js --help
-          node cli/dist/index.js add --help
-
-      - name: Smoke test - add hygiene
-        run: |
-          mkdir -p /tmp/scratch
-          cd /tmp/scratch
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add hygiene
-          test -f LICENSE
-          test -f CONTRIBUTING.md
-          test -f SECURITY.md
-          test -f .editorconfig
-
-      - name: Smoke test - scaffold core and lint
-        run: |
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore   # oxfmt reads .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          bunx oxlint@1.85.0
-          bunx oxfmt@0.70.0 --check
-
-      - name: Verify skill/template alignment
-        run: |
-          # Every cli/templates/<name>/ (except 'core') should have a matching
-          # skill/references/<name>.md (with -system suffix allowed for layout).
-          set -e
-          fail=0
-          for dir in cli/templates/*/; do
-            name=$(basename "$dir")
-            [ "$name" = "core" ] && continue
-            ref="skill/references/${name}.md"
-            alt="skill/references/${name}-system.md"
-            if [ ! -f "$ref" ] && [ ! -f "$alt" ]; then
-              echo "MISSING: $ref or $alt for template $name"
-              fail=1
-            fi
-          done
-          exit $fail
-```
-
-The alignment check enforces the rule from `05-skill.md`: every template must
-have a matching skill reference (so conventions stay documented).
-
-The "scaffold core and lint" step is the guard for template correctness. The
-repo's own `bun run lint` excludes `cli/templates` (templates are authored to
-pass their *own* shipped oxlint/oxfmt configs, not the repo's), so without
-this step a lint error inside a template — a hooks-rule violation, a decorative
-SVG without `aria-hidden`, unsorted imports — would reach consumer apps
-unnoticed. Scaffolding a full app and running `oxlint` + `oxfmt --check` on the
-result lints the templates with their shipped config, the only faithful
-check. Typecheck/build of the scaffolded app are intentionally left out: they
-need a full dependency install (React, idb, lucide-react, Vite …) and would be
-slow and flaky; revisit if template type errors start slipping through.
+**Decision: CI typechecks, tests and builds a scaffolded app.** This spec
+used to leave typecheck and build of the scaffold out as "slow and flaky".
+Meanwhile `init` produced an app that did not build, the router template
+imported a page no template shipped, and the service worker's tsconfig could
+not resolve its own imports — all invisible to lint. The `scaffold` job is
+the only place the React templates meet a compiler; it installs with
+`bun install` (no lockfile), so the newest caret versions within the pins are
+what it tests.
 
 ## release.yml (tag + GitHub release from the version)
 

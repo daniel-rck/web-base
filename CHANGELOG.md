@@ -128,6 +128,9 @@ The version is bumped on every change (driven by the conventional-commit type:
   IPs to the optional Rate Limiting binding `SYNC_RATE_LIMIT`, keyed by object
   id — no IP addresses at rest. Apps bind R2 as `SYNC` (plus optional
   `[[ratelimits]]`).
+- **`tools-ci.yml` follows the workflow rules too:** `permissions: {}` with
+  per-job grants, a concurrency group, SHA-pinned actions, `persist-credentials:
+  false`, and Bun from `packageManager` instead of a hard-coded version.
 
 ### Fixed
 
@@ -274,6 +277,14 @@ The version is bumped on every change (driven by the conventional-commit type:
   `tsconfig.templates.json` runs as part of `bun run typecheck`; `cli/test/sync/`
   covers encodings, pinned key-schedule vectors, pairing, storage, the client
   state machine, the worker and an end-to-end run against a fake R2 bucket.
+- **`tools-ci.yml` builds what it ships.** New jobs: `scaffold` runs `init`,
+  adds `backup` and `sync`, and lints, typechecks, tests (with the template
+  tests in `cli/template-tests/`) and builds the result, then runs `check
+  --strict`, `pins` and `wrangler deploy --dry-run` on it; `bunx-install` runs
+  `bunx github:<repo>#<sha> --version`; `workflow-lint` runs actionlint (with
+  shellcheck) and zizmor. Typecheck and build of a scaffold were left out
+  before as "slow and flaky", which is how an `init` that didn't build went
+  unnoticed.
 
 ## [0.5.0] - 2026-09-22
 
