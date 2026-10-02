@@ -6,5 +6,5 @@
     "erasableSyntaxOnly": true
   },
   "include": ["cli/templates/sync/client/**/*.ts", "cli/test/sync/**/*.ts"],
-  "exclude": ["cli/test/sync/worker.test.ts", "cli/test/sync/e2e.test.ts"]
+  "exclude": ["cli/test/sync/worker*.ts", "cli/test/sync/e2e.test.ts"]
 }
