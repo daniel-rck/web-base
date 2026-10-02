@@ -192,7 +192,11 @@ node_modules/
 .wrangler/
 *.log
 .DS_Store
+.claude/worktrees/
 ```
+
+`.claude/worktrees/` holds Claude Code's isolated agent checkouts; ignoring it
+keeps oxlint, oxfmt and Git from treating those copies as part of the repo.
 
 `cli/dist/` is intentionally **not** ignored — the committed bundle is what
 makes `bunx github:...` work (see the decision above). oxlint and oxfmt skip it

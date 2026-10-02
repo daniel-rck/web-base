@@ -11,7 +11,64 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: exit codes are 0 / 1 / 2.** `0` ok, `1` the app does not conform
+  (`check` drift or `--strict` findings), `2` the command could not run (bad
+  usage, unknown option, malformed `package.json` or manifest, missing target
+  directory). Everything failed with `1` before; the reusable workflows only
+  test for non-zero, so they are unaffected.
+- **Breaking: unknown options are rejected** (exit 2). citty ignored them, so
+  `check --strcit` ran as a plain `check` and passed.
+- **Breaking: a malformed `package.json` is an error, not "unstamped".** The
+  readers swallowed parse errors, so `update` reported the app as unstamped
+  and `check` silently ignored `webBase.unmanaged`. A missing file is still
+  fine where it was before. `webBase.version` and `webBase.unmanaged` are
+  type-checked too; `unmanaged` entries are normalized (`./`, backslashes).
+- **Breaking: `update` never writes `webBase.unmanaged` files**, and
+  `add --force` doesn't either. `update core --apply` — the command
+  `notify-apps.yml` sends every app — would have reverted Hausverwaltung's
+  `useLiveQuery` fork.
+- **Breaking: expanding a meta-template never adopts a block.** `update core
+  --apply` installed every missing owned file, including whole blocks an app
+  never used (layout and storage into HamsterFlight). A block with no owned
+  file present is now reported as `not adopted`; `update <block> --apply` or
+  `add <block>` adopts it.
+- **Breaking: `init` never overwrites an existing `package.json`**, not even
+  with `--force`, which used to delete every app dependency and script.
+- **`--force-scaffold` implies `--force`.** On its own it did nothing.
+- **The CLI internals were rebuilt around one `package.json` document** (loaded
+  once, saved once) and one install path (`applyTemplates`) shared by `init`
+  and `add`; `pkg.ts`, `manifest.ts` and `copy.ts` are split into
+  `lib/pkg/`, `lib/manifest/` and `lib/files/`.
+
 ### Fixed
+
+- **`init --dry-run` no longer fails** ("No package.json found") and writes
+  nothing at all — no directory, no `.git`.
+- **`add core` without a `package.json` fails before the first write** instead
+  of dying after `hygiene` was copied. Files-only templates still work without one.
+- **`check router|pwa|worker|hygiene` pass.** Templates that ship only
+  scaffold seams always failed with "not on the base at all".
+- **`add` no longer stamps over owned files it kept.** The stamp claimed the
+  app had pulled the current version, and `update` then mislabeled those files
+  as local edits that `--apply` would revert.
+- **Manifests are validated, and template paths can't leave their roots.** A
+  `to` of `../x` or `/etc/x`, a `from` outside the template, a name that
+  doesn't match its directory, an unknown key or a missing `extends` target is
+  an error before anything is written; `add /abs/dir` no longer loads
+  `/abs/dir/manifest.json`. One broken manifest no longer hides the template list.
+- **Line endings don't count as drift.** A checkout with `core.autocrlf=true`
+  made every owned file differ.
+- **Patching `package.json` keeps its shape.** A dependency the app lists in the
+  other section is updated in place instead of duplicated, sorted sections stay
+  sorted, and indentation and CRLF line endings survive.
+- **`init` detects an enclosing Git work tree** (no nested `.git` in a
+  monorepo), creates a missing target directory, validates the app name (it
+  becomes the npm name and the workers.dev label) and names "fill in
+  `src/features/`" as a next step.
+- **`update --apply` without a `package.json`** writes the files and warns that
+  it couldn't stamp, instead of failing after writing.
 
 - **The build no longer needs GNU sed.** The shebang comes from
   `bun build --banner`; `sed -i '1i…'` broke `bun install` (via `prepare`) on

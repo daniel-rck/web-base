@@ -9,16 +9,36 @@ output). Pathes are resolved with [pathe](https://github.com/unjs/pathe).
 ```
 cli/
 ├── src/
-│   ├── index.ts                # citty entry, registers subcommands
+│   ├── index.ts                # process.exitCode = await runCli(argv)
+│   ├── cli.ts                  # the citty command tree (main + subcommands)
+│   ├── run.ts                  # runCli: help/version/dispatch → exit code
+│   ├── exit.ts                 # EXIT codes, CliError
 │   ├── version.ts              # WEB_BASE_VERSION (source of truth), compareVersions
 │   ├── commands/
+│   │   ├── define.ts           # defineCliCommand, unknown-option guard, error → exit 2
+│   │   ├── shared-args.ts      # --cwd/--force/--dry-run…, resolveTargetDir, loadChainOrList
+│   │   ├── list.ts             # printAvailable (bare `add`)
+│   │   ├── apply-log.ts        # how add/init report each file and package.json change
 │   │   ├── init.ts             # scaffold a new app
+│   │   ├── init-package.ts     # renderPackageJson, validateAppName
 │   │   ├── add.ts              # copy a template (or meta-template) into an app
-│   │   └── update.ts           # diff local files vs template source
-│   └── lib/
-│       ├── manifest.ts         # loadManifest, resolveTemplate, types
-│       ├── copy.ts             # copyTemplateFiles, diffTemplateFile
-│       └── pkg.ts              # patchPackageJson, stampWebBaseVersion, readWebBaseVersion
+│   │   ├── update.ts           # diff local files vs template source, --apply
+│   │   ├── check.ts            # read-only drift guard for CI
+│   │   └── check-render.ts     # check's human-readable output
+│   ├── lib/
+│   │   ├── manifest/           # types, validate (shape + paths), load, resolve (extends)
+│   │   ├── files/              # compare (EOL-insensitive), copy (policy-aware)
+│   │   ├── pkg/                # doc (load/save package.json), patch, webbase (stamp, unmanaged), splice
+│   │   ├── diff/lines.ts       # line diff (LCS) and change counts
+│   │   ├── apply.ts            # applyTemplates — the one install path of init and add
+│   │   ├── update-plan.ts      # planUpdate / applyUpdate
+│   │   ├── check.ts            # collectCheck / judgeCheck
+│   │   ├── obsolete.ts         # findObsolete
+│   │   ├── paths.ts            # relativePathProblem, resolveInside, normalizeRepoPath
+│   │   ├── templates-dir.ts    # where the templates live
+│   │   ├── git.ts              # work-tree detection, git init
+│   │   └── text.ts             # normalizeEol, writeOut
+│   └── test/                   # test helpers: runInProcess, scratch fixtures
 └── templates/
     └── <template-name>/
         ├── manifest.json
@@ -38,27 +58,46 @@ This works with Bun's runtime and is preserved through `bun build`.
 `cli/src/index.ts`:
 
 ```typescript
-import { defineCommand, runMain } from "citty";
-import { initCommand } from "./commands/init.ts";
-import { addCommand } from "./commands/add.ts";
-import { updateCommand } from "./commands/update.ts";
-import { WEB_BASE_VERSION } from "./version.ts";
+import { runCli } from "./run.ts";
 
-const main = defineCommand({
-  meta: {
-    name: "web-base",
-    version: WEB_BASE_VERSION,
-    description: "Scaffolding CLI for daniel-rck web apps",
-  },
-  subCommands: {
-    init: initCommand,
-    add: addCommand,
-    update: updateCommand,
-  },
-});
-
-runMain(main);
+process.exitCode = await runCli(process.argv.slice(2));
 ```
+
+`cli.ts` holds the citty command tree (`main` with `init`, `add`, `update`,
+`check`). `runCli` dispatches it itself: no arguments → usage, exit 2;
+`--help`/`-h` (also after a subcommand) → usage, exit 0; `--version` alone →
+the version, exit 0; an unknown command → usage, exit 2; otherwise
+`runCommand(sub, { rawArgs })` and the command's own exit code. An argument
+error citty raises before `run` (a missing required positional) prints the
+subcommand's usage and exits 2.
+
+**Decision: our own dispatcher instead of citty's `runMain`.** `runMain`
+discards a command's return value and exits 1 for every failure, which would
+erase the difference between "the app drifted" (1) and "the command could not
+run" (2). The cost is relying on `runCommand`/`showUsage`, citty 0.1.x API;
+`run.test.ts` covers the dispatch so a citty upgrade that changes it fails
+loudly.
+
+### Exit codes
+
+Modelled on diff(1), defined once in `exit.ts`:
+
+| Code | Meaning |
+|---|---|
+| `0` | Did what was asked; for `check`, the app conforms |
+| `1` | Ran fine, but the app does not conform (`check` drift, `--strict` findings) |
+| `2` | Could not run: bad usage, unknown option, malformed `package.json` or manifest, missing target directory, I/O error |
+
+Every command is defined with `defineCliCommand`, whose `run` returns an exit
+code. Any error inside a command is caught there, printed (with its `hint` for
+a `CliError`) and mapped to `2` — nothing throws out of a command.
+
+### Unknown options
+
+citty ignores options it doesn't know, so `check --strcit` used to run as a
+plain `check` and pass. `defineCliCommand` rejects, before the command does
+anything, every option that isn't declared (in kebab- or camelCase) and every
+positional beyond the declared ones: exit 2, "Unknown option: --strcit".
 
 ## Versioning
 
@@ -75,16 +114,17 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 { /* x.y.z */ 
   must match `WEB_BASE_VERSION`; `cli/src/version.test.ts` fails if they drift.
 - **Stamping.** `init`, `add`, and `update --apply` write the current version
   into the consuming app's `package.json` under `webBase.version` (via
-  `stampWebBaseVersion`, additive — other `webBase` fields are preserved). The
-  stamp means "this app last pulled web-base vX."
-- **Reporting.** `update` reads the stamp (`readWebBaseVersion`, never throws)
-  and reports `current` / `behind (X → Y)` / `ahead` / `unstamped` so an app
-  knows whether to pull. The catch-up path is `web-base update <template>
-  --apply`.
+  `stampVersion`, additive — other `webBase` fields are preserved). The
+  stamp means "this app last pulled web-base vX." `add` does **not** stamp
+  when it kept owned files that differ from the template (no `--force`): the
+  claim would be false, and `update` would then flag those files as local edits.
+- **Reporting.** `update` reads the stamp (`readWebBase`) and reports
+  `current` / `behind (X → Y)` / `ahead` / `unstamped` so an app knows whether
+  to pull. The catch-up path is `web-base update <template> --apply`.
 - **CHANGELOG.** `CHANGELOG.md` (Keep a Changelog) records what each version
   changed.
 
-`web-base --version` surfaces `WEB_BASE_VERSION` through citty's `meta.version`.
+`web-base --version` prints `WEB_BASE_VERSION`.
 
 ## Manifest format
 
@@ -92,7 +132,7 @@ Every template under `cli/templates/<name>/` has a `manifest.json`. Schema:
 
 ```typescript
 type TemplateManifest = {
-  name: string;
+  name: string;           // must equal the template's directory name
   description: string;
 
   // Meta-templates: if present, runs these templates in order before applying
@@ -123,6 +163,34 @@ type TemplateManifest = {
   };
 };
 ```
+
+### Manifest validation
+
+`loadManifest` validates every manifest before anything is copied
+(`lib/manifest/validate.ts`), collecting all problems into one error (exit 2):
+
+- the manifest is a JSON object with no unknown keys (`$schema`/`$comment`
+  allowed); `name` equals the directory name; `description` is a string;
+- `extends` is an array of template names (`^[a-z][a-z0-9-]*$`), each of which
+  exists;
+- every `files[]` entry has string `from`/`to`, an optional boolean `overwrite`
+  and an optional `policy` of `"owned"`/`"scaffold"`;
+- `from` and `to` are relative, normalized (no `./`, `//`, backslashes) and
+  stay inside their root; `from` exists on disk and is not `manifest.json`;
+  `to` is unique within the manifest and never `package.json`, `.git/…` or
+  `node_modules/…`;
+- `dependencies`/`devDependencies`/`scripts` map names to strings,
+  `postInstall` is a string array, `obsolete` has the documented shape.
+
+The template name given on the command line must match the same pattern
+before it touches the filesystem (`add /abs/dir`, `add ../x` → exit 2). Every
+source and destination is additionally resolved through `resolveInside`, which
+throws if the path leaves the template directory or the target app.
+
+**Decision: validate strictly, including paths.** `WEB_BASE_TEMPLATES_DIR` lets
+any directory act as the template root, and a manifest with `"to": "../x"` used
+to write outside the app. Unknown keys are rejected so a typo (`polcy`) is an
+error instead of a silently ignored setting.
 
 **Decision: superseded setups are declared, reported, never deleted.** When a
 template replaces a tool (`oxc` replaced Biome), the manifest lists the old
@@ -166,8 +234,13 @@ base by listing its repo-relative path in `package.json`:
 ```
 
 `check` skips a listed file and reports it as `unmanaged`; `update --apply`
-still overwrites it, so an app that opts out is choosing to maintain that file
-itself and to not run `update` for the block that owns it.
+and `add --force` never overwrite it. Entries are repo-relative paths; `./x`
+and backslashes are normalized, absolute or escaping paths are an error.
+
+**Decision: `update` respects the opt-out too.** It used to overwrite listed
+files, so the one command `notify-apps.yml` sends every app (`update core
+--apply`) would have reverted Hausverwaltung's fork. An app that opts out
+maintains that file itself; nothing in the CLI writes it.
 
 The current — and only — user is Hausverwaltung's `useLiveQuery`. Six of seven
 apps carry the template version byte-for-byte, so demoting it to `scaffold`
@@ -220,8 +293,8 @@ and new meta-templates (e.g. `add minimal` later) cost only a new directory.
 2. If no `extends`, return `[name]`.
 3. Otherwise, recursively resolve each entry in `extends` and concatenate,
    deduplicating while preserving first occurrence.
-4. If the meta-template has its own `files`/`dependencies`/`scripts`, append
-   `name` itself at the end.
+4. If the meta-template has its own `files`/`dependencies`/`devDependencies`/
+   `scripts`/`postInstall`/`obsolete`, append `name` itself at the end.
 
 A `visited` set tracks the current resolution path so a circular `extends`
 (`a` → `b` → `a`) throws `Circular extends detected: …` instead of recursing
@@ -248,9 +321,7 @@ async function resolveTemplate(template: string, visited = new Set<string>()): P
       }
     }
   }
-  if (manifest.files?.length || manifest.dependencies || manifest.devDependencies || manifest.scripts) {
-    resolved.push(template);
-  }
+  if (hasOwnContent(manifest)) resolved.push(template);
   return resolved;
 }
 ```
@@ -267,21 +338,29 @@ web-base init [--cwd <dir>] [--name <app-name>] [--force] [--force-scaffold] [--
 
 Behavior:
 
-1. Prompt for app name if `--name` not given (use `consola.prompt`) — but only
-   when `process.stdin.isTTY`. Without a TTY and without `--name`, fail with a
-   message rather than blocking a pipeline on a prompt nobody can answer.
-2. Write a fresh `package.json` using the template in `07-conventions.md`,
-   substituting the name, description, homepage URL pattern, repo URL pattern.
-3. Resolve and apply `core` (calls the same code path as `add core`).
-4. Stamp `webBase.version` into the new `package.json`.
-5. Run `git init` if the target is not already a repo. This is not cosmetic:
-   oxlint and oxfmt skip what `.gitignore` lists, and the drift guard and CI
-   assume a repo. A missing `git` binary is not fatal — the
-   command falls back to telling the user. Committing stays a next step.
-6. Print next steps (set the color accent in `theme.css`, fill in domain content).
+1. If the target already has a `package.json`, abort (exit 2) and suggest
+   `add core` — **also with `--force`**: rewriting it would delete every
+   dependency and script the app has.
+2. Take the app name from `--name`, or prompt for it (`consola.prompt`) — but
+   only when `process.stdin.isTTY`. Without a TTY and without `--name`, fail
+   (exit 2) rather than blocking a pipeline on a prompt nobody can answer.
+   The name must match `^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`: it becomes the
+   npm name, the `<name>.daniel-rck.workers.dev` label and part of the repo URL.
+3. Create the target directory if it doesn't exist (`mkdir -p`).
+4. Build a fresh `package.json` in memory from the template in
+   `07-conventions.md` (`renderPackageJson`), apply `core` through
+   `applyTemplates` — the same code path `add` uses — stamp `webBase.version`,
+   then write `package.json` once.
+5. Run `git init` unless the target is already inside a Git work tree
+   (`git rev-parse --is-inside-work-tree` — a package in a monorepo must not
+   get a nested `.git`). This is not cosmetic: oxlint and oxfmt skip what
+   `.gitignore` lists, and the drift guard and CI assume a repo. A missing
+   `git` binary is not fatal — the command falls back to telling the user.
+   Committing stays a next step.
+6. Print next steps: the templates' `postInstall` steps, filling in the domain
+   content under `src/features/`, `bun install`, the commit.
 
-If the target already has a `package.json`, `init` aborts and suggests
-`add core` instead.
+`--dry-run` writes nothing at all — no directory, no `package.json`, no `.git`.
 
 ### `web-base add <template>`
 
@@ -293,12 +372,18 @@ web-base add <template> [--cwd <dir>] [--force] [--force-scaffold] [--dry-run]
 
 Behavior:
 
-1. Call `resolveTemplate(template)`.
-2. For each leaf in the chain:
-   a. `copyTemplateFiles(manifest.files, ...)` — skip existing files unless
-      `--force`, log every action. **`--force` respects the file policy**: it
-      re-pulls `owned` building blocks but leaves `scaffold` seams alone.
-      `--force-scaffold` opts into overwriting those too.
+1. Resolve and load the template chain (`loadChain`). An unknown template lists
+   the available ones and exits 2.
+2. Load the app's `package.json` once. If any template in the chain adds
+   dependencies or scripts and there is no `package.json`, fail (exit 2)
+   **before the first write** — `add core` used to copy `hygiene` and then die
+   half-way. Templates that only copy files (`hygiene`, `sync`) work without one.
+3. `applyTemplates` walks the chain:
+   a. `copyTemplateFile` per file — skip existing files unless `--force`, log
+      every action. **`--force` respects the file policy**: it re-pulls `owned`
+      building blocks but leaves `scaffold` seams alone. `--force-scaffold`
+      opts into overwriting those too, and implies `--force`. Files listed in
+      `webBase.unmanaged` are never overwritten.
 
       **Decision: `--force` does not mean "overwrite everything".** Scaffold
       seams are where the app's own work lives — and `wrangler.toml` is one of
@@ -308,12 +393,12 @@ Behavior:
       rather than a tooling one. A file that is simply *absent* is still
       installed regardless of policy; the protection is against clobbering, not
       against installing.
-   b. `patchPackageJson(...)` — additive merge of `dependencies`,
-      `devDependencies`, `scripts`. Existing entries are overwritten only if
-      the value differs.
-3. Stamp `webBase.version` into the app's `package.json` (once, after the chain,
-   if a `package.json` exists).
-4. Collect and display all `postInstall` messages at the end.
+   b. `patchSections(...)` — additive merge of `dependencies`,
+      `devDependencies`, `scripts` into the in-memory document (see
+      *Package.json document* below).
+4. Stamp `webBase.version` — unless owned files that differ were kept (see
+   *Versioning*); then warn which command pulls them. Save `package.json` once.
+5. Collect and display all `postInstall` messages at the end.
 
 `--dry-run` logs all operations but writes nothing.
 
@@ -331,28 +416,34 @@ web-base update <template> [--cwd <dir>] [--apply]
 
 Behavior:
 
-1. Resolve the template chain with `resolveTemplate` and load every leaf
-   manifest, so `update core` covers the same file set `add core` installs.
-   A meta-template with no files anywhere in its chain reports "has no files to
-   update" and exits.
+1. Resolve the template chain and load every leaf manifest, so `update core`
+   covers the same file set `add core` installs. A chain with no files
+   anywhere reports "has no files to update" and exits 0.
 2. Report the app's base-version status by comparing its stamped
    `webBase.version` against `WEB_BASE_VERSION`: `current` / `behind` / `ahead`
    / `unstamped`.
-3. For each file in `manifest.files`:
-   - If identical: report as `identical`.
-   - Else if the file's `policy` is `scaffold`: report `scaffold, differs/missing
-     (left as-is)` — never queued for apply.
-   - Else (owned): report `missing`, or `differs` with line counts. An owned file
-     that differs while the app is on the current version is additionally flagged
-     as a local edit that `--apply` will revert.
-4. Print a summary (`N identical, N differs, N missing, N scaffold left as-is`),
-   then warn about every `obsolete` leftover of the resolved templates (see
-   *Manifest format*), with a hint to remove it by hand.
-5. If `--apply` is set, overwrite the queued **owned** files (differing/missing;
-   the queue decision is `shouldApplyUpdate` from `lib/manifest.ts`)
-   with the template source and stamp `webBase.version` (the stamp updates even
-   when all files were already identical, since `--apply` asserts the app pulled
-   current source). Scaffold files are never overwritten.
+3. `planUpdate` decides an action for every file:
+   - `identical` — nothing to do;
+   - `unmanaged-skip` — listed in `webBase.unmanaged`; never written;
+   - `scaffold-left` — a scaffold seam that differs or is missing; never written;
+   - `apply` — an owned file that differs or is missing. One that differs while
+     the app is on the current version is flagged as a local edit `--apply`
+     will revert;
+   - `not-adopted` — a missing owned file of a block the app never took up.
+4. Print a summary, then warn about every `obsolete` leftover of the resolved
+   templates (see *Manifest format*), with a hint to remove it by hand.
+5. With `--apply`, write every `apply` entry from the template source and stamp
+   `webBase.version` (also when everything was identical: `--apply` asserts
+   the app pulled current source). Without a `package.json` the files are
+   still written and the missing stamp is a warning, not an error.
+
+**Decision: a meta-template never adopts a block.** When `update` expands a
+meta-template (`core`), a block of which not one owned file is present stays
+unadopted: its missing files are reported as `not-adopted`, not installed.
+Otherwise the command `notify-apps.yml` sends every app — `update core --apply`
+— would push layout, storage and router files into HamsterFlight, a canvas
+game that has none of them. Naming the block (`update layout --apply`) adopts
+it, as does `add layout`.
 
 `update` does **not** patch `package.json` dependencies/scripts — only files
 (plus the `webBase.version` stamp on `--apply`). Dependency drift is visible
@@ -374,22 +465,28 @@ Behavior:
 1. Resolve the template (default `core`) including `extends`.
 2. For every **owned** file across the resolved templates, record whether it is
    identical, differs, or is missing. Scaffold files are never checked.
-3. Then judge **per building block**, not per file:
-   - Not one owned file of a template is present → the app does not use that
-     block. Report it as `not adopted` and move on.
-   - The block is present but incomplete → reported as partially adopted, not
-     as drift. Taking `primitives` and `InstallButton` without `AppNav` is a
-     legitimate choice for a single-route app; `--strict` is how an app that
-     means to be fully on the base turns that into a failure.
-4. Files listed in the app's `webBase.unmanaged` are skipped before any of
-   this and reported as `unmanaged` (see *The per-app escape hatch* above).
+3. Then judge **per building block**, not per file (`collectCheck`, then
+   `judgeCheck`). A block's adoption is computed over its owned files that are
+   not `webBase.unmanaged`:
+   - `full` — all present;
+   - `partial` — some present. Not drift: taking `primitives` and
+     `InstallButton` without `AppNav` is a legitimate choice for a single-route
+     app; `--strict` is how an app that means to be fully on the base turns
+     that into a failure;
+   - `none` — not one present: the app does not use that block. Reported as
+     `not adopted`;
+   - `nothing-owned` — the block has nothing to guard: only scaffold seams
+     (`router`, `pwa`, `worker`, `hygiene`), or every owned file is unmanaged.
+4. Files listed in the app's `webBase.unmanaged` are reported as `unmanaged`
+   (see *The per-app escape hatch* above) — on success and on failure.
    `obsolete` leftovers of the resolved templates are warned about; they are
    not drift.
-5. If any owned file drifted, or no owned file matched anywhere, print an error
-   and exit non-zero. `--strict` additionally fails when a block was never
-   adopted or an `obsolete` leftover is present. Also warns when the app's stamped `webBase.version` differs from
-   the running CLI's version, since the comparison is against the CLI's bundled
-   templates.
+5. Exit 1 when any owned file drifted, or when the chain has guardable blocks
+   and none of them is adopted ("not on the base at all"). A chain with nothing
+   to guard passes. `--strict` additionally fails on `none` blocks, files
+   absent from `partial` blocks, and `obsolete` leftovers. `check` also warns
+   when the app's stamped `webBase.version` differs from the running CLI's
+   version, since the comparison is against the CLI's bundled templates.
 
 **Decision: a missing owned file is never drift; only differing content is.**
 Treating absence as drift fails HamsterFlight on every layout, storage and
@@ -397,8 +494,12 @@ router file — a pixi.js canvas game will never have them — and fails Tonspur
 for taking `primitives` without `AppNav`, which is the right call for a
 single-route app. The opposite failure, treating absence as always-fine, let an
 app that had adopted nothing pass silently; that is caught separately by
-failing when *no* owned file matches anywhere. `--strict` is the opt-in for an
+failing when *no* guardable block is adopted. `--strict` is the opt-in for an
 app that asserts full `core` adoption; never use it in HamsterFlight.
+
+**Decision: a block with nothing to guard passes.** `check router` (and `pwa`,
+`worker`, `hygiene`) used to exit 1 with "not on the base at all" because
+those templates ship only scaffold seams, so nothing could ever match.
 
 This is what makes the "owned files stay identical across apps" rule
 (`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`
@@ -406,35 +507,59 @@ reusable workflow in `06-workflows.md`.
 
 ## File copy: behavior contract
 
-`copyTemplateFiles(files, { targetDir, template, force, dryRun })`:
+`copyTemplateFile(spec, { targetDir, template, force, forceScaffold, dryRun, unmanaged })`
+returns what it did (`CopyAction`):
 
-- For each `{ from, to }`:
-  - `src = templatesDir() / template / from`
-  - `dst = targetDir / to`
-  - If `dst` exists and `!force && !spec.overwrite`:
-    - If content differs: log "exists (differs)" and skip
-    - If content same: log "exists (same)" and skip
-  - Otherwise: `mkdir -p $(dirname dst)`, `copyFile(src, dst)`, log result.
-- If `dryRun`: log "would copy" instead of writing.
+- `src = resolveInside(templatesDir()/template, from)`,
+  `dst = resolveInside(targetDir, to)` — both containment-checked.
+- `dst` absent → copy (`mkdir -p`, byte-exact `copyFile`): `copied`
+  (`would-copy` in dry-run). An absent file is installed regardless of policy.
+- `dst` listed in `unmanaged` → `unmanaged`, never written.
+- `dst` identical to `src` (modulo line endings) → `same`.
+- Otherwise it differs. Overwrite is allowed for an **owned** file with
+  `force` or `spec.overwrite`, and for a **scaffold** file only with `force`
+  *and* `forceScaffold` (`spec.overwrite` never reaches a seam) →
+  `overwritten` / `would-overwrite`. Else `kept-scaffold` (scaffold under
+  `--force`) or `kept-differs`.
 
-`templatesDir()` resolves the templates directory relative to the running
-binary. It must work both for `bun run cli/src/index.ts` (source mode) and
-`node cli/dist/index.js` (built mode). Strategy: from `import.meta.url`,
-try `../templates` first (built layout: `cli/dist/index.js` →
-`cli/templates`), fall back to `../../templates` (source layout: `cli/src/lib/manifest.ts`
-→ `cli/templates`).
+`compareTemplateFile(spec, { targetDir, template, withEdits? })` →
+`missing` / `identical` / `differs` with added/removed line counts (and the
+line edits for `--diff`). **Line endings don't count:** a Windows checkout with
+`core.autocrlf` used to read as drift on every owned file. Copying stays
+byte-exact; only the comparison normalizes `\r\n`.
 
-## Package.json patcher: behavior contract
+`templatesDir()` honours `WEB_BASE_TEMPLATES_DIR` (tests point it at fixture
+templates); otherwise it walks up from the running module to the first
+`templates/` directory that contains `core/manifest.json`. That finds
+`cli/templates` both from the bundle (`cli/dist/index.js`) and from source
+(`cli/src/lib/templates-dir.ts`).
 
-`patchPackageJson({ targetDir, dependencies?, devDependencies?, scripts?, dryRun? })`:
+## Package.json document: behavior contract
 
-- Read `${targetDir}/package.json`.
-- For each section (`dependencies`, `devDependencies`, `scripts`):
-  - For each `[name, value]` in the input: if `pkg[section][name] !== value`,
-    set it and log the change.
-- If no changes occurred, log "already up to date" and exit early.
-- Write back with `JSON.stringify(pkg, null, 2) + "\n"`.
-- If `dryRun`: log changes but don't write.
+Each command loads the app's `package.json` **once** (`loadPackageJson`),
+edits it in memory and saves it **once** at the end (`savePackageJson`), so a
+run that fails half-way never leaves it half-patched.
+
+- **Loading.** A missing file is `undefined`. A file that exists but is
+  malformed JSON, not an object, or has non-string values in
+  `dependencies`/`devDependencies`/`scripts` is an error (exit 2) naming the
+  path. `readWebBase` validates the `webBase` block the same way: an object;
+  `version` a version string; `unmanaged` an array of repo-relative paths.
+
+  **Decision: a malformed `package.json` is an error, never "empty".** The
+  readers used to swallow parse errors, so `update` called a broken file
+  "unstamped" and `check` silently ignored its `webBase.unmanaged` — CI went
+  red with no hint why. A missing file is still legitimately empty.
+- **Patching** (`patchSections(doc, { dependencies?, devDependencies?, scripts? })`):
+  for each `[name, value]`, set it if it differs. A package the app already
+  lists in the *other* dependency section is updated where it is, never
+  duplicated. New keys go into sorted position when the section is sorted
+  (as Bun writes it); scripts are only appended.
+- **Saving.** Nothing is written when nothing changed or in dry-run. A
+  stamp-only change is spliced into the original text (`spliceStamp`), keeping
+  inline arrays and key order; if the file's shape defeats the splice it falls
+  back to a reformat and says so. Any other change re-serializes with the
+  file's own indentation, line endings and final newline.
 
 The patcher does NOT remove existing keys — it only adds/updates. Removing old
 deps is a manual step listed in the `postInstall` messages of templates that
@@ -443,20 +568,21 @@ packages to remove).
 
 ## Tests
 
-Vitest tests live in `cli/src/**/*.test.ts`:
+Vitest tests live next to the code in `cli/src/**/*.test.ts`:
 
-- `lib/manifest.test.ts`: `resolveTemplate` returns expected order for a
-  simple meta-template, handles missing extends, handles a meta extending
-  another meta.
-- `lib/copy.test.ts`: skip-existing behavior, force-overwrite behavior,
-  dry-run produces no writes.
-- `lib/pkg.test.ts`: patch adds missing keys, leaves existing identical keys
-  alone, overwrites existing differing keys; `stampWebBaseVersion` adds/updates
-  `webBase.version` and preserves other fields; `readWebBaseVersion` reads or
-  returns undefined.
-- `lib/obsolete.test.ts`: `findObsolete` reports leftover files and
-  dependencies (either section), ignores manifests without `obsolete`,
-  tolerates a missing or malformed `package.json`.
+- `lib/**`: unit tests per module — manifest validation (table-driven) and
+  resolution, path containment, EOL-insensitive comparison, the line diff,
+  copy policy (`--force`, `--force-scaffold`, `overwrite`, `unmanaged`,
+  dry-run), the package.json document (style detection, splice, reformat
+  fallback, malformed input), patching, `webBase` validation, `findObsolete`,
+  and `adoptionOf`/`judgeCheck`.
+- `commands/*.test.ts`, `run.test.ts`: every command run in-process against
+  the real templates in scratch directories (`test/cli.ts` → `runInProcess`
+  captures consola and stdout and returns the exit code). Each bug fixed in
+  the 0.6.0 rework has a test here.
+- `templates.test.ts`: every shipped manifest loads and validates, no template
+  ships a file its manifest doesn't list, the `core` chain writes each
+  destination once, and every template has a skill reference.
 - `docs.test.ts`: version pins in `07-conventions.md` and the skill's
   `tech-stack.md` match the template manifests (and each other);
   `01-monorepo-structure.md` shows the current version and root pins; the
@@ -464,21 +590,17 @@ Vitest tests live in `cli/src/**/*.test.ts`:
 - `version.test.ts`: `WEB_BASE_VERSION` matches the root `package.json` version
   (drift guard); `compareVersions` ordering.
 
-Integration test: run `bun build`, then `node cli/dist/index.js add hygiene
---cwd /tmp/scratch-app`, assert files exist. This runs in `tools-ci.yml`.
-
 ## Error handling
 
-- Missing template → `consola.error(\`Template "<name>" not found.\`)`, list
-  available, `process.exit(1)`.
-- Missing `manifest.json` → same as missing template.
-- Malformed `manifest.json` → bubble the JSON parse error with the file path
-  (both `loadManifest` and `listTemplates` use the same `parseManifest` helper,
-  so a single corrupt manifest reports its path instead of crashing the list).
-- Missing source file (a manifest lists a `from` that isn't on disk) → throw
-  `Template file not found: <template>/<from>`. Applies to both copy and diff.
-- Circular `extends` → throw `Circular extends detected: a -> b -> a`.
-- Malformed target `package.json` → bubble the JSON parse error with the path.
-- Write errors (permissions, full disk) → bubble. Don't try to recover.
+All of these exit 2 with a message (see *Exit codes*):
 
-All commands return `process.exitCode = 1` on failure (don't throw out of `run`).
+- Missing template or a name that isn't a template name → `Template "<name>"
+  not found.` and the list of available templates.
+- Malformed or invalid `manifest.json` → the path and every problem found.
+  `listTemplates` reports a broken manifest by path and still lists the rest.
+- Missing source file (a manifest lists a `from` that isn't on disk) →
+  `Template file not found: <template>/<from>`.
+- Circular `extends` → `Circular extends detected: a -> b -> a`.
+- Malformed target `package.json` or `webBase` block → the path and the problem.
+- Missing target directory (except for `init`, which creates it).
+- Write errors (permissions, full disk) → reported, not recovered from.

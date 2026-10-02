@@ -1,127 +1,57 @@
 import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
-import { defineCommand } from "citty";
+import { mkdir } from "node:fs/promises";
 import { consola } from "consola";
 import { resolve } from "pathe";
-import { copyTemplateFiles } from "../lib/copy.ts";
-import { loadManifest, resolveTemplate } from "../lib/manifest.ts";
-import { patchPackageJson, stampWebBaseVersion } from "../lib/pkg.ts";
+import { CliError, EXIT } from "../exit.ts";
+import { applyTemplates } from "../lib/apply.ts";
+import { gitInit, gitWorkTreeState } from "../lib/git.ts";
+import { createPackageJson, savePackageJson } from "../lib/pkg/doc.ts";
+import { stampVersion } from "../lib/pkg/webbase.ts";
 import { WEB_BASE_VERSION } from "../version.ts";
+import { logApplyEvent, logSave, postInstallSteps, printNextSteps } from "./apply-log.ts";
+import { defineCliCommand } from "./define.ts";
+import { renderPackageJson, validateAppName } from "./init-package.ts";
+import {
+  cwdArg,
+  dryRunArg,
+  forceArgs,
+  forceFlags,
+  loadChainOrList,
+  resolveTargetDir,
+} from "./shared-args.ts";
 
-export const initCommand = defineCommand({
-  meta: {
-    name: "init",
-    description: "Scaffold a new app from an empty directory",
-  },
-  args: {
-    cwd: { type: "string", description: "Target directory (default: current)" },
-    name: { type: "string", description: "App name" },
-    force: { type: "boolean", description: "Overwrite existing owned files" },
-    "force-scaffold": {
-      type: "boolean",
-      description: "With --force, also overwrite scaffold seams (destroys per-app customization)",
-    },
-    "dry-run": { type: "boolean", description: "Log actions without writing" },
-  },
-  async run({ args }) {
-    const targetDir = resolve(args.cwd ?? process.cwd());
-    const force = args.force === true;
-    const forceScaffold = args["force-scaffold"] === true;
-    const dryRun = args["dry-run"] === true;
+/** The template `init` applies to a fresh directory. */
+const INIT_TEMPLATE = "core";
 
-    try {
-      if (existsSync(resolve(targetDir, "package.json")) && !force) {
-        consola.error(
-          "A package.json already exists in the target directory. Use `web-base add core` to migrate an existing app, or pass --force to overwrite.",
-        );
-        process.exitCode = 1;
-        return;
-      }
-
-      // Only prompt when a human is there to answer: in CI (or any non-TTY
-      // pipeline) a blocking prompt hangs the job until it times out.
-      const interactive = process.stdin.isTTY === true;
-      const name =
-        args.name ??
-        (interactive
-          ? await consola.prompt("App name?", { type: "text", placeholder: "my-app" })
-          : undefined);
-      if (typeof name !== "string" || !name.trim()) {
-        consola.error("App name is required. Pass --name <app-name>.");
-        process.exitCode = 1;
-        return;
-      }
-
-      const pkg = renderPackageJson(name.trim());
-      if (dryRun) {
-        consola.info(`  package.json — would write (name: ${name})`);
-      } else {
-        await writeFile(resolve(targetDir, "package.json"), `${pkg}\n`, "utf8");
-        consola.success(`  package.json — written (name: ${name})`);
-      }
-
-      const chain = await resolveTemplate("core");
-      const postInstall: string[] = [];
-      for (const leaf of chain) {
-        const manifest = await loadManifest(leaf);
-        consola.start(`Applying ${manifest.name}`);
-        if (manifest.files?.length) {
-          await copyTemplateFiles(manifest.files, {
-            targetDir,
-            template: manifest.name,
-            force,
-            forceScaffold,
-            dryRun,
-          });
-        }
-        if (manifest.dependencies || manifest.devDependencies || manifest.scripts) {
-          await patchPackageJson({
-            targetDir,
-            dependencies: manifest.dependencies,
-            devDependencies: manifest.devDependencies,
-            scripts: manifest.scripts,
-            dryRun,
-          });
-        }
-        if (manifest.postInstall?.length) postInstall.push(...manifest.postInstall);
-      }
-
-      await stampWebBaseVersion({ targetDir, version: WEB_BASE_VERSION, dryRun });
-
-      // oxlint and oxfmt skip what .gitignore lists, and the rest of the
-      // workflow (drift guard, CI) assumes a Git repo. Scaffold one rather than
-      // leaving it to a next-step the user may skip.
-      const repoInitialized = await ensureGitRepo(targetDir, dryRun);
-
-      const nextSteps = [
-        ...postInstall,
-        "Run: bun install",
-        ...(repoInitialized
-          ? ["Commit the scaffold: git add -A && git commit -m 'chore: initial scaffold'"]
-          : ["Initialize Git: git init && git add -A && git commit -m 'chore: initial scaffold'"]),
-      ];
-      consola.box(["Next steps:", ...nextSteps.map((s) => `  - ${s}`)].join("\n"));
-    } catch (err) {
-      consola.error((err as Error).message);
-      process.exitCode = 1;
-    }
-  },
-});
+async function askName(given: string | undefined): Promise<string> {
+  if (given !== undefined) return validateAppName(given);
+  // Only prompt when a human is there to answer: in CI (or any non-TTY
+  // pipeline) a blocking prompt hangs the job until it times out.
+  if (process.stdin.isTTY !== true) {
+    throw new CliError("App name is required.", { hint: "Pass --name <app-name>." });
+  }
+  const answer = await consola.prompt("App name?", { type: "text", placeholder: "my-app" });
+  if (typeof answer !== "string") throw new CliError("App name is required.");
+  return validateAppName(answer);
+}
 
 /**
- * Create a Git repo in `targetDir` unless one is already there. Returns whether
- * the directory ends up under version control; a missing `git` binary is not
- * fatal, the caller just falls back to telling the user to do it.
+ * oxlint and oxfmt skip what .gitignore lists, and the drift guard and CI
+ * assume a Git repo — so scaffold one, unless the directory already sits
+ * inside a work tree (a monorepo must not get a nested `.git`).
  */
-async function ensureGitRepo(targetDir: string, dryRun: boolean): Promise<boolean> {
-  if (existsSync(resolve(targetDir, ".git"))) return true;
+function ensureGitRepo(targetDir: string, dryRun: boolean): boolean {
+  const state = gitWorkTreeState(targetDir);
+  if (state === "inside") return true;
+  if (state === "no-git") {
+    consola.warn("  git not found — initialize the repo by hand (oxlint/oxfmt and CI assume one).");
+    return false;
+  }
   if (dryRun) {
     consola.info("  .git — would initialize");
     return true;
   }
-  const { spawnSync } = await import("node:child_process");
-  const result = spawnSync("git", ["init", "--quiet"], { cwd: targetDir, stdio: "ignore" });
-  if (result.status === 0) {
+  if (gitInit(targetDir)) {
     consola.success("  .git — initialized");
     return true;
   }
@@ -129,35 +59,54 @@ async function ensureGitRepo(targetDir: string, dryRun: boolean): Promise<boolea
   return false;
 }
 
-function renderPackageJson(name: string): string {
-  const pkg = {
-    name,
-    private: true,
-    version: "0.0.0",
-    type: "module",
-    description: "",
-    keywords: ["pwa", "privacy", "offline", "react", "vite", "typescript"],
-    author: "",
-    license: "MIT",
-    homepage: `https://${name}.daniel-rck.workers.dev`,
-    repository: {
-      type: "git",
-      url: `https://github.com/daniel-rck/${name}.git`,
-    },
-    bugs: { url: `https://github.com/daniel-rck/${name}/issues` },
-    packageManager: "bun@1.3.11",
-    scripts: {
-      dev: "vite",
-      build: "tsc -b && vite build",
-      preview: "vite preview",
-      lint: "oxlint && oxfmt --check",
-      format: "oxfmt",
-      typecheck: "tsc -b --noEmit",
-      test: "vitest run",
-      "test:watch": "vitest",
-      "worker:dev": "wrangler dev",
-      "worker:deploy": "wrangler deploy",
-    },
-  };
-  return JSON.stringify(pkg, null, 2);
-}
+export const initCommand = defineCliCommand({
+  meta: { name: "init", description: "Scaffold a new app into an empty directory" },
+  args: {
+    ...cwdArg,
+    name: { type: "string", description: "App name (lowercase, dashes)" },
+    ...forceArgs,
+    ...dryRunArg,
+  },
+  async run(args) {
+    const targetDir = resolveTargetDir(args.cwd, { mustExist: false });
+    const { force, forceScaffold } = forceFlags(args);
+    const dryRun = args["dry-run"] === true;
+    // Never even with --force: rewriting an existing package.json would delete
+    // every dependency and script the app has.
+    if (existsSync(resolve(targetDir, "package.json"))) {
+      throw new CliError("A package.json already exists in the target directory.", {
+        hint: "Use `web-base add core` to bring an existing app onto the base.",
+      });
+    }
+    const name = await askName(args.name);
+    const chain = await loadChainOrList(INIT_TEMPLATE);
+
+    if (!existsSync(targetDir)) {
+      if (dryRun) consola.info(`  ${targetDir} — would create`);
+      else await mkdir(targetDir, { recursive: true });
+    }
+    const pkg = createPackageJson(targetDir, renderPackageJson(name));
+    const result = await applyTemplates({
+      targetDir,
+      chain,
+      pkg,
+      force,
+      forceScaffold,
+      dryRun,
+      onEvent: logApplyEvent,
+    });
+    stampVersion(pkg, WEB_BASE_VERSION);
+    logSave(await savePackageJson(pkg, { dryRun }));
+    const repo = ensureGitRepo(targetDir, dryRun);
+
+    printNextSteps([
+      ...postInstallSteps(result),
+      "Fill in the domain content under src/features/",
+      "Run: bun install",
+      repo
+        ? "Commit the scaffold: git add -A && git commit -m 'chore: initial scaffold'"
+        : "Initialize Git: git init && git add -A && git commit -m 'chore: initial scaffold'",
+    ]);
+    return EXIT.ok;
+  },
+});
