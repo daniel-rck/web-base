@@ -14,6 +14,79 @@ records which base it last pulled.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-02
+
+### Migration
+
+0.6.0 moves the machinery out of the scaffold seams into owned files, so each
+app migrates once — one PR per app, in that app's repo, with a deploy check.
+Per-app notes (HamsterFlight, Hausverwaltung, Tonspur) are in
+[`08-app-migrations.md`](https://github.com/daniel-rck/web-base/blob/main/docs/specs/08-app-migrations.md#migrating-an-app-to-060).
+
+1. **Pull the owned files** of the blocks the app already uses. `update` never
+   writes `webBase.unmanaged` files and never adopts a block:
+
+   ```bash
+   bunx github:daniel-rck/web-base#v0.6.0 check core --diff
+   bunx github:daniel-rck/web-base#v0.6.0 update core --apply
+   ```
+
+2. **Add the new owned files and dependencies.** `add` skips every file that
+   exists; delete the scaffold copies the app doesn't want afterwards (e.g. a
+   second `HomePage`):
+
+   ```bash
+   for t in testing pwa router worker storage; do
+     bunx github:daniel-rck/web-base#v0.6.0 add "$t"
+   done
+   ```
+
+3. **Rewrite the seams** onto the owned files:
+   - `src/lib/ui/theme.css` becomes the seam — `@import "./tokens.css";`, then
+     `:root { --accent-h: <hue>; }`, then only the app's own tokens. Delete
+     everything `tokens.css` now defines.
+   - `src/lib/db/db.ts`: `export const getDB = createDBOpener<AppSchema>({
+     name, version, upgrade })` from `./open.ts`. **Keep the app's existing
+     database `name` and `version`** — a new name starts every user with an
+     empty database.
+   - `src/sw/index.ts`: `registerAppShell()` from `./base.ts`, then only the
+     app's own handlers; no `skipWaiting()`, `clientsClaim()` or
+     `precacheAndRoute()` of its own. In `vite.config.ts` set
+     `registerType: "prompt"`; render `<UpdatePrompt />` next to
+     `<RouterProvider>` in `main.tsx`. `tsconfig.sw.json` needs
+     `"allowImportingTsExtensions": true`.
+   - The router: the shell as the root layout route (`src/App.tsx`),
+     `ErrorBoundary: RouteError`, `HydrateFallback: RouteFallback`, and
+     `{ path: "*", Component: NotFound }`; `main.tsx` renders
+     `<RouterProvider>` without an `AppShell` around it.
+   - `worker/index.ts`: `fetch: (request, env, ctx) => routeRequest(request,
+     env, ctx, handleApi)`. In `wrangler.toml`: `not_found_handling =
+     "single-page-application"` under `[assets]`, no `run_worker_first`,
+     `nodejs_compat` only if the worker imports a Node built-in,
+     `compatibility_date` ≥ 2025-04-01. `tsconfig.worker.json` needs
+     `"allowImportingTsExtensions": true`. Review the CSP in the new
+     `public/_headers`.
+
+4. **Take the new hue and `theme_color`** from the table in
+   [`04-layout-system.md`](https://github.com/daniel-rck/web-base/blob/main/docs/specs/04-layout-system.md#color-tokens):
+   `--accent-h` in `theme.css`, `theme_color` in `vite.config.ts` and
+   `<meta name="theme-color">` in `index.html`. Every app's `theme_color`
+   changes, Pizzateig's and Tankzettel's too (`accent-600` is darker).
+
+5. **Search the app's own code** for what the new tokens replace — white text
+   on accents, removed focus outlines, semantic text on its own tint:
+
+   ```bash
+   grep -rnE 'text-white|outline-none|text-(success|warning|danger|info)\b' src --exclude-dir=lib
+   ```
+
+   Use `text-fg-on-accent`, the default focus outline, and `text-*-fg`.
+
+6. **Verify and pin.** `bun run lint && bun run typecheck && bun run test &&
+   bun run build`, then `web-base check --strict` (never in HamsterFlight),
+   `web-base pins` (`useLiveQuery` needs React ≥ 19.2), `bunx wrangler deploy
+   --dry-run`, and pin the caller to `web-base-check.yml@v0.6.0`.
+
 ### Changed
 
 - **Breaking: exit codes are 0 / 1 / 2.** `0` ok, `1` the app does not conform
@@ -617,7 +690,8 @@ that machinery first, then raises the baseline it distributes.
   `biome`, `layout`, `storage`, `pwa`, `router`, `worker`, `sync`), the Claude
   Code skill, and the reusable GitHub Actions workflow.
 
-[Unreleased]: https://github.com/daniel-rck/web-base/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/daniel-rck/web-base/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/daniel-rck/web-base/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/daniel-rck/web-base/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/daniel-rck/web-base/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/daniel-rck/web-base/compare/v0.3.0...v0.3.1
