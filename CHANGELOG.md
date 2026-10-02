@@ -79,6 +79,12 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ### Added
 
+- **`check --diff` and `update --diff`** print a unified diff (local →
+  template, `git apply -p1`-compatible) for every differing file; `update`
+  includes scaffold seams, so upstream seam changes can be ported by hand.
+- **`check --json`** prints a machine-readable result (`schemaVersion: 1`,
+  documented in `02-cli.md`) on stdout, keeping warnings on stderr; errors
+  become a `{ ok: false, exitCode: 2, error }` envelope.
 - **The CI smoke tests run locally.** The shell steps in `tools-ci.yml`
   (`add hygiene`, `check --strict` on a fresh scaffold, the
   `webBase.unmanaged` exemption, a leftover `biome.json`, `update core`

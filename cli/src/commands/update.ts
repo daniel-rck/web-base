@@ -1,13 +1,15 @@
 import { consola } from "consola";
 import { EXIT } from "../exit.ts";
+import { formatUnifiedDiff } from "../lib/diff/unified.ts";
 import { findObsolete } from "../lib/obsolete.ts";
 import { loadPackageJson, savePackageJson } from "../lib/pkg/doc.ts";
 import { readWebBase, stampVersion } from "../lib/pkg/webbase.ts";
+import { writeOut } from "../lib/text.ts";
 import { applyUpdate, planUpdate, type UpdateEntry } from "../lib/update-plan.ts";
 import { compareVersions, WEB_BASE_VERSION } from "../version.ts";
 import { logSave } from "./apply-log.ts";
 import { defineCliCommand } from "./define.ts";
-import { cwdArg, loadChainOrList, resolveTargetDir } from "./shared-args.ts";
+import { cwdArg, diffArg, loadChainOrList, resolveTargetDir } from "./shared-args.ts";
 
 /** Report where the app's stamp stands; returns whether it is at this CLI's version. */
 function reportStamp(stamped: string | undefined): boolean {
@@ -51,6 +53,7 @@ export const updateCommand = defineCliCommand({
     template: { type: "positional", required: true, description: "Template name" },
     ...cwdArg,
     apply: { type: "boolean", description: "Overwrite owned files with the template source" },
+    ...diffArg,
   },
   async run(args) {
     const targetDir = resolveTargetDir(args.cwd);
@@ -62,13 +65,27 @@ export const updateCommand = defineCliCommand({
     const pkg = await loadPackageJson(targetDir);
     const { version: stamped, unmanaged } = readWebBase(pkg);
     const atCurrent = reportStamp(stamped);
-    const entries = await planUpdate({ targetDir, requested: args.template, chain, unmanaged });
+    const diff = args.diff === true;
+    const entries = await planUpdate({
+      targetDir,
+      requested: args.template,
+      chain,
+      unmanaged,
+      withEdits: diff,
+    });
 
     for (const manifest of chain) {
       const block = entries.filter((e) => e.template === manifest.name);
       if (block.length === 0) continue;
       if (chain.length > 1) consola.info(`${manifest.name}:`);
-      for (const entry of block) logEntry(entry, atCurrent);
+      for (const entry of block) {
+        logEntry(entry, atCurrent);
+        // Scaffold diffs too: they are how an app ports an upstream seam change by hand.
+        const { edits } = entry.comparison;
+        if (diff && edits && (entry.action === "apply" || entry.action === "scaffold-left")) {
+          writeOut(formatUnifiedDiff(edits, entry.spec.to));
+        }
+      }
     }
     const count = (action: UpdateEntry["action"]) =>
       entries.filter((e) => e.action === action).length;

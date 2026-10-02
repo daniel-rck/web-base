@@ -110,3 +110,46 @@ describe("web-base check", () => {
     expect((await runInProcess(["check", "--cwd", "/nonexistent/web-base-test"])).code).toBe(2);
   });
 });
+
+describe("web-base check --diff / --json", () => {
+  it("--diff prints a patch that turns the local file back into the template", async () => {
+    const app = await coreApp();
+    const path = resolve(app, "src/lib/ui/primitives.tsx");
+    await writeFile(path, "// local edit\n", { flag: "a" });
+    const run = await runInProcess(["check", "core", "--cwd", app, "--diff"]);
+    expect(run.code).toBe(1);
+    expect(run.stdout).toContain("--- local/src/lib/ui/primitives.tsx");
+    expect(run.stdout).toContain("-// local edit");
+    expect(run.stdout.match(/^--- /gm)).toHaveLength(1);
+  });
+
+  it("--json puts only the document on stdout, with the exit code inside", async () => {
+    const app = await coreApp();
+    await writeFile(resolve(app, "src/lib/ui/primitives.tsx"), "// edit\n", { flag: "a" });
+    const run = await runInProcess(["check", "core", "--cwd", app, "--json", "--diff"]);
+    const doc = JSON.parse(run.stdout);
+    expect(run.code).toBe(1);
+    expect(doc).toMatchObject({
+      schemaVersion: 1,
+      command: "check",
+      ok: false,
+      exitCode: 1,
+      template: "core",
+    });
+    expect(doc.summary.differs).toBe(1);
+    const layout = doc.blocks.find((b: { template: string }) => b.template === "layout");
+    expect(layout.files.find((f: { status: string }) => f.status === "differs").diff).toContain(
+      "-// edit",
+    );
+  });
+
+  it("--json reports errors as an envelope with exit code 2", async () => {
+    const run = await runInProcess(["check", "--cwd", "/nonexistent/web-base-test", "--json"]);
+    expect(run.code).toBe(2);
+    expect(JSON.parse(run.stdout)).toMatchObject({
+      ok: false,
+      exitCode: 2,
+      error: expect.stringContaining("not found"),
+    });
+  });
+});

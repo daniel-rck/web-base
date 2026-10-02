@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "pathe";
@@ -113,5 +114,25 @@ describe("web-base update", () => {
 
   it("exits 2 without a template argument", async () => {
     expect((await runInProcess(["update"])).code).toBe(2);
+  });
+});
+
+describe("web-base update --diff", () => {
+  it("shows owned and scaffold diffs, and the owned one applies with git apply", async () => {
+    const app = await coreApp();
+    const owned = resolve(app, "src/lib/ui/AppNav.tsx");
+    const original = await readFile(owned, "utf8");
+    await writeFile(owned, original.replace("export", "// local\nexport"));
+    await writeFile(resolve(app, "wrangler.toml"), 'name = "real-app"\n');
+    const run = await runInProcess(["update", "core", "--cwd", app, "--diff"]);
+    expect(run.stdout).toContain("--- local/src/lib/ui/AppNav.tsx");
+    expect(run.stdout).toContain("--- local/wrangler.toml");
+    const patch = run.stdout.slice(run.stdout.indexOf("--- local/src/lib/ui/AppNav.tsx"));
+    const ownedPatch = patch.slice(
+      0,
+      patch.indexOf("--- local/", 5) === -1 ? undefined : patch.indexOf("--- local/", 5),
+    );
+    execFileSync("git", ["apply", "-p1"], { cwd: app, input: ownedPatch });
+    expect(await readFile(owned, "utf8")).toBe(original);
   });
 });

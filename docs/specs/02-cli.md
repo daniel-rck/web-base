@@ -411,7 +411,7 @@ Compares local files in the target repo against the current template source
 and reports diffs.
 
 ```
-web-base update <template> [--cwd <dir>] [--apply]
+web-base update <template> [--cwd <dir>] [--apply] [--diff]
 ```
 
 Behavior:
@@ -437,6 +437,10 @@ Behavior:
    the app pulled current source). Without a `package.json` the files are
    still written and the missing stamp is a warning, not an error.
 
+`--diff` prints a unified diff after every file it reports as differing —
+owned files `--apply` would write *and* scaffold seams, because a seam diff is
+how an app ports an upstream change by hand. See *Diff output* below.
+
 **Decision: a meta-template never adopts a block.** When `update` expands a
 meta-template (`core`), a block of which not one owned file is present stays
 unadopted: its missing files are reported as `not-adopted`, not installed.
@@ -457,7 +461,7 @@ Read-only drift guard for CI. Verifies that the app's **owned** building blocks
 still match the template source; scaffold seams are ignored.
 
 ```
-web-base check [template] [--cwd <dir>] [--strict]
+web-base check [template] [--cwd <dir>] [--strict] [--diff] [--json]
 ```
 
 Behavior:
@@ -488,6 +492,10 @@ Behavior:
    when the app's stamped `webBase.version` differs from the running CLI's
    version, since the comparison is against the CLI's bundled templates.
 
+With `--diff`, every drifted owned file is followed by its unified diff. With
+`--json`, stdout carries only the JSON document below (warnings and errors go
+to stderr) and the exit code is unchanged.
+
 **Decision: a missing owned file is never drift; only differing content is.**
 Treating absence as drift fails HamsterFlight on every layout, storage and
 router file — a pixi.js canvas game will never have them — and fails Tonspur
@@ -500,6 +508,56 @@ app that asserts full `core` adoption; never use it in HamsterFlight.
 **Decision: a block with nothing to guard passes.** `check router` (and `pwa`,
 `worker`, `hygiene`) used to exit 1 with "not on the base at all" because
 those templates ship only scaffold seams, so nothing could ever match.
+
+#### `check --json` (schemaVersion 1)
+
+Normative — `web-base-check.yml` and other CI consumers depend on it; a
+breaking change bumps `schemaVersion`.
+
+```json
+{
+  "schemaVersion": 1,
+  "command": "check",
+  "template": "core",
+  "webBaseVersion": "0.6.0",
+  "stamped": "0.5.0",
+  "strict": false,
+  "ok": false,
+  "exitCode": 1,
+  "failures": ["1 owned file(s) drifted from the base"],
+  "summary": { "identical": 11, "differs": 1, "missing": 0, "unmanaged": 0 },
+  "blocks": [
+    {
+      "template": "layout",
+      "adoption": "full",
+      "files": [
+        { "path": "src/lib/ui/primitives.tsx", "status": "differs", "added": 1, "removed": 0, "diff": "--- local/…" }
+      ]
+    }
+  ],
+  "obsolete": [{ "template": "oxc", "kind": "file", "name": "biome.json" }]
+}
+```
+
+`stamped` is `null` when the app is unstamped; `adoption` is `full` /
+`partial` / `none` / `nothing-owned`; file `status` is `identical` / `differs`
+/ `missing` / `unmanaged`; `diff` is present only with `--diff`. When the
+command cannot run, stdout carries `{ "schemaVersion": 1, "command": "check",
+"ok": false, "exitCode": 2, "error": "<message>" }`.
+
+### Diff output
+
+`--diff` renders local → template as a unified diff with three lines of
+context, headers `--- local/<path>` and `+++ web-base/<path>`: `-` lines are
+what the app has, `+` lines what `--apply` would write, and `git apply -p1` in
+the app root applies it. A missing final newline is shown as `\ No newline at
+end of file`. Diffs go straight to stdout, interleaved with the report lines.
+The line diff (`lib/diff/lines.ts`) trims the common prefix and suffix and runs
+an LCS over the rest; for a pathological pair beyond 25M table cells it
+reports the middle as replaced wholesale — still correct, just not minimal.
+
+**Decision: no diff dependency.** About 150 lines of our own code cover what
+the CLI needs; `jsdiff` would be the bundle's largest dependency.
 
 This is what makes the "owned files stay identical across apps" rule
 (`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`

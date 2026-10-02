@@ -1,12 +1,19 @@
 import { consola } from "consola";
 import type { CheckReport, CheckVerdict } from "../lib/check.ts";
+import { formatUnifiedDiff } from "../lib/diff/unified.ts";
+import { writeOut } from "../lib/text.ts";
 
 /** Human-readable `check` output; the JSON form lives in check-json.ts. */
-export function renderCheck(report: CheckReport, verdict: CheckVerdict): void {
+export function renderCheck(
+  report: CheckReport,
+  verdict: CheckVerdict,
+  { diff = false }: { diff?: boolean } = {},
+): void {
   for (const block of report.blocks) {
     for (const file of block.files) {
-      if (file.status === "differs")
-        consola.warn(`  ${file.path} — drift (+${file.added} / -${file.removed})`);
+      if (file.status !== "differs") continue;
+      consola.warn(`  ${file.path} — drift (+${file.added} / -${file.removed})`);
+      if (diff && file.edits) writeOut(formatUnifiedDiff(file.edits, file.path));
     }
     const absent = block.files.filter((f) => f.status === "missing").length;
     if (block.adoption === "none") {
