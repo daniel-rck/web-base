@@ -34,7 +34,7 @@
   "scripts": {
     "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.templates.json",
     "lint": "oxlint && oxfmt --check",
     "format": "oxfmt",
     "test": "vitest run",
