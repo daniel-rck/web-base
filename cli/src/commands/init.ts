@@ -3,15 +3,15 @@ import { mkdir } from "node:fs/promises";
 import { consola } from "consola";
 import { resolve } from "pathe";
 import { CliError, EXIT } from "../exit.ts";
-import { applyTemplates } from "../lib/apply.ts";
+import { type ApplyEvent, applyTemplates } from "../lib/apply.ts";
 import { gitInit, gitWorkTreeState } from "../lib/git.ts";
 import { loadPins } from "../lib/pins.ts";
 import { createPackageJson, savePackageJson } from "../lib/pkg/doc.ts";
 import { stampVersion } from "../lib/pkg/webbase.ts";
 import { WEB_BASE_VERSION } from "../version.ts";
-import { logApplyEvent, logSave, postInstallSteps, printNextSteps } from "./apply-log.ts";
+import { logApplyEvent, logSave, printNextSteps } from "./apply-log.ts";
 import { defineCliCommand } from "./define.ts";
-import { renderPackageJson, validateAppName } from "./init-package.ts";
+import { fillPlaceholders, renderPackageJson, validateAppName } from "./init-package.ts";
 import {
   cwdArg,
   dryRunArg,
@@ -21,8 +21,8 @@ import {
   resolveTargetDir,
 } from "./shared-args.ts";
 
-/** The template `init` applies to a fresh directory. */
-const INIT_TEMPLATE = "core";
+/** The template `init` applies to a fresh directory: core plus the app's entry files. */
+const INIT_TEMPLATE = "app";
 
 async function askName(given: string | undefined): Promise<string> {
   if (given !== undefined) return validateAppName(given);
@@ -88,6 +88,13 @@ export const initCommand = defineCliCommand({
     }
     const { packageManager } = await loadPins();
     const pkg = createPackageJson(targetDir, renderPackageJson(name, packageManager));
+    const seams: string[] = [];
+    const onEvent = (event: ApplyEvent) => {
+      logApplyEvent(event);
+      if (event.type === "file" && event.action === "copied" && event.spec.policy === "scaffold") {
+        seams.push(event.spec.to);
+      }
+    };
     const result = await applyTemplates({
       targetDir,
       chain,
@@ -95,14 +102,19 @@ export const initCommand = defineCliCommand({
       force,
       forceScaffold,
       dryRun,
-      onEvent: logApplyEvent,
+      onEvent,
     });
+    // Only seams this run created: owned files must stay byte-identical to the base.
+    await fillPlaceholders(targetDir, seams, name);
     stampVersion(pkg, WEB_BASE_VERSION);
     logSave(await savePackageJson(pkg, { dryRun }));
     const repo = ensureGitRepo(targetDir, dryRun);
 
+    // The app template's own steps. The other templates' postInstall texts are
+    // migration steps for existing apps, which a fresh scaffold has already done.
+    const own = result.postInstall.find((p) => p.template === INIT_TEMPLATE)?.steps ?? [];
     printNextSteps([
-      ...postInstallSteps(result),
+      ...own,
       "Fill in the domain content under src/features/",
       "Run: bun install",
       repo

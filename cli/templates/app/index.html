@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover: without it env(safe-area-inset-*) is 0 on iOS and
+         the shell's notch and home-indicator padding does nothing. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="<one-line German description>" />
+    <meta name="theme-color" content="#a71f65" />
+    <title><app-name></title>
+    <!-- Before the stylesheet: applies a forced light/dark choice before first paint. -->
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

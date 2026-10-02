@@ -139,13 +139,6 @@ app raises its own `compatibility_date` in its own PR, with a deploy check.
 The same applies to `nodejs_compat`: add it where a worker actually needs a Node
 built-in, remove it where nothing does, one app at a time.
 
-**`init` produces a scaffold that does not build.** `router.tsx` lazy-imports
-`../features/home/HomePage.tsx`, which no template ships, and `init` writes no
-React/Vite/TS/Tailwind dependencies, no `vite.config.ts`, `index.html`,
-`main.tsx`, `index.css` or `tsconfig.app.json`. `tools-ci.yml` only lints the
-scaffold, never typechecks or builds it. None of the nine apps run `init`, so
-this blocks nothing — but a new app cannot be scaffolded end to end today.
-
 ---
 
 ## Cross-app checklist

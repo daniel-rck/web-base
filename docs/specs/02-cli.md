@@ -354,17 +354,22 @@ Behavior:
    npm name, the `<name>.daniel-rck.workers.dev` label and part of the repo URL.
 3. Create the target directory if it doesn't exist (`mkdir -p`).
 4. Build a fresh `package.json` in memory from the template in
-   `07-conventions.md` (`renderPackageJson`), apply `core` through
-   `applyTemplates` — the same code path `add` uses — stamp `webBase.version`,
-   then write `package.json` once.
+   `07-conventions.md` (`renderPackageJson`, `packageManager` from the pin
+   table), apply the `app` template (`core` plus the entry files and Vite/TS
+   config, `03-templates.md`) through `applyTemplates` — the same code path
+   `add` uses — stamp `webBase.version`, then write `package.json` once.
+   Every **scaffold** file this run created gets `<app-name>` replaced with
+   the app's name; owned files stay byte-identical to the base.
 5. Run `git init` unless the target is already inside a Git work tree
    (`git rev-parse --is-inside-work-tree` — a package in a monorepo must not
    get a nested `.git`). This is not cosmetic: oxlint and oxfmt skip what
    `.gitignore` lists, and the drift guard and CI assume a repo. A missing
    `git` binary is not fatal — the command falls back to telling the user.
    Committing stays a next step.
-6. Print next steps: the templates' `postInstall` steps, filling in the domain
-   content under `src/features/`, `bun install`, the commit.
+6. Print next steps: the `app` template's own `postInstall` (the other
+   templates' steps are migration steps for existing apps, which a fresh
+   scaffold has already done), filling in the domain content under
+   `src/features/`, `bun install`, the commit.
 
 `--dry-run` writes nothing at all — no directory, no `package.json`, no `.git`.
 

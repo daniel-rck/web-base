@@ -36,7 +36,7 @@ describe("shipped templates", () => {
     expect(filesUnder(resolve(root, name)).filter((f) => !listed.has(f))).toEqual([]);
   });
 
-  it.each(["core"])("the %s chain writes every destination only once", async (name) => {
+  it.each(["core", "app"])("the %s chain writes every destination only once", async (name) => {
     const destinations = (await loadChain(name)).flatMap((m) => (m.files ?? []).map((f) => f.to));
     expect(destinations.filter((to, i) => destinations.indexOf(to) !== i)).toEqual([]);
   });

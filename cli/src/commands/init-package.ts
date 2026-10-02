@@ -1,3 +1,5 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "pathe";
 import { CliError } from "../exit.ts";
 import type { PackageJson } from "../lib/pkg/doc.ts";
 
@@ -48,4 +50,22 @@ export function renderPackageJson(name: string, packageManager: string): Package
       "worker:deploy": "wrangler deploy",
     },
   };
+}
+
+/** The placeholder scaffold files carry for the app name (wrangler.toml, index.html, …). */
+export const APP_NAME_PLACEHOLDER = "<app-name>";
+
+/** Put the app name into the seams `init` just created. */
+export async function fillPlaceholders(
+  targetDir: string,
+  files: string[],
+  name: string,
+): Promise<void> {
+  for (const file of files) {
+    const path = resolve(targetDir, file);
+    const text = await readFile(path, "utf8");
+    if (text.includes(APP_NAME_PLACEHOLDER)) {
+      await writeFile(path, text.replaceAll(APP_NAME_PLACEHOLDER, name), "utf8");
+    }
+  }
 }

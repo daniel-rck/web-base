@@ -1,16 +1,25 @@
 {
   "name": "router",
-  "description": "react-router-dom 7 scaffold with typed route constants",
+  "description": "react-router-dom 7: root layout route, typed route constants, error and 404 pages",
   "files": [
     { "from": "router.tsx", "to": "src/lib/router.tsx", "policy": "scaffold" },
-    { "from": "routes.ts", "to": "src/lib/routes.ts", "policy": "scaffold" }
+    { "from": "routes.ts", "to": "src/lib/routes.ts", "policy": "scaffold" },
+    { "from": "App.tsx", "to": "src/App.tsx", "policy": "scaffold" },
+    { "from": "HomePage.tsx", "to": "src/features/home/HomePage.tsx", "policy": "scaffold" },
+    { "from": "routing/RouteError.tsx", "to": "src/lib/routing/RouteError.tsx" },
+    { "from": "routing/NotFound.tsx", "to": "src/lib/routing/NotFound.tsx" },
+    { "from": "routing/RouteFallback.tsx", "to": "src/lib/routing/RouteFallback.tsx" },
+    { "from": "routing/useDocumentTitle.ts", "to": "src/lib/routing/useDocumentTitle.ts" }
   ],
   "dependencies": {
+    "lucide-react": "^1.39.0",
     "react-router-dom": "^7.18.3"
   },
   "postInstall": [
-    "Wrap your app in <RouterProvider router={router} /> in main.tsx",
-    "Add routes in src/lib/router.tsx",
-    "Define route path constants in src/lib/routes.ts and import them everywhere"
+    "Render <RouterProvider router={router} /> in src/main.tsx — do not wrap it in AppShell: the shell is the root layout route in src/App.tsx",
+    "Set the app title and nav items in src/App.tsx",
+    "Add lazy feature routes in src/lib/router.tsx, path constants in src/lib/routes.ts",
+    "Call useDocumentTitle(\"<Seite>\") in every page; give each page a <PageHeader>",
+    "An app with its own router setup keeps it, but adds the ErrorBoundary (RouteError), the \"*\" route (NotFound) and HydrateFallback"
   ]
 }

@@ -10,17 +10,19 @@ templates only have an `extends` array.
 
 | Template | Kind | What it installs |
 |---|---|---|
+| `app` | leaf + extends `core` | everything in `core`, plus `index.html`, `vite.config.ts`, the tsconfigs, `src/main.tsx`, `src/index.css`, `.gitignore` — what `init` applies |
 | `core` | meta | hygiene + oxc + router + storage + pwa + worker + layout |
 | `hygiene` | leaf | LICENSE, CONTRIBUTING, SECURITY, .editorconfig |
 | `oxc` | leaf | oxlint + oxfmt configs + lint/format scripts + devDeps |
-| `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, theme.css |
+| `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, ThemeToggle, OfflineIndicator, tokens.css + theme.css |
 | `storage` | leaf | idb wrapper + useLiveQuery hook |
-| `pwa` | leaf | sw.ts (injectManifest) + vite config snippet + workbox deps |
-| `router` | leaf | router.tsx + react-router-dom dep |
+| `pwa` | leaf | service worker (injectManifest: precache, offline navigation, prompt-based updates) + `useAppUpdate`/`UpdatePrompt` |
+| `router` | leaf | router.tsx with the root layout route (`src/App.tsx`), error/404 pages, a starter `HomePage` |
 | `worker` | leaf | worker/index.ts + wrangler.toml + Cloudflare types |
 | `sync` | leaf (extra) | client + worker handlers for R2+KV E2E-encrypted sync |
 
-`core` is the meta-template every app uses. `sync` is opt-in.
+`core` is the meta-template every app uses; `app` is `core` plus the entry
+files a brand-new app needs (`init`). `sync` is opt-in.
 
 ---
 
@@ -36,9 +38,45 @@ templates only have an `extends` array.
 }
 ```
 
-No files of its own. The order of `extends` matters: layout last because it
-imports from storage (for `useLiveQuery` examples) and from router (for
-`NavLink` in `AppNav`).
+No files of its own. The order of `extends` only decides the order of the log
+and of the `postInstall` steps; the templates' code depends on each other like
+this: `layout` → react-router-dom (`NavLink` in `AppNav`); `router` → `layout`
+(`App.tsx` renders `AppShell`; the error pages use the primitives); `pwa`'s
+`UpdatePrompt` → `layout` (`useAppUpdate` itself has no dependency).
+
+---
+
+## app
+
+What `web-base init` applies: `extends: ["core"]` plus the files a brand-new
+app needs to build. All of them are **scaffold** — they are the app's own
+from the first commit.
+
+Files:
+- `index.html` — `lang="de"`, `viewport-fit=cover` (without it
+  `env(safe-area-inset-*)` is 0 on iOS), `theme-color`, `<title>`, and
+  `<script src="/theme-init.js">` before the stylesheet
+- `vite.config.ts` — `react()`, `tailwindcss()`, the VitePWA block
+  (`injectManifest`, `registerType: "prompt"`, a German manifest with
+  `lang`, `id`, `scope`); a plain object so `vitest.config.ts` can merge it
+- `tsconfig.json` (references app/node/sw/worker), `tsconfig.app.json`
+  (`include: ["src"]`, `exclude: ["src/sw"]`, `types: ["vite/client"]`),
+  `tsconfig.node.json` (`vite.config.ts`, `vitest.config.ts`)
+- `main.tsx` → `src/main.tsx` — `<RouterProvider>` + `<UpdatePrompt />`
+- `index.css` → `src/index.css` — `@import "./lib/ui/theme.css";`
+- `gitignore` → `.gitignore`
+
+dependencies: `react`, `react-dom`; devDependencies: `typescript`, `vite`,
+`@vitejs/plugin-react`, `tailwindcss`, `@tailwindcss/vite`, `@types/react`,
+`@types/react-dom`, `@types/node` — all from the pin table. No scripts: the
+scripts are `init`'s `package.json` template (`07-conventions.md`), so
+`add app` never overwrites an app's build script.
+
+`init` replaces `<app-name>` with the app's name in every scaffold file it
+creates (`wrangler.toml`, `index.html`, `vite.config.ts`, …); owned files stay
+byte-identical to the base. `tools-ci.yml`'s `scaffold` job runs `init`, then
+`bun install`, lint, typecheck, test and build on the result — the proof that
+a new app builds end to end.
 
 ---
 
@@ -215,48 +253,109 @@ postInstall:
 
 ## pwa
 
-PWA support via `vite-plugin-pwa` with `injectManifest` strategy.
+PWA support via `vite-plugin-pwa` with the `injectManifest` strategy.
 
 Files:
-- `sw.ts` → `src/sw/index.ts` — service worker source with workbox precache
-- `vite.snippet.md` → `vite.snippet.md` — short markdown noting the VitePWA config to merge
-- `tsconfig.sw.json` → `tsconfig.sw.json` — separate TS config for the SW (different lib: WebWorker)
+- `sw-base.ts` → `src/sw/base.ts` (owned) — `registerAppShell()`: precache the
+  build (`precacheAndRoute`, `cleanupOutdatedCaches`), serve `index.html` for
+  every navigation (`NavigationRoute`, denylist `/api`, `/healthz`), activate a
+  waiting worker only on a `SKIP_WAITING` message, `clients.claim()` on
+  activate
+- `sw.ts` → `src/sw/index.ts` (scaffold) — calls `registerAppShell()`; app
+  handlers (push, background sync, runtime caching) go below it
+- `useAppUpdate.ts` → `src/lib/pwa/useAppUpdate.ts` (owned) —
+  `useRegisterSW` from `virtual:pwa-register/react`, returns `{ needRefresh,
+  offlineReady, reload, dismiss }`, re-checks for an update hourly while the
+  tab is visible and online
+- `UpdatePrompt.tsx` → `src/lib/pwa/UpdatePrompt.tsx` (owned) — the German
+  toast („Update verfügbar – neu laden …", „Die App ist jetzt auch offline
+  verfügbar."), mounted once next to `<RouterProvider>`
+- `tsconfig.sw.json` → `tsconfig.sw.json` (scaffold) — WebWorker lib,
+  `allowImportingTsExtensions`
 
-dependencies (none — vite-plugin-pwa is a devDep):
+devDependencies: `vite-plugin-pwa`, `workbox-precaching`, `workbox-routing`,
+`workbox-window` (a peer of vite-plugin-pwa's register code).
 
-devDependencies:
-- `vite-plugin-pwa`: `^1.3`
-- `workbox-precaching`: `^7.4.0`
-- `workbox-window`: `^7.4.0`
+`obsolete`: `vite.snippet.md` — the template used to ship the VitePWA block as
+a file to merge by hand; the full `vite.config.ts` now comes with the `app`
+template and is shown in the skill's `pwa.md`.
 
-postInstall:
-- "Open vite.snippet.md and merge the VitePWA() config into your vite.config.ts"
-- "Delete vite.snippet.md after merging"
-- "Add to `tsconfig.json` references: `{ \"path\": \"./tsconfig.sw.json\" }`"
+The VitePWA config (`strategies: "injectManifest"`, `srcDir: "src/sw"`,
+`filename: "index.ts"`, `registerType: "prompt"`) builds the worker to
+`dist/index.js`. `tsconfig.app.json` excludes `src/sw` — the worker's
+`/// <reference lib="webworker" />` would otherwise pull WebWorker types into
+the DOM program.
 
 **Decision: injectManifest, not generateSW.** Needed for custom message
 handlers (push notifications in ErinnerMich, background sync in
-Hausverwaltung). The cost is a hand-written SW file, but the SW skeleton
-shipped here is ~40 lines and covers precache + activate + skipWaiting +
-clientsClaim.
+Hausverwaltung). The cost is a hand-written SW file; the owned `base.ts` keeps
+the baseline in one place and the per-app `index.ts` small.
+
+**Decision: a new version waits for the user (`registerType: "prompt"`).**
+The worker used to `skipWaiting()` on install and claim every client. Workers
+Assets only serves the current deploy, so a new worker activating under an
+open page evicted the old precache while that page still needed its lazy
+route chunks — the next navigation failed. Now the new worker waits;
+`UpdatePrompt` offers „Neu laden", which posts `SKIP_WAITING` and reloads every
+tab together. `useAppUpdate` uses the plugin's `useRegisterSW` rather than
+`workbox-window` directly because the plugin injects the correct worker URL,
+scope and type.
+
+**Decision: offline deep links.** `precacheAndRoute` only answers precached
+URLs, so a reload of `/mieter/123` offline failed. The `NavigationRoute`
+serves the precached `index.html` for every navigation outside the denylist.
+
+**Decision: `UpdatePrompt` lives in `pwa`, not `layout`.** The layout must
+build without the PWA plugin (its `useInstallPrompt` already works without
+one). An app with its own design system uses `useAppUpdate()` and can list
+`src/lib/pwa/UpdatePrompt.tsx` in `webBase.unmanaged`.
 
 ---
 
 ## router
 
-Adds react-router-dom with a typed routes scaffold.
+react-router-dom 7 with the root layout route, typed route constants, and the
+error and not-found pages.
 
 Files:
-- `router.tsx` → `src/lib/router.tsx` — a `createBrowserRouter` skeleton
-- `routes.ts` → `src/lib/routes.ts` — typed route path constants
+- `router.tsx` → `src/lib/router.tsx` (scaffold) — `createBrowserRouter`: the
+  root route renders `App` with `ErrorBoundary: RouteError` and
+  `HydrateFallback: RouteFallback`; a pathless child with its own
+  `ErrorBoundary` (so page errors render inside the shell) holds the lazy
+  `HomePage` index route and the `*` route (`NotFound`)
+- `routes.ts` → `src/lib/routes.ts` (scaffold) — typed route path constants
+- `App.tsx` → `src/App.tsx` (scaffold) — the root layout route:
+  `<AppShell title navItems><Outlet /><ScrollRestoration /></AppShell>`
+- `HomePage.tsx` → `src/features/home/HomePage.tsx` (scaffold) — a starting
+  page (`PageHeader` + `EmptyState`), so the lazy import `router.tsx` always
+  had resolves
+- `routing/RouteError.tsx` → `src/lib/routing/RouteError.tsx` (owned) — a
+  German error page: a 404 response renders `NotFound`; a failed lazy chunk
+  („Importing a module script failed" & co.) offers „Neu laden"; anything else
+  says the data is safe and offers reload and „Zur Startseite". Logs the error;
+  shows the stack only in development
+- `routing/NotFound.tsx` (owned) — „Seite nicht gefunden" with the path and a
+  link to `/`
+- `routing/RouteFallback.tsx` (owned) — a centred spinner while the first
+  route loads
+- `routing/useDocumentTitle.ts` (owned) — `<Seite> · <App>` as the document
+  title while a page is mounted (the app part is `index.html`'s `<title>`)
 
-dependencies:
-- `react-router-dom`: `^7.14.2`
+dependencies: `react-router-dom`, `lucide-react` (the starter nav icon).
 
-postInstall:
-- "Wrap your app in `<RouterProvider router={router} />` in main.tsx"
-- "Add routes in src/lib/router.tsx"
-- "Define route path constants in src/lib/routes.ts and import them everywhere"
+**Decision: the shell is a layout route.** `AppNav`'s links are `NavLink`s,
+so `AppShell` must render inside the router; the old postInstall said both
+"wrap your app in `<AppShell>`" and "wrap your app in `<RouterProvider>`",
+and the first reading throws. `main.tsx` renders `<RouterProvider>` alone.
+
+**Decision: our own error pages.** Without an `errorElement`, React Router
+shows its English developer screen — and after a deploy a missing lazy chunk
+is the most common error a user sees. The owned pages link to `/` by literal,
+because owned code can't import an app's `routes.ts`.
+
+**Decision: `useDocumentTitle`, not React 19's `<title>` element.** The static
+`<title>` in `index.html` comes first in the document and wins over a
+rendered one.
 
 The `routes.ts` pattern centralizes path strings so refactors are typesafe:
 

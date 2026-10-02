@@ -181,6 +181,7 @@ Rejected approaches with the reason and the replacement:
 | Dexie | Too magical, IndexedDB abstraction unneeded for these use cases | idb + custom `useLiveQuery` (~50 lines) |
 | localStorage for app data | Synchronous, size-limited, no queries | idb |
 | generateSW (vite-plugin-pwa) | Can't add message handlers / push handlers / background sync | injectManifest + hand-written sw.ts |
+| `skipWaiting()` on install | Open tabs lose their lazy chunks after a deploy | `registerType: "prompt"` + `UpdatePrompt` |
 | Skip react-router | Painful to retrofit when a second view appears | Always include the router |
 | Per-repo CI duplication | Drift across apps, hard to bump versions everywhere | Reusable workflow from web-base |
 | Starter-template GitHub feature for existing apps | Doesn't help with updates after initial copy | The CLI |
@@ -221,21 +222,26 @@ For consistency:
 
 ```
 src/
-├── App.tsx                    # router setup, theme import
-├── main.tsx                   # entry, mounts router
-├── index.css                  # imports lib/ui/theme.css
+├── App.tsx                    # root layout route: AppShell around <Outlet /> (router)
+├── main.tsx                   # entry: <RouterProvider> + <UpdatePrompt /> (app)
+├── index.css                  # imports lib/ui/theme.css (app)
 ├── lib/                       # shared, app-agnostic
 │   ├── ui/                    # from `web-base add layout`
 │   ├── db/                    # from `web-base add storage`
+│   ├── pwa/                   # useAppUpdate, UpdatePrompt (pwa)
+│   ├── routing/               # RouteError, NotFound, RouteFallback, useDocumentTitle (router)
 │   ├── router.tsx             # from `web-base add router`
 │   ├── routes.ts
 │   └── sync/                  # from `web-base add sync` (optional)
 ├── features/                  # per-domain folders
+│   ├── home/HomePage.tsx      # the router template's starting page
 │   └── <feature>/
 │       ├── <Feature>Page.tsx
 │       ├── components/
 │       └── db.ts              # feature-specific idb queries
-└── sw/index.ts                # from `web-base add pwa`
+└── sw/
+    ├── base.ts                # owned SW baseline (pwa)
+    └── index.ts               # the app's SW: registerAppShell() + handlers
 
 worker/
 └── index.ts                   # from `web-base add worker`
@@ -251,7 +257,8 @@ This maps onto the file `policy` in the template manifests (`02-cli.md`):
   `db.ts` (`AppSchema`), `routes.ts`/`router.tsx`, `sw.ts`/`worker.ts`,
   `wrangler.toml`. `update` reports their drift but never overwrites them.
 
-Files inside `features/` are per-app, never copied.
+Files inside `features/` are per-app and never copied — except
+`features/home/HomePage.tsx`, the router template's starting page.
 
 ## Versioning of the apps
 

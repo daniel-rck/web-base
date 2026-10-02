@@ -30,7 +30,25 @@ describe("web-base init", () => {
     });
     expect(pkg.webBase).toEqual({ version: WEB_BASE_VERSION });
     expect(run.text).toContain("src/features/");
-    expect((await runInProcess(["check", "core", "--cwd", dir, "--strict"])).code).toBe(0);
+    expect((await runInProcess(["check", "app", "--cwd", dir, "--strict"])).code).toBe(0);
+  });
+
+  it("ships the app entry files and fills the app name into the seams it created", async () => {
+    const dir = await scratchDir();
+    await runInProcess(["init", "--cwd", dir, "--name", "my-app"]);
+    for (const file of [
+      "index.html",
+      "vite.config.ts",
+      "tsconfig.app.json",
+      "src/main.tsx",
+      "src/App.tsx",
+    ]) {
+      expect(existsSync(resolve(dir, file))).toBe(true);
+    }
+    expect(await readFile(resolve(dir, "wrangler.toml"), "utf8")).toContain('name = "my-app"');
+    expect(await readFile(resolve(dir, "index.html"), "utf8")).toContain("<title>my-app</title>");
+    // Owned files stay byte-identical to the base.
+    expect((await runInProcess(["check", "app", "--cwd", dir])).code).toBe(0);
   });
 
   it("writes nothing with --dry-run", async () => {

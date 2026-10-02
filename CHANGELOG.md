@@ -91,6 +91,26 @@ The version is bumped on every change (driven by the conventional-commit type:
   second consumer (a chart reading `resolvedTheme`) went stale when the toggle
   changed; other tabs now follow via the `storage` event, and the hook no
   longer throws without `matchMedia` (jsdom). `setTheme` is exported on its own.
+- **Breaking: a new service-worker version waits for the user.** `sw.ts`
+  called `skipWaiting()` on install, so a deploy activated the new worker under
+  open pages and evicted the lazy chunks they still needed. The owned
+  `src/sw/base.ts` (`registerAppShell()`) activates only on `SKIP_WAITING`; the
+  new `UpdatePrompt` („Update verfügbar – neu laden") and `useAppUpdate()` hook
+  (`useRegisterSW`, `registerType: "prompt"`, hourly re-check) drive it.
+  `src/sw/index.ts` shrinks to the app's own handlers.
+- **Breaking: the router renders the shell as its root layout route.** The
+  template ships `src/App.tsx` (`AppShell` around `<Outlet />`), error and 404
+  pages, and the `HomePage` its lazy import always pointed to; `main.tsx`
+  renders `<RouterProvider>` alone. The old instructions said to wrap the app
+  in both `AppShell` and `RouterProvider`, and the first reading throws.
+- **`init` builds a complete app.** It applies the new `app` template — `core`
+  plus `index.html`, `vite.config.ts`, the tsconfigs, `src/main.tsx`,
+  `src/index.css` and `.gitignore` — and fills the app name into every
+  `<app-name>` placeholder of the seams it creates. Next steps list only what a
+  fresh app still needs.
+- **`vite.snippet.md` is gone**; the VitePWA block lives in the `app`
+  template's `vite.config.ts` and the skill's `pwa.md`. `check` reports a
+  leftover copy as obsolete.
 
 ### Fixed
 
@@ -149,6 +169,9 @@ The version is bumped on every change (driven by the conventional-commit type:
   failing `prompt()` was an unhandled rejection. The iOS dialog is labelled by
   its heading.
 - **The sticky sidebar ignored the notch inset** the header absorbs.
+- **`init` produced a scaffold that did not build** (no entry files, no
+  React/Vite/TypeScript dependencies, a lazy import of a page no template
+  shipped). The deferred item in `08-app-migrations.md` is resolved.
 
 ### Added
 
@@ -202,6 +225,15 @@ The version is bumped on every change (driven by the conventional-commit type:
 - **A skip link** („Zum Inhalt springen") to `<main id="main">`.
 - **`buttonClassName()`** styles a router `<Link>` as a button; `Badge` has an
   `info` variant; `EmptyState` takes `titleAs`.
+- **Offline deep links**: the service worker serves `index.html` for every
+  navigation (except `/api` and `/healthz`), so reloading `/mieter/123`
+  offline opens the app.
+- **German error pages** (`RouteError`: a missing lazy chunk after a deploy
+  offers „Neu laden"), `NotFound` for `*`, `RouteFallback` while the first route
+  loads, and `useDocumentTitle()` — React Router showed its English developer
+  screen before.
+- **`import/no-unassigned-import` allows CSS imports** in the shared oxlint
+  config (every app imports its stylesheet).
 
 ## [0.5.0] - 2026-09-22
 
