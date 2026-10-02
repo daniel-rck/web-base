@@ -67,6 +67,8 @@ function worst(
   return Number(min.toFixed(2));
 }
 
+const escapeRegExp = (text: string) => text.replaceAll(/[()[\]\\.*+?^${}|]/g, "\\$&");
+
 const circular = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 
 describe("theme tokens", () => {
@@ -180,9 +182,8 @@ describe("accent hues", () => {
 
   it("the skill's layout reference shows the same hue table", () => {
     const skill = read("skill/references/layout-system.md");
-    const escape = (text: string) => text.replaceAll(/[()[\]\\.*+?^${}|]/g, "\\$&");
     for (const { app, hue } of tableRows) {
-      expect(skill).toMatch(new RegExp(`\\| ${escape(app)} \\|[^\\n]*\`${hue}\``));
+      expect(skill).toMatch(new RegExp(`\\| ${escapeRegExp(app)} \\|[^\\n]*\`${hue}\``));
     }
   });
 });
