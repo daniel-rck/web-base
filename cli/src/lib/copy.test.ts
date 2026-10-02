@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { copyTemplateFiles, diffTemplateFile } from "./copy.ts";
 
 let scratch: string;
@@ -16,11 +16,10 @@ beforeEach(async () => {
   await mkdir(resolve(templates, "hygiene"), { recursive: true });
   await mkdir(target, { recursive: true });
   await writeFile(resolve(templates, "hygiene", "LICENSE"), "MIT 2026", "utf8");
-  process.env.WEB_BASE_TEMPLATES_DIR = templates;
+  vi.stubEnv("WEB_BASE_TEMPLATES_DIR", templates);
 });
 
 afterEach(async () => {
-  process.env.WEB_BASE_TEMPLATES_DIR = undefined;
   await rm(scratch, { recursive: true, force: true });
 });
 

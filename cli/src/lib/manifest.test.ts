@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   filePolicy,
   listTemplates,
@@ -20,11 +20,10 @@ async function writeManifest(template: string, manifest: TemplateManifest): Prom
 
 beforeEach(async () => {
   scratch = await mkdtemp(resolve(tmpdir(), "web-base-manifest-"));
-  process.env.WEB_BASE_TEMPLATES_DIR = scratch;
+  vi.stubEnv("WEB_BASE_TEMPLATES_DIR", scratch);
 });
 
 afterEach(async () => {
-  process.env.WEB_BASE_TEMPLATES_DIR = undefined;
   await rm(scratch, { recursive: true, force: true });
 });
 

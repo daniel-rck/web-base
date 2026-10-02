@@ -32,8 +32,7 @@
     "skill"
   ],
   "scripts": {
-    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify && bun run build:shebang && chmod +x cli/dist/index.js",
-    "build:shebang": "sed -i '1i#!/usr/bin/env node' cli/dist/index.js",
+    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint && oxfmt --check",

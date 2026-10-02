@@ -27,7 +27,13 @@ jobs:
           # the repo tarball as-is — Bun runs no prepare script for Git deps,
           # so the bin entry must already exist in the tree. Fail if the
           # committed bundle drifted from cli/src/ (fix: bun run build, commit).
-          git diff --exit-code -- cli/dist
+          # `git status` rather than `git diff`: an extra emitted chunk is untracked.
+          out=$(git status --porcelain -- cli/dist)
+          if [ -n "$out" ]; then
+            echo "$out"
+            echo "::error::cli/dist is stale — run bun run build and commit it"
+            exit 1
+          fi
 
       - name: Verify CLI runs
         run: |

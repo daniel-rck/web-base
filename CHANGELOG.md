@@ -9,6 +9,24 @@ The version is bumped on every change (driven by the conventional-commit type:
 `web-base update <template> --apply`; the stamped `webBase.version` in an app's
 `package.json` records which base it last pulled.
 
+## [Unreleased]
+
+### Fixed
+
+- **The build no longer needs GNU sed.** The shebang comes from
+  `bun build --banner`; `sed -i '1i…'` broke `bun install` (via `prepare`) on
+  macOS and stacked a second shebang when run twice. `tools-ci.yml` now fails
+  on *untracked* files in `cli/dist` too (`git status --porcelain`).
+- **Tests stub `WEB_BASE_TEMPLATES_DIR` with `vi.stubEnv`.** Assigning
+  `undefined` to `process.env` stores the string `"undefined"`.
+
+### Added
+
+- **Root `vitest.config.ts`** scopes the repo's tests to `cli/src` and
+  `cli/test`, so test files shipped inside templates are never collected here.
+- **A `SessionStart` hook** (`.claude/`) installs dependencies in Claude Code
+  cloud sessions so the `typecheck`/`lint`/`test` gatekeepers can run.
+
 ## [0.5.0] - 2026-09-22
 
 ### Added

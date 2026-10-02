@@ -25,8 +25,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
   },
   "files": ["cli/dist", "cli/templates", "skill"],
   "scripts": {
-    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify && bun run build:shebang && chmod +x cli/dist/index.js",
-    "build:shebang": "sed -i '1i#!/usr/bin/env node' cli/dist/index.js",
+    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint && oxfmt --check",
@@ -57,13 +56,18 @@ directly — having a single bundled file avoids the user needing to run
 `bun install` first. Templates under `cli/templates/` stay as files (not
 bundled) because the CLI reads them at runtime.
 
+**Decision: the shebang comes from `bun build --banner`.** It used to be
+prepended with `sed -i '1i…'`, which is GNU-only — on macOS (BSD sed) the build,
+and with it `prepare` and every `bun install`, failed — and which stacked a
+second shebang when run twice.
+
 **Decision: `cli/dist/index.js` is committed.** Bun installs Git dependencies
 from the repo tarball as-is and runs no lifecycle scripts (`prepare` is
 ignored), so if the bin entry only exists after a build step, `bunx
 github:daniel-rck/web-base` fails with `could not determine executable to run`.
 The bundled file is therefore checked in, and `tools-ci.yml` rebuilds it and
-fails on `git diff -- cli/dist` so the committed bundle can't drift from
-`cli/src/`. After changing CLI source, run `bun run build` and commit the
+fails when `git status --porcelain -- cli/dist` is non-empty (modified *or*
+untracked output) so the committed bundle can't drift from `cli/src/`. After changing CLI source, run `bun run build` and commit the
 updated bundle (the `prepare` script does this on every local `bun install`
 too). The alternative — publishing to npm so a packed tarball with a
 `prepublishOnly` build is served — was rejected; see below.
@@ -94,13 +98,40 @@ too). The alternative — publishing to npm so a packed tarball with a
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["cli/src", "cli/src/**/*.json"]
+  "include": ["cli/src", "cli/src/**/*.json", "vitest.config.ts"]
 }
 ```
 
 `allowImportingTsExtensions` is required because the source uses
 `import { foo } from "./bar.ts"`. Bun resolves this natively; the bundler
 strips the extension. Don't drop the `.ts` suffix on imports.
+
+## vitest.config.ts
+
+```ts
+import { defineConfig } from "vitest/config";
+
+// Only the repo's own tests. Template test files (cli/templates/, cli/template-tests/)
+// are copied into a scaffolded app and run there, never here.
+export default defineConfig({
+  test: {
+    include: ["cli/src/**/*.test.ts", "cli/test/**/*.test.ts"],
+    unstubEnvs: true,
+  },
+});
+```
+
+Without an explicit `include`, vitest's default glob would collect test files
+that ship inside templates. `unstubEnvs` restores every `vi.stubEnv` after each
+test — tests set `WEB_BASE_TEMPLATES_DIR` that way, never by assigning
+`process.env` (assigning `undefined` stores the string `"undefined"`).
+
+## .claude/ (cloud sessions)
+
+`.claude/settings.json` registers `.claude/hooks/session-start.sh` as a
+`SessionStart` hook. In a Claude Code cloud session (`CLAUDE_CODE_REMOTE=true`)
+it runs `bun install --frozen-lockfile`, so the gatekeepers in `CLAUDE.md`
+(`typecheck`, `lint`, `test`) can run; elsewhere it is a no-op.
 
 ## .oxlintrc.json / .oxfmtrc.json
 
@@ -173,6 +204,9 @@ After scaffolding, this should be the file tree at the root:
 
 ```
 web-base/
+├── .claude/
+│   ├── hooks/session-start.sh
+│   └── settings.json
 ├── .github/workflows/
 │   ├── tools-ci.yml
 │   └── web-app-ci.yml
@@ -185,7 +219,8 @@ web-base/
 ├── docs/specs/
 │   └── (these files)
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+└── vitest.config.ts
 ```
 
 The `cli/` and `skill/` directories are populated per their own specs.
