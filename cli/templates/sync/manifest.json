@@ -2,9 +2,15 @@
   "name": "sync",
   "description": "R2+KV end-to-end encrypted sync (extra, not in core)",
   "files": [
-    { "from": "client.ts", "to": "src/lib/sync/client.ts" },
-    { "from": "crypto.ts", "to": "src/lib/sync/crypto.ts" },
-    { "from": "types.ts", "to": "src/lib/sync/types.ts" },
+    { "from": "client/types.ts", "to": "src/lib/sync/types.ts" },
+    { "from": "client/errors.ts", "to": "src/lib/sync/errors.ts" },
+    { "from": "client/encoding.ts", "to": "src/lib/sync/encoding.ts" },
+    { "from": "client/crypto.ts", "to": "src/lib/sync/crypto.ts" },
+    { "from": "client/pairing.ts", "to": "src/lib/sync/pairing.ts" },
+    { "from": "client/storage.ts", "to": "src/lib/sync/storage.ts" },
+    { "from": "client/http.ts", "to": "src/lib/sync/http.ts" },
+    { "from": "client/client.ts", "to": "src/lib/sync/client.ts" },
+    { "from": "client/index.ts", "to": "src/lib/sync/index.ts", "policy": "scaffold" },
     { "from": "worker-sync.ts", "to": "worker/sync.ts" },
     { "from": "sync.md", "to": "docs/sync.md" }
   ],
