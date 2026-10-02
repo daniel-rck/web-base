@@ -1,11 +1,10 @@
 name: Notify apps
 
-# Stage 2 (issue-notification): when a new web-base version is released, open an
-# "update available" issue in each consuming app repo. Updates stay manual — the
-# issue is the reminder to run `web-base update`. No write access to app *code*
-# is needed, only issues:write via the APP_NOTIFY_TOKEN secret (a PAT or GitHub
-# App token with access to the app repos). If the secret is absent, the workflow
-# no-ops. See docs/specs/06-workflows.md.
+# Opens an "update available" issue in each consuming app repo when a web-base
+# release is published. Updates stay manual: the issue is the reminder to run
+# `web-base update`. Writing to the app repos needs the APP_NOTIFY_TOKEN secret
+# (Issues read/write + Metadata read on the app repos; no access to app code).
+# Without it every matrix job is a no-op. See docs/specs/06-workflows.md.
 
 on:
   release:
@@ -17,9 +16,16 @@ on:
         required: false
         type: string
 
+permissions: {}
+
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {} # the app repos are written with APP_NOTIFY_TOKEN only
+    concurrency:
+      group: notify-apps-${{ matrix.repo }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
@@ -45,8 +51,8 @@ jobs:
             echo "APP_NOTIFY_TOKEN not set — skipping notification for $TARGET."
             exit 0
           fi
-          if [ -z "${VERSION:-}" ]; then
-            echo "No version resolved (run from a release or pass the version input)." >&2
+          if ! [[ "${VERSION:-}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::No valid version resolved (run from a release or pass the version input)."
             exit 1
           fi
           title="web-base ${VERSION} verfügbar"
