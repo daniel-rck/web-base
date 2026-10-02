@@ -149,7 +149,7 @@ the spinner is correct; `<output>` is for computed results). The full file is
 
 oxlint does not lint CSS or JSON. oxfmt formats both, and parses the Tailwind 4
 directives (`@theme`, `@apply`, `@custom-variant`, `@utility`) in the `layout`
-template's `theme.css` without extra config.
+template's `tokens.css` and `theme.css` without extra config.
 
 ---
 
@@ -157,25 +157,26 @@ template's `theme.css` without extra config.
 
 The shared UI structure. Full spec in `04-layout-system.md`.
 
-Files:
-- `AppShell.tsx` → `src/lib/ui/AppShell.tsx`
-- `AppHeader.tsx` → `src/lib/ui/AppHeader.tsx`
-- `AppNav.tsx` → `src/lib/ui/AppNav.tsx`
-- `PageHeader.tsx` → `src/lib/ui/PageHeader.tsx`
-- `primitives.tsx` → `src/lib/ui/primitives.tsx`
-- `InstallButton.tsx` → `src/lib/ui/InstallButton.tsx`
-- `useInstallPrompt.ts` → `src/lib/ui/useInstallPrompt.ts`
-- `theme.css` → `src/lib/ui/theme.css`
-- `index.ts` → `src/lib/ui/index.ts` (barrel)
+Files (all → `src/lib/ui/`, owned unless marked):
+- `AppShell.tsx`, `AppHeader.tsx`, `AppNav.tsx`, `PageHeader.tsx`
+- `primitives.tsx` (barrel) with one file per primitive: `Button.tsx`,
+  `Card.tsx` (`Card`, `SectionCard`), `Chip.tsx`, `Badge.tsx`, `Spinner.tsx`,
+  `EmptyState.tsx`, and the internal `cn.ts`
+- `InstallButton.tsx` + `useInstallPrompt.ts`
+- `ThemeToggle.tsx` + `useTheme.ts`
+- `OfflineIndicator.tsx` + `useOnlineStatus.ts`
+- `tokens.css` — every design token (owned)
+- `theme.css` — **scaffold**: imports `tokens.css`, sets `--accent-h`
+- `index.ts` — **scaffold** barrel
+- `theme-init.js` → `public/theme-init.js` — **scaffold** anti-flash script
 
-dependencies:
-- `lucide-react`: `^1.16.0`
+dependencies: `lucide-react`, `react-router-dom` (`AppNav` uses `NavLink`).
+Versions come from `cli/templates/pins.json` (see `07-conventions.md`).
 
-postInstall:
-- "Import theme: add `@import \"./lib/ui/theme.css\";` to your `src/index.css`"
-- "Wrap your app in `<AppShell>...</AppShell>`"
-- "Set the color accent: edit the `--accent-h` value in `theme.css`"
-- "Suggested accents: Hausverwaltung→250 (Slate-Blau), Tennisturnier→155 (Emerald), ErinnerMich→285 (Indigo)"
+postInstall: import `theme.css` from `src/index.css`; render `<AppShell>` as
+the router's root layout route; give every page a `<PageHeader>`; set
+`--accent-h` from the hue table in `04-layout-system.md`; load
+`/theme-init.js` in `<head>`. The exact text is in the manifest.
 
 ---
 

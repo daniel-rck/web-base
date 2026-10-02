@@ -1,7 +1,8 @@
 # 04 — Layout System
 
 The shared UI structure across all daniel-rck web apps. Structure is identical;
-only the color accent in `theme.css` changes per app.
+only the color accent in `theme.css` changes per app. Every token lives in the
+owned `tokens.css`; `theme.css` is the per-app seam on top of it.
 
 ## Design principles
 
@@ -18,8 +19,8 @@ only the color accent in `theme.css` changes per app.
    first effect runs. Absent attribute = follow the OS; `data-theme="dark"` /
    `"light"` = forced. A `ThemeToggle` (auto-mounted in the header) cycles
    system → light → dark; the choice persists in `localStorage` and is expressed
-   as `data-theme` on `<html>`. An inline init script (`themeInitScript`) in
-   `index.html` prevents a flash of the wrong theme on load.
+   as `data-theme` on `<html>`. `public/theme-init.js`, loaded from
+   `index.html` before the stylesheet, prevents a flash of the wrong theme.
 
 ## Color tokens
 
@@ -308,9 +309,16 @@ not).
 
 ## Components
 
+All of them live in `src/lib/ui/` and are **owned** (`update` keeps them
+current) except `theme.css`, `public/theme-init.js` and the `index.ts` barrel,
+which are scaffold seams.
+
 ### AppShell
 
-`src/lib/ui/AppShell.tsx`. The top-level layout wrapper.
+`src/lib/ui/AppShell.tsx`. The top-level layout wrapper. It renders inside
+the router — as the root layout route around `<Outlet />` (the router
+template ships that route as `src/App.tsx`), because `AppNav`'s links are
+router `NavLink`s.
 
 Props:
 ```typescript
@@ -327,16 +335,26 @@ type AppShellProps = {
 
 Structure:
 - Outermost: `min-h-screen flex flex-col bg-surface text-fg`
-- `<AppHeader>` (sticky, h-14) — receives `<><InstallButton />{headerActions}</>`
-  as `actions`, so the PWA install button always renders before any app-specific
-  actions. `InstallButton` self-hides when not applicable.
+- A skip link as the first focusable element: `<a href="#main">Zum Inhalt
+  springen</a>`, `sr-only` until focused.
+- `<AppHeader>` (sticky) — receives `<>{themeToggle ?? <ThemeToggle />}<OfflineIndicator /><InstallButton />{headerActions}</>`
+  as `actions`. The always-present toggle comes first so it keeps its position
+  while the conditional indicator and install button appear and disappear.
 - Below header: `flex flex-1 min-h-0`
-  - Desktop sidebar (hidden on `<md`): `<aside class="hidden md:flex w-56 shrink-0 border-r border-border bg-surface-muted">`
-    - `<AppNav variant="sidebar">`
-  - Main: `flex-1 overflow-y-auto pb-16 md:pb-0`
+  - Desktop sidebar (hidden on `<md`): `<aside class="hidden md:block w-56 shrink-0 border-r border-border bg-surface-muted">`,
+    with the `<AppNav variant="sidebar">` inside a
+    `sticky top-[calc(3.5rem+env(safe-area-inset-top))]` wrapper — the header's
+    `h-14` plus the notch inset it absorbs.
+  - Main: `<main id="main" tabIndex={-1} class="flex-1 min-w-0 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 focus:outline-hidden">`
     - `<div class="container mx-auto max-w-4xl px-4 py-6">{children}</div>`
-- Mobile bottom nav (hidden on `≥md`): `md:hidden fixed bottom-0 inset-x-0 border-t bg-surface`
+- Mobile bottom nav (hidden on `≥md`): `md:hidden fixed bottom-0 inset-x-0 border-t border-border bg-surface/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)]`
   - `<AppNav variant="bottom">`
+
+**Decision: the window scrolls, not `<main>`.** There is deliberately no
+`overflow-y-auto` on `<main>`: an overflow container captures every descendant
+`position: sticky` without ever scrolling itself, which silently breaks sticky
+headers and toolbars anywhere in the page. `min-w-0` stops wide content
+(tables, code blocks) from stretching the flex item past the viewport.
 
 ### AppHeader
 
@@ -357,14 +375,21 @@ Structure:
 - `<header class="sticky top-0 z-20 shrink-0 border-b border-border bg-surface/95 backdrop-blur">`
   with `style={{ paddingTop: "env(safe-area-inset-top)" }}`
 - Inside: `container mx-auto {maxWidthClass} h-14 px-4 flex items-center justify-between gap-4`
+- Left group: logo (if any, `text-accent-600`) + the title as a
+  `<span class="text-base font-semibold tracking-tight truncate">` — branding,
+  not a heading
+- Right group: `<div class="flex items-center gap-2 shrink-0">{actions}</div>`
 
 The `h-14` sits on the inner container, not on the `<header>`. On a notched
 phone the header also absorbs the status-bar inset; a fixed height on the
 `<header>` itself would push the title up under the notch. And `maxWidthClass`
 exists because an app with a wider content column (Minispiele's card grid) would
 otherwise get a header narrower than the page beneath it.
-- Left group: logo (if any, `text-accent-600`) + `<h1 class="text-base font-semibold tracking-tight truncate">{title}</h1>`
-- Right group: `<div class="flex items-center gap-2 shrink-0">{actions}</div>`
+
+**Decision: the page title is the `<h1>`, not the app name.** With the app
+name as `<h1>` every page's outline opened with the same heading and the
+page's own title sat at `<h2>`, level with its sections. `PageHeader` is now
+the page's `<h1>`, `SectionCard` titles are `<h2>`.
 
 ### AppNav
 
@@ -384,30 +409,29 @@ type AppNavProps = {
 };
 ```
 
-Both variants render a `<nav>` landmark, so both carry
-`aria-label="Hauptnavigation"` to give each landmark an accessible name. The
-icon span is `aria-hidden`; the label span is `truncate` so long labels clip
-with an ellipsis instead of wrapping and breaking the layout rhythm.
+Both variants render a `<nav>` landmark with `aria-label="Hauptnavigation"`.
+Items are `NavLink`s with `end` (so `aria-current="page"` marks exactly the
+active route). The icon span is `aria-hidden`; the label span is `truncate`.
+Every link has the shared focus outline (see *Primitives*).
 
 Sidebar variant:
-- Outer: `<nav class="w-full p-3 space-y-1" aria-label="Hauptnavigation">`
-- Each item: `<NavLink>` from react-router-dom, `end={true}`
-- Item classes:
-  - Base: `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors min-w-0`
+- Outer: `<nav class="w-full p-3 space-y-1">`
+- Item: `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors min-w-0`
   - Active: `bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-200`
   - Inactive: `text-fg-muted hover:bg-surface-sunken hover:text-fg`
-- Label span: `truncate`
 
 Bottom variant:
-- Outer: `<nav class="flex h-16" aria-label="Hauptnavigation">`
-- Each item: `<NavLink class="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 text-xs">`
-- Active: `text-accent-600`
-- Inactive: `text-fg-muted`
-- Label span: `max-w-full truncate`
+- Outer: `<nav class="flex h-16 items-stretch px-2">`
+- Item: `group flex-1 min-w-0 flex flex-col items-center justify-center gap-1 py-1.5 text-xs font-medium`
+- The active state is a **pill behind the icon** (`grid h-8 min-w-14 place-items-center rounded-full`,
+  active `bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-200`),
+  with the label in `text-accent-600 dark:text-accent-300`; inactive icon and
+  label are `text-fg-muted`. At this size a tint alone is easy to miss, and the
+  pill keeps the touch target legible.
 
 ### PageHeader
 
-`src/lib/ui/PageHeader.tsx`. Section header inside a page.
+`src/lib/ui/PageHeader.tsx`. The page's title — its one `<h1>`.
 
 Props:
 ```typescript
@@ -420,7 +444,7 @@ type PageHeaderProps = {
 
 Structure:
 - `<div class="mb-6 flex items-start justify-between gap-4">`
-- Left: `<h2 class="text-2xl font-semibold tracking-tight">{title}</h2>` + optional `<p class="mt-1 text-sm text-fg-muted">{subtitle}</p>`
+- Left: `<h1 class="text-2xl font-semibold tracking-tight truncate">{title}</h1>` + optional `<p class="mt-1 text-sm text-fg-muted">{subtitle}</p>`
 - Right: `{actions}` if present
 
 ### InstallButton
@@ -435,14 +459,16 @@ Props: none.
 Behavior:
 - **Standalone** (`display-mode: standalone` or `navigator.standalone`):
   renders `null`. The user already installed the app.
-- **Chrome / Edge / Android**: listens for `beforeinstallprompt`,
-  shows the button once the browser deems the app installable, and
-  triggers the deferred prompt on click. Listens for `appinstalled`
-  to hide itself.
-- **iOS Safari**: no `beforeinstallprompt` is fired. The button is
-  shown unconditionally (until standalone) and opens a native
-  `<dialog>` with a short German „Zum Home-Bildschirm hinzufügen"
-  instruction (Teilen-Symbol → Zum Home-Bildschirm → Hinzufügen).
+- **Chrome / Edge / Android**: shows the button once the browser fired
+  `beforeinstallprompt`, and triggers the deferred prompt on click. The event
+  is captured **at module load**, not in an effect — it can fire before a
+  lazily rendered shell mounts, and a missed event never comes back. A prompt
+  is used once; a failing `prompt()` resolves to `"unavailable"`.
+- **iOS and iPadOS Safari** (iPadOS 13+ reports a Macintosh user agent and is
+  recognized by its touch points): no `beforeinstallprompt` is fired. The
+  button (`aria-haspopup="dialog"`) is shown until standalone and opens a
+  native `<dialog aria-labelledby=…>` with a short German „Zum
+  Home-Bildschirm hinzufügen" instruction. A click on the backdrop closes it.
 
 `useInstallPrompt()` is exported for apps that want to build a custom
 install UI (e.g. a banner) instead of the default button:
@@ -461,24 +487,30 @@ registered service worker, browsers simply never fire
 `beforeinstallprompt`, the iOS path still works, and the button stays
 hidden on non-iOS.
 
-If an app wants to suppress the default button (rare), pass an
-`InstallButton`-replacement via `headerActions` and additionally hide
-the auto-mounted one by overriding `AppShell`. Default is: show.
+### OfflineIndicator
+
+`src/lib/ui/OfflineIndicator.tsx` plus `useOnlineStatus()` in
+`src/lib/ui/useOnlineStatus.ts` (`useSyncExternalStore` over the `online` /
+`offline` events; a server render reads as online). `AppShell` mounts it in
+the header. While the browser is offline it shows a warning `Badge` „Offline"
+(title: „Keine Internetverbindung – deine Daten werden lokal gespeichert.").
+The app keeps working — data is local-first — the badge only explains why sync
+or updates pause. A visually hidden `role="status"` region is always mounted
+and carries the announcement, because a live region that appears together
+with its text is often not announced at all.
 
 ### ThemeToggle
 
 `src/lib/ui/ThemeToggle.tsx` plus the `useTheme` hook in
 `src/lib/ui/useTheme.ts`. A ghost-variant button that cycles the theme
 system → light → dark on click, showing the matching `lucide-react` icon
-(`Monitor` / `Sun` / `Moon`) with a German `aria-label`/`title` and an
-`sr-only` label. `AppShell` auto-mounts it in the header's right slot — before
-`InstallButton`, so the always-present toggle keeps a stable position while the
-conditional install button appears/disappears. Unlike `InstallButton`, it is
-always visible.
+(`Monitor` / `Sun` / `Moon`). Its `aria-label`/`title` name the current state
+*and* the action: „Design: Hell – wechseln zu Dunkel". `AppShell`
+auto-mounts it first in the header's right slot.
 
 Props: none.
 
-`useTheme()` is exported for custom theme UIs:
+`useTheme()` is exported for custom theme UIs, and `setTheme` on its own:
 
 ```typescript
 type Theme = "light" | "dark" | "system";
@@ -491,29 +523,36 @@ type UseThemeResult = {
 ```
 
 Behavior:
+- **One store for the page.** The choice lives in a module-level store read
+  through `useSyncExternalStore`, so every `useTheme()` — the header toggle, a
+  chart reading `resolvedTheme` — sees the same value at once. Other tabs
+  follow through the `storage` event (also on `localStorage.clear()`, which
+  reports `key === null`).
 - The choice persists in `localStorage` under the key `theme` (settings-only,
-  per `07-conventions.md`). Default is `"system"`.
+  per `07-conventions.md`). Default is `"system"`. Storage errors (Safari
+  private mode) are swallowed; the choice still applies for the session.
 - `setTheme` writes `localStorage` and sets/removes `data-theme` on
   `document.documentElement` (`"system"` removes it, so the CSS falls back to
-  `prefers-color-scheme`).
-- `resolvedTheme` tracks the live system preference via a
-  `matchMedia("(prefers-color-scheme: dark)")` listener while in `"system"` mode.
-- SSR-safe (`typeof window` guards).
+  `prefers-color-scheme`). The first subscriber reconciles the DOM with the
+  stored value.
+- `resolvedTheme` tracks `matchMedia("(prefers-color-scheme: dark)")`; without
+  `matchMedia` (jsdom) it reads as light instead of throwing.
+- SSR-safe: the server snapshot is `"system"`.
 
 **FOUC prevention.** The canonical mechanism is the shipped
-`public/theme-init.js` (an `owned` file of the layout template), referenced from
-`index.html` `<head>` before the stylesheet:
+`public/theme-init.js` (a **scaffold** file of the layout template — an app
+that stores the theme elsewhere adapts it), referenced from `index.html`
+`<head>` before the stylesheet:
 
 ```html
 <script src="/theme-init.js"></script>
 ```
 
 **Decision: an external file, not an inline `<script>`.** An inline snippet
-forces any app with a Worker CSP to pin a `sha256-` hash of it, and that hash
-breaks the theme silently the moment the snippet changes — a trap two apps had
-already walked into. `script-src 'self'` is both simpler and stricter. As a real
-file it is also guardable by `web-base check`, which an inline `<head>` snippet
-can never be.
+forces any app with a CSP to pin a `sha256-` hash of it, and that hash breaks
+the theme silently the moment the snippet changes — a trap two apps had
+already walked into. `script-src 'self'` is both simpler and stricter (the
+worker template's `public/_headers` ships exactly that).
 
 `themeInitScript` stays exported from `useTheme.ts` for apps that must inline it
 anyway; the two must be kept in sync. An app that persists the theme somewhere
@@ -522,49 +561,74 @@ adapts the read in its own `public/theme-init.js`. The contract is only that
 `data-theme` ends up on `<html>` for a forced choice and stays absent for
 "system".
 
-### primitives.tsx
+### Primitives
 
-Small reusable primitives co-located in one file (don't grow this past
-~150 lines; split into `card.tsx`, etc. when it does):
+One file per primitive, all re-exported by `primitives.tsx` (so an app's
+`index.ts` line `export * from "./primitives.tsx"` keeps working):
 
-- `Card` — `<div class="rounded-lg border border-border bg-surface p-4 shadow-sm">`
-- `EmptyState` — centered icon + title + description + optional CTA
-- `Spinner` — animated SVG, sizes sm/md/lg, accent-colored
-- `Badge` — pill, variants: `neutral | accent | success | warning | danger`
-- `Button` — variants: `primary | secondary | ghost | danger`; sizes `sm | md | lg`
+| File | Exports |
+|---|---|
+| `Button.tsx` | `Button` — variants `primary \| secondary \| ghost \| danger`, sizes `sm \| md \| lg`; `buttonClassName()` for a `<Link>` that should look like a button |
+| `Card.tsx` | `Card` (`interactive` adds a hover lift), `SectionCard` (titled `<section>`, `<h2>` title, optional `hint` and `icon`) |
+| `Chip.tsx` | `Chip` — selectable pill with `aria-pressed` |
+| `Badge.tsx` | `Badge` — variants `neutral \| accent \| success \| warning \| danger \| info` |
+| `Spinner.tsx` | `Spinner` — sizes `sm \| md \| lg`, `label` (default „Lädt …") |
+| `EmptyState.tsx` | `EmptyState` — icon, title (`titleAs`: `h2` default, `h3` inside a SectionCard, `p`), description, action |
+| `cn.ts` | `cn()` class concat and `FOCUS_RING` (internal, not re-exported) |
 
-All primitives must:
-- Accept `className` and merge it (via simple `clsx`-style concat or `cn`
-  helper — don't add `clsx` as a dependency unless other components need it)
-- Forward refs where applicable (`Button`, `Card`)
-- Have descriptive `aria-*` attributes for screen readers
+All primitives:
+- Accept `className` and merge it with `cn` (no `clsx` dependency).
+- Take `ref` as a regular prop (React 19) — no `forwardRef`.
+- Show keyboard focus as a real **outline**: `focus-visible:outline-2
+  focus-visible:outline-offset-2` plus an outline colour (`outline-accent-500`;
+  the danger button uses `outline-danger`).
+- Put text on fills with `text-fg-on-accent`, never `text-white`; badge text on
+  a semantic tint uses the `*-fg` token.
+- Style hover as `not-disabled:hover:` and dim disabled controls with
+  `disabled:opacity-50 disabled:cursor-not-allowed` — a disabled secondary or
+  ghost button used to look enabled.
+- `Spinner` is `role="status"` with visually hidden text — screen readers
+  announce a status region's content, not an `aria-label` on it.
+
+**Decision: an outline, not a box-shadow ring.** Tailwind 4's
+`focus-visible:outline-none` sets `outline-style: none`, and forced-colors
+mode (Windows high contrast) drops box-shadows, so the old ring-only focus
+style vanished there entirely; its missing `ring-offset-surface` also drew a
+white halo in dark mode. An outline survives both.
 
 ### index.ts (barrel)
 
+A scaffold seam (apps may add their own exports):
+
 ```typescript
-export { AppShell } from "./AppShell.tsx";
-export type { AppShellProps } from "./AppShell.tsx";
-export { AppHeader } from "./AppHeader.tsx";
 export type { AppHeaderProps } from "./AppHeader.tsx";
+export { AppHeader } from "./AppHeader.tsx";
+export type { AppNavProps, NavItem } from "./AppNav.tsx";
 export { AppNav } from "./AppNav.tsx";
-export type { NavItem, AppNavProps } from "./AppNav.tsx";
-export { PageHeader } from "./PageHeader.tsx";
-export type { PageHeaderProps } from "./PageHeader.tsx";
+export type { AppShellProps } from "./AppShell.tsx";
+export { AppShell } from "./AppShell.tsx";
 export { InstallButton } from "./InstallButton.tsx";
-export { useInstallPrompt } from "./useInstallPrompt.ts";
-export type { UseInstallPromptResult } from "./useInstallPrompt.ts";
-export { ThemeToggle } from "./ThemeToggle.tsx";
-export { themeInitScript, useTheme } from "./useTheme.ts";
-export type { Theme, UseThemeResult } from "./useTheme.ts";
+export { OfflineIndicator } from "./OfflineIndicator.tsx";
+export type { PageHeaderProps } from "./PageHeader.tsx";
+export { PageHeader } from "./PageHeader.tsx";
 export * from "./primitives.tsx";
+export { ThemeToggle } from "./ThemeToggle.tsx";
+export type { UseInstallPromptResult } from "./useInstallPrompt.ts";
+export { useInstallPrompt } from "./useInstallPrompt.ts";
+export { useOnlineStatus } from "./useOnlineStatus.ts";
+export type { Theme, UseThemeResult } from "./useTheme.ts";
+export { setTheme, themeInitScript, useTheme } from "./useTheme.ts";
 ```
+
+An app that kept an older barrel imports the new pieces directly
+(`./OfflineIndicator.tsx`, `./useOnlineStatus.ts`).
 
 ## Per-app customization
 
-After `web-base add layout`, the only file a developer should edit in
-`src/lib/ui/` is `theme.css` — and within that, primarily the `--accent-h`
-value. Everything else stays untouched so `web-base update layout` works
-cleanly.
+After `web-base add layout`, the files a developer edits in `src/lib/ui/` are
+the seams: `theme.css` (the `--accent-h` hue and any app tokens) and, if
+needed, `index.ts`. Everything else is owned and stays untouched, so
+`web-base update layout --apply` works cleanly.
 
 If an app needs structural changes (e.g. a top-right floating action button),
 add it to **this spec and the template at once**, not as a per-app edit.
@@ -573,6 +637,11 @@ add it to **this spec and the template at once**, not as a per-app edit.
 
 - ❌ Hard-coding accent colors in component files (`bg-blue-500`). Use
   `bg-accent-500` only.
+- ❌ `text-white` on a fill. Use `text-fg-on-accent`.
+- ❌ `focus-visible:outline-none` with a ring. Use the outline (`FOCUS_RING`).
+- ❌ A semantic colour as text on its own tint (`bg-success/15 text-success`).
+  Use `text-success-fg`.
+- ❌ Editing `tokens.css` in an app. Add tokens in `theme.css`.
 - ❌ Adding `clsx`, `tailwind-merge`, `class-variance-authority` unless they
   pay for themselves across multiple files. Concat is fine.
 - ❌ shadcn/ui as a dependency. The shadcn *philosophy* (copy code, don't

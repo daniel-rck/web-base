@@ -185,7 +185,9 @@ Rejected approaches with the reason and the replacement:
 | Per-repo CI duplication | Drift across apps, hard to bump versions everywhere | Reusable workflow from web-base |
 | Starter-template GitHub feature for existing apps | Doesn't help with updates after initial copy | The CLI |
 | Custom-built monorepo with Turborepo/Nx | Overkill for three independent apps | Three repos, one tooling repo |
-| Tailwind config overrides per app | Drift, hard to reason about | Single `theme.css`, only `--accent-h` changes |
+| Tailwind config overrides per app | Drift, hard to reason about | Owned `tokens.css`; the `theme.css` seam sets `--accent-h` and adds app tokens |
+| `focus-visible:outline-none` + a ring | Forced-colors mode drops box-shadows, so focus disappears | The outline in `cn.ts` (`FOCUS_RING`) |
+| `text-white` on a fill, `text-success` on its own tint | Fails 4.5:1 at several accent hues | `text-fg-on-accent`, `text-*-fg` |
 | shadcn/ui as a dependency | Brings Radix UI, their token system, implicit decisions | shadcn-style copy (the CLI does this) |
 | Adding `clsx` everywhere "just in case" | Tiny lib but creates expectation it's used | String concat until a real need appears |
 

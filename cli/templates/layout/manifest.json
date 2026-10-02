@@ -7,21 +7,32 @@
     { "from": "AppNav.tsx", "to": "src/lib/ui/AppNav.tsx" },
     { "from": "PageHeader.tsx", "to": "src/lib/ui/PageHeader.tsx" },
     { "from": "primitives.tsx", "to": "src/lib/ui/primitives.tsx" },
+    { "from": "cn.ts", "to": "src/lib/ui/cn.ts" },
+    { "from": "Button.tsx", "to": "src/lib/ui/Button.tsx" },
+    { "from": "Card.tsx", "to": "src/lib/ui/Card.tsx" },
+    { "from": "Chip.tsx", "to": "src/lib/ui/Chip.tsx" },
+    { "from": "Badge.tsx", "to": "src/lib/ui/Badge.tsx" },
+    { "from": "Spinner.tsx", "to": "src/lib/ui/Spinner.tsx" },
+    { "from": "EmptyState.tsx", "to": "src/lib/ui/EmptyState.tsx" },
     { "from": "InstallButton.tsx", "to": "src/lib/ui/InstallButton.tsx" },
     { "from": "useInstallPrompt.ts", "to": "src/lib/ui/useInstallPrompt.ts" },
     { "from": "ThemeToggle.tsx", "to": "src/lib/ui/ThemeToggle.tsx" },
     { "from": "useTheme.ts", "to": "src/lib/ui/useTheme.ts" },
+    { "from": "OfflineIndicator.tsx", "to": "src/lib/ui/OfflineIndicator.tsx" },
+    { "from": "useOnlineStatus.ts", "to": "src/lib/ui/useOnlineStatus.ts" },
     { "from": "tokens.css", "to": "src/lib/ui/tokens.css" },
     { "from": "theme.css", "to": "src/lib/ui/theme.css", "policy": "scaffold" },
     { "from": "theme-init.js", "to": "public/theme-init.js", "policy": "scaffold" },
     { "from": "index.ts", "to": "src/lib/ui/index.ts", "policy": "scaffold" }
   ],
   "dependencies": {
-    "lucide-react": "^1.39.0"
+    "lucide-react": "^1.39.0",
+    "react-router-dom": "^7.18.3"
   },
   "postInstall": [
     "Import theme: add `@import \"./lib/ui/theme.css\";` to your `src/index.css`",
-    "Wrap your app in `<AppShell>...</AppShell>`",
+    "Render `<AppShell>` inside the router, as the root layout route around `<Outlet />` (the router template ships it as src/App.tsx) — AppNav's links need the router",
+    "Give every page a `<PageHeader title=…>` — it is the page's <h1>",
     "Set the color accent: the `--accent-h` value in theme.css. Take your app's slot from the hue table in https://github.com/daniel-rck/web-base/blob/main/docs/specs/04-layout-system.md (355 is the free one) — never edit tokens.css, web-base owns it",
     "Prevent theme flash: add `<script src=\"/theme-init.js\"></script>` to <head> in index.html, before your stylesheet",
     "If the app persists the theme somewhere other than localStorage[\"theme\"], adapt public/theme-init.js to read it"

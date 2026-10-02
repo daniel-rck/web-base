@@ -27,7 +27,9 @@ export function AppHeader({ title, logo, actions, maxWidthClass = "max-w-4xl" }:
       >
         <div className="flex items-center gap-2 min-w-0">
           {logo ? <span className="text-accent-600 shrink-0">{logo}</span> : null}
-          <h1 className="text-base font-semibold tracking-tight truncate">{title}</h1>
+          {/* Branding, not a heading: the page's <h1> is its PageHeader, so the
+              outline doesn't open with the same app name on every page. */}
+          <span className="text-base font-semibold tracking-tight truncate">{title}</span>
         </div>
         {actions ? <div className="flex items-center gap-2 shrink-0">{actions}</div> : null}
       </div>

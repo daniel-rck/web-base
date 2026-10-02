@@ -80,6 +80,17 @@ The version is bumped on every change (driven by the conventional-commit type:
   buttons at L 0.49 instead of 0.55), `danger` 0.60 → 0.55, `fg-subtle` 0.60 →
   0.54 (light) / 0.55 → 0.62 (dark). White on several accent buttons was
   3.9:1, badge text on its tint as low as 1.9:1.
+- **Breaking: one file per layout primitive, `ref` as a prop.** `primitives.tsx`
+  (221 lines) is now a barrel over `Button`, `Card` (+ `SectionCard`), `Chip`,
+  `Badge`, `Spinner` and `EmptyState`; `forwardRef` is gone (React 19). Imports
+  from `primitives.tsx` keep working.
+- **Breaking: `PageHeader` is the page's `<h1>`; the header title is a
+  `<span>`.** Every page outline used to open with the app name as `<h1>`, and
+  the page title sat at `<h2>`, level with its sections.
+- **`useTheme` is one store for the page.** Each call kept its own state, so a
+  second consumer (a chart reading `resolvedTheme`) went stale when the toggle
+  changed; other tabs now follow via the `storage` event, and the hook no
+  longer throws without `matchMedia` (jsdom). `setTheme` is exported on its own.
 
 ### Fixed
 
@@ -123,6 +134,21 @@ The version is bumped on every change (driven by the conventional-commit type:
   search index.**
 - **The CI docs named tags that don't exist** (`@v0.3.0`, `ref: v0.2.1`) and
   contradicted each other on `@main` versus tags.
+- **Keyboard focus survives forced-colors mode.** Focus was a box-shadow ring
+  with `outline-none`, which Windows high contrast removes; it also drew a
+  white halo in dark mode. All controls use a real outline now.
+- **Disabled secondary and ghost buttons looked enabled**; hover no longer
+  applies to disabled controls.
+- **Text on fills used `text-white`** instead of `--color-fg-on-accent`, and
+  badge text sat on its own semantic tint at 1.9–3.5:1.
+- **The spinner wasn't announced**: `role="status"` carried only an
+  `aria-label`; it now contains visually hidden text.
+- **`ThemeToggle` named only the current state**; it now says what a click does.
+- **iPadOS 13+ never saw the install button** (it reports a Macintosh user
+  agent); a `beforeinstallprompt` fired before the shell mounted was lost; a
+  failing `prompt()` was an unhandled rejection. The iOS dialog is labelled by
+  its heading.
+- **The sticky sidebar ignored the notch inset** the header absorbs.
 
 ### Added
 
@@ -171,6 +197,11 @@ The version is bumped on every change (driven by the conventional-commit type:
 - **The theme is tested:** every text pair at every hue in the 04 table, light
   and dark, both gamut-mapping modes; the hue spacing rule; the two dark blocks
   staying identical; and the spec showing `tokens.css`/`theme.css` verbatim.
+- **`OfflineIndicator`** in the header (and `useOnlineStatus()`): a warning
+  badge while offline, announced through an always-mounted status region.
+- **A skip link** („Zum Inhalt springen") to `<main id="main">`.
+- **`buttonClassName()`** styles a router `<Link>` as a button; `Badge` has an
+  `info` variant; `EmptyState` takes `titleAs`.
 
 ## [0.5.0] - 2026-09-22
 
