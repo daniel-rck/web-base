@@ -18,14 +18,25 @@ reference is the day-to-day terse version.
 
 ## Per-app accent hues
 
-| App | `--accent-h` |
-|---|---|
-| Hausverwaltung | 250 (Slate-Blau) |
-| Tennisturnier | 155 (Emerald) |
-| ErinnerMich | 285 (Indigo) |
+| App | Accent | `--accent-h` |
+|---|---|---|
+| Pizzateig | Orange | `50` |
+| Tankzettel | Frischgrün | `110` |
+| Tennisturnier | Smaragd | `175` |
+| Minispiele | Türkis | `200` |
+| Zeiterfassung | Blau | `255` |
+| Hausverwaltung | Indigo | `280` |
+| ErinnerMich | Violett | `305` |
+| Tonspur | Magenta | `330` |
+| (nächste App) | Himbeere | `355` |
+
+Reserved for the semantic tokens: danger 25, warning 80, success 150, info
+230. Every accent keeps ≥25° from those and from every other app.
 
 Change *only* `--accent-h` in `theme.css` to change the app's accent. All
-accent shades derive from it via OKLCH on the same hue.
+tokens live in `tokens.css` (owned by web-base, never edited); all accent
+shades derive from the hue via OKLCH. Text on a semantic tint uses the
+matching `text-success-fg` / `-warning-fg` / `-danger-fg` / `-info-fg`.
 
 ## Components
 

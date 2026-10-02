@@ -31,41 +31,66 @@ on the same hue.
 `warning` 80, `success` 150, `info` 230. An app accent must sit at least 25°
 away from each of them — otherwise a `Badge variant="success"` and an accent
 chip are indistinguishable — and at least 25° from every other app's accent.
+`cli/src/docs/theme.test.ts` enforces both against the table below (the
+reserved hues are read from `tokens.css`).
 
 Per-app hues:
 
-| App | Accent name | `--accent-h` | Sample OKLCH |
-|---|---|---|---|
-| Pizzateig | Orange | `50` | `oklch(0.62 0.18 50)` |
-| Tankzettel | Frischgrün | `110` | `oklch(0.62 0.18 110)` |
-| Tennisturnier | Emerald | `155` | `oklch(0.68 0.17 155)` |
-| Minispiele | Türkis | `195` | `oklch(0.62 0.18 195)` |
-| Zeiterfassung | Blau | `230` | `oklch(0.62 0.18 230)` |
-| Hausverwaltung | Slate-Blau | `250` | `oklch(0.62 0.18 250)` |
-| ErinnerMich | Indigo | `285` | `oklch(0.58 0.19 285)` |
-| Tonspur | Neon-Magenta | `320` | `oklch(0.62 0.18 320)` |
-| HamsterFlight | — | — | Not a Tailwind app: a pixi.js canvas game with no `theme.css`. Excluded by decision, not by omission. |
+| App | Accent name | `--accent-h` |
+|---|---|---|
+| Pizzateig | Orange | `50` |
+| Tankzettel | Frischgrün | `110` |
+| Tennisturnier | Smaragd | `175` |
+| Minispiele | Türkis | `200` |
+| Zeiterfassung | Blau | `255` |
+| Hausverwaltung | Indigo | `280` |
+| ErinnerMich | Violett | `305` |
+| Tonspur | Magenta | `330` |
+| (nächste App) | Himbeere | `355` |
 
-**Decision: two of the three warm apps moved.** Pizzateig (50), Tankzettel (55)
-and Tonspur (45) previously sat inside a 10° band, and that band is itself
-squeezed between `danger` (25) and `warning` (80). Pizzateig kept 50 because its
-token set is tuned around it (warm-tinted surfaces, `--color-accent-warm`,
-`--shadow-warm`); Tankzettel and Tonspur are pure accent consumers, so moving
-them costs one line each. Minispiele's apparent collision with Hausverwaltung at
-250 was a stale scaffold — the app already overrode the hue to 195 in
-`index.css`; 195 is now written where it belongs.
+HamsterFlight is not in the table: it is not a Tailwind app (a pixi.js canvas
+game with no `theme.css`) — excluded by decision, not by omission.
 
-If different hues are wanted, swap the value of `--accent-h`. No other
-tokens need to change.
+**Decision: the hues were redistributed in 0.6.0.** The previous table broke
+its own rule three times — Tennisturnier at 155 sat 5° from `success`,
+Zeiterfassung at 230 *on* `info`, Hausverwaltung at 250 20° from both — and
+the template default (250) did too. With four reserved hues and a 25° minimum
+the wheel has exactly nine free slots: one in 50–55, one in 105–125, two in
+175–205 and five in 255–360. Pizzateig (50, its warm token set is tuned
+around it) and Tankzettel (110, the zero-drift reference) stay; the others
+move by 5–30° to exact 25° spacing, so no app changes colour family (the two
+blues stay blue, Hausverwaltung now reads indigo, ErinnerMich violet). The
+last slot, 355, is the template default — the next app takes it and records
+itself here. A tenth accent needs a rule change, not a squeeze.
 
-## theme.css
+An earlier decision moved two of the three warm apps (Tankzettel 55 → 110,
+Tonspur 45 → 320) out of the 10° band they shared between `danger` and
+`warning`.
 
-The full template file at `cli/templates/layout/theme.css`:
+**Contrast guarantee.** Every text pair the components use reaches WCAG AA
+(4.5:1) at every hue in the table, in light and dark: body text (`fg`,
+`fg-muted`, `fg-subtle`) on the surfaces, `fg-on-accent` on accent-600/700
+and on the danger fills, accent text where the nav and badges put it, and the
+`*-fg` text tokens on their own semantic tint. The focus outline (accent-500)
+reaches 3:1 on the surface. `theme.test.ts` checks this in sRGB, taking the
+worse of per-channel clipping and chroma-reducing gamut mapping. It does not
+cover P3 displays or app-specific token forks (Pizzateig's warm surfaces).
+
+**Decision: semantic text uses its own `-fg` token.** The semantic fills
+(`success`, `warning`, …) are mid-lightness so they read as icons and tints;
+as text on a 15% tint of themselves they reached 1.9–3.5:1. `--color-*-fg`
+is a darker (light theme) or lighter (dark theme) shade of the same hue.
+
+## tokens.css
+
+`src/lib/ui/tokens.css` — **owned**: every token, the dark blocks, motion.
+`update` overwrites it, so apps never edit it. The full template file:
 
 ```css
 /*
- * Design tokens for daniel-rck web apps.
- * Per-app: change only `--accent-h` below.
+ * Design tokens for daniel-rck web apps. OWNED by web-base: `web-base update`
+ * overwrites this file, so never edit it in an app. The per-app seam is
+ * theme.css, which imports this file and sets the accent hue.
  */
 
 @import "tailwindcss";
@@ -88,19 +113,20 @@ The full template file at `cli/templates/layout/theme.css`:
 }
 
 @theme {
-  /* ── App accent — change this per app ─────────────────── */
-  --accent-h: 250; /* hue: 250=slate-blue, 155=emerald, 285=indigo */
+  /* ── Accent ───────────────────────────────────────────── */
+  /* Fallback only — theme.css sets the app's hue. */
+  --accent-h: 355;
 
   --color-accent-50: oklch(0.97 0.02 var(--accent-h));
   --color-accent-100: oklch(0.94 0.04 var(--accent-h));
   --color-accent-200: oklch(0.88 0.08 var(--accent-h));
   --color-accent-300: oklch(0.8 0.12 var(--accent-h));
   --color-accent-400: oklch(0.7 0.16 var(--accent-h));
-  --color-accent-500: oklch(0.62 0.18 var(--accent-h));
-  --color-accent-600: oklch(0.55 0.18 var(--accent-h));
-  --color-accent-700: oklch(0.48 0.16 var(--accent-h));
-  --color-accent-800: oklch(0.4 0.13 var(--accent-h));
-  --color-accent-900: oklch(0.3 0.1 var(--accent-h));
+  --color-accent-500: oklch(0.6 0.18 var(--accent-h));
+  --color-accent-600: oklch(0.49 0.18 var(--accent-h));
+  --color-accent-700: oklch(0.43 0.16 var(--accent-h));
+  --color-accent-800: oklch(0.37 0.13 var(--accent-h));
+  --color-accent-900: oklch(0.28 0.1 var(--accent-h));
 
   /* ── Surfaces ──────────────────────────────────────────── */
   --color-surface: oklch(1 0 0);
@@ -109,18 +135,27 @@ The full template file at `cli/templates/layout/theme.css`:
   --color-border: oklch(0.88 0 0);
   --color-fg: oklch(0.18 0 0);
   --color-fg-muted: oklch(0.45 0 0);
-  --color-fg-subtle: oklch(0.6 0 0);
+  --color-fg-subtle: oklch(0.54 0 0);
 
-  /* Foreground for text sitting on a saturated fill (accent/danger/success
-   * buttons and badges). `--color-fg` is near-black in light mode, so it is the
+  /* Foreground for text sitting on a saturated fill (accent/danger buttons,
+   * the active chip). `--color-fg` is near-black in light mode, so it is the
    * wrong token there — this one stays light in both themes. */
   --color-fg-on-accent: oklch(0.99 0 0);
 
   /* ── Semantic ──────────────────────────────────────────── */
+  /* Reserved hues: danger 25, warning 80, success 150, info 230. App accents
+   * keep ≥25° away (04-layout-system.md). The fills are for icons, borders and
+   * tints; text on a tint uses the matching `-fg` token. */
   --color-success: oklch(0.65 0.17 150);
   --color-warning: oklch(0.75 0.15 80);
-  --color-danger: oklch(0.6 0.2 25);
+  --color-danger: oklch(0.55 0.2 25);
+  --color-danger-strong: oklch(0.48 0.19 25);
   --color-info: oklch(0.65 0.15 230);
+
+  --color-success-fg: oklch(0.48 0.13 150);
+  --color-warning-fg: oklch(0.5 0.11 80);
+  --color-danger-fg: oklch(0.5 0.19 25);
+  --color-info-fg: oklch(0.48 0.13 230);
 
   /* ── Typography ────────────────────────────────────────── */
   --font-sans:
@@ -132,6 +167,7 @@ The full template file at `cli/templates/layout/theme.css`:
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
 
   /* ── Shadows ───────────────────────────────────────────── */
   --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
@@ -143,6 +179,21 @@ The full template file at `cli/templates/layout/theme.css`:
   --duration-fast: 150ms;
   --duration-base: 250ms;
   --duration-slow: 400ms;
+
+  --animate-fade-in: fade-in var(--duration-base) var(--ease-out-quart) both;
+  --animate-slide-up: slide-up var(--duration-base) var(--ease-out-quart) both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+  }
 }
 
 /*
@@ -151,7 +202,7 @@ The full template file at `cli/templates/layout/theme.css`:
  * Three states: no `data-theme` = follow the OS; `data-theme="dark"` / `"light"`
  * = forced. The dark token list appears twice — once in the media query (system)
  * and once on the forced selector — because CSS can't share one declaration
- * block across a media query and a plain selector. Keep both blocks in sync.
+ * block across a media query and a plain selector. A test keeps them identical.
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -161,7 +212,11 @@ The full template file at `cli/templates/layout/theme.css`:
     --color-border: oklch(0.3 0 0);
     --color-fg: oklch(0.95 0 0);
     --color-fg-muted: oklch(0.7 0 0);
-    --color-fg-subtle: oklch(0.55 0 0);
+    --color-fg-subtle: oklch(0.62 0 0);
+    --color-success-fg: oklch(0.8 0.14 150);
+    --color-warning-fg: oklch(0.85 0.13 80);
+    --color-danger-fg: oklch(0.78 0.13 25);
+    --color-info-fg: oklch(0.8 0.11 230);
     color-scheme: dark;
   }
 }
@@ -173,12 +228,32 @@ The full template file at `cli/templates/layout/theme.css`:
   --color-border: oklch(0.3 0 0);
   --color-fg: oklch(0.95 0 0);
   --color-fg-muted: oklch(0.7 0 0);
-  --color-fg-subtle: oklch(0.55 0 0);
+  --color-fg-subtle: oklch(0.62 0 0);
+  --color-success-fg: oklch(0.8 0.14 150);
+  --color-warning-fg: oklch(0.85 0.13 80);
+  --color-danger-fg: oklch(0.78 0.13 25);
+  --color-info-fg: oklch(0.8 0.11 230);
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
+}
+
+/*
+ * Reduced motion: collapse animations and transitions to an instant for users
+ * who ask for it. The spinner keeps turning — it is the only signal that work
+ * is in progress, not decoration.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 html {
@@ -192,6 +267,44 @@ body {
   text-rendering: optimizeLegibility;
 }
 ```
+
+## theme.css
+
+`src/lib/ui/theme.css` — the per-app **scaffold** seam. It imports
+`tokens.css`, sets the accent hue, and holds whatever tokens an app adds:
+
+```css
+/*
+ * The app's theme — a per-app seam (`web-base update` never touches it).
+ * Every token lives in tokens.css, which web-base owns; this file only picks
+ * the accent hue and holds app-specific additions.
+ */
+
+@import "./tokens.css";
+
+/* The accent hue: take your app's slot from the table in 04-layout-system.md.
+ * 355 is the one free slot (the fallback in tokens.css). Unlayered on purpose,
+ * so it wins over the `@theme` default whatever the cascade layers say. */
+:root {
+  --accent-h: 355;
+}
+
+/* App-specific tokens and overrides below (e.g. Pizzateig's warm surfaces). */
+```
+
+**Decision: owned tokens behind a thin seam.** `theme.css` used to be the
+whole token file *and* a scaffold, so no token fix ever reached an existing
+app — the same trap the oxlint config was split out of (`oxlint.base.json` +
+`.oxlintrc.json`). Now the tokens flow through `update`, and the seam is five
+lines an app has no reason to rewrite. The hue sits in an unlayered `:root`
+rule so it overrides the `@theme` default regardless of cascade layers.
+
+**Decision: reduced motion is a token-file reset.** `prefers-reduced-motion:
+reduce` collapses every animation and transition to an instant, except
+`.animate-spin` — the spinner is the only sign that work is in progress. The
+`--animate-fade-in`/`--animate-slide-up` keyframes and `--radius-2xl` were
+promoted from Pizzateig's fork (08 claimed this had happened in 0.3.0; it had
+not).
 
 ## Components
 

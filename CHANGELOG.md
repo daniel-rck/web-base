@@ -64,6 +64,22 @@ The version is bumped on every change (driven by the conventional-commit type:
   `contents: read` to the called jobs (omit `permissions:` or grant it;
   `permissions: {}` fails at startup). Apps should pin `@vX.Y.Z` and let their
   Dependabot bump it.
+- **Breaking: the design tokens move into an owned `tokens.css`.** `theme.css`
+  was the whole token file *and* a scaffold seam, so no token fix ever reached
+  an existing app. It is now a five-line seam that imports `tokens.css` and sets
+  `--accent-h`; `update layout --apply` keeps the tokens current. Apps replace
+  their `theme.css` once (see *Migration*).
+- **Breaking: accent hues are redistributed** so every accent sits ≥25° from the
+  semantic hues and from every other app — the old table broke its own rule
+  three times. Tennisturnier 155 → 175, Minispiele 195 → 200, Zeiterfassung
+  230 → 255, Hausverwaltung 250 → 280, ErinnerMich 285 → 305, Tonspur 320 →
+  330; Pizzateig 50 and Tankzettel 110 stay. 355 is the free slot and the new
+  template default (was 250).
+- **Breaking: darker accent and danger shades** so every text pair reaches WCAG
+  AA (4.5:1) at every app hue: accent-500…900 one step darker (primary
+  buttons at L 0.49 instead of 0.55), `danger` 0.60 → 0.55, `fg-subtle` 0.60 →
+  0.54 (light) / 0.55 → 0.62 (dark). White on several accent buttons was
+  3.9:1, badge text on its tint as low as 1.9:1.
 
 ### Fixed
 
@@ -147,6 +163,14 @@ The version is bumped on every change (driven by the conventional-commit type:
   passes `--diff`, so a failing run shows what drifted.
 - **Dependabot keeps the pinned actions current:** one grouped `chore(deps)`
   PR a week, for releases at least seven days old.
+- **Text-on-tint tokens** `--color-{success,warning,danger,info}-fg` (light and
+  dark) and `--color-danger-strong` for the danger hover.
+- **Motion and radius tokens promoted from Pizzateig:** `--animate-fade-in`,
+  `--animate-slide-up` (with keyframes), `--radius-2xl`, and a
+  `prefers-reduced-motion` reset that spares only the spinner.
+- **The theme is tested:** every text pair at every hue in the 04 table, light
+  and dark, both gamut-mapping modes; the hue spacing rule; the two dark blocks
+  staying identical; and the spec showing `tokens.css`/`theme.css` verbatim.
 
 ## [0.5.0] - 2026-09-22
 

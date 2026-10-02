@@ -82,8 +82,11 @@ of it. Its `vitest.config.ts` uses `@cloudflare/vitest-pool-workers` projects.
 `theme.css` keeps hue-65 warm-tinted surfaces, `--color-accent-warm`,
 `--shadow-warm` and `.slider-warm`. That palette is the product's identity. The
 generally-useful parts of its fork (the `--animate-*` keyframes, `--radius-2xl`,
-the `prefers-reduced-motion` reset) were promoted upstream in 0.3.0 instead of
-staying app-local.
+the `prefers-reduced-motion` reset) are promoted into the owned `tokens.css` in
+0.6.0 — earlier versions of this page claimed that had happened in 0.3.0; it had
+not. Since 0.6.0 the warm palette lives in Pizzateig's `theme.css` seam on top
+of `tokens.css` (verify the promoted names and values against Pizzateig's fork
+when it migrates).
 
 ### Tennisturnier — KV-only sync
 

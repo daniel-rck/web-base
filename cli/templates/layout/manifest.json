@@ -1,6 +1,6 @@
 {
   "name": "layout",
-  "description": "AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, ThemeToggle, theme.css",
+  "description": "AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, ThemeToggle, design tokens",
   "files": [
     { "from": "AppShell.tsx", "to": "src/lib/ui/AppShell.tsx" },
     { "from": "AppHeader.tsx", "to": "src/lib/ui/AppHeader.tsx" },
@@ -11,6 +11,7 @@
     { "from": "useInstallPrompt.ts", "to": "src/lib/ui/useInstallPrompt.ts" },
     { "from": "ThemeToggle.tsx", "to": "src/lib/ui/ThemeToggle.tsx" },
     { "from": "useTheme.ts", "to": "src/lib/ui/useTheme.ts" },
+    { "from": "tokens.css", "to": "src/lib/ui/tokens.css" },
     { "from": "theme.css", "to": "src/lib/ui/theme.css", "policy": "scaffold" },
     { "from": "theme-init.js", "to": "public/theme-init.js", "policy": "scaffold" },
     { "from": "index.ts", "to": "src/lib/ui/index.ts", "policy": "scaffold" }
@@ -21,8 +22,7 @@
   "postInstall": [
     "Import theme: add `@import \"./lib/ui/theme.css\";` to your `src/index.css`",
     "Wrap your app in `<AppShell>...</AppShell>`",
-    "Set the color accent: edit the `--accent-h` value in theme.css",
-    "Pick an accent hue from the table in docs/specs/04-layout-system.md — keep it 25° away from the reserved semantic hues (25 danger, 80 warning, 150 success, 230 info) and from every other app",
+    "Set the color accent: the `--accent-h` value in theme.css. Take your app's slot from the hue table in https://github.com/daniel-rck/web-base/blob/main/docs/specs/04-layout-system.md (355 is the free one) — never edit tokens.css, web-base owns it",
     "Prevent theme flash: add `<script src=\"/theme-init.js\"></script>` to <head> in index.html, before your stylesheet",
     "If the app persists the theme somewhere other than localStorage[\"theme\"], adapt public/theme-init.js to read it"
   ]
