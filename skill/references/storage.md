@@ -3,10 +3,24 @@
 IndexedDB via the `idb` library, plus a tiny `useLiveQuery` hook for
 reactive queries.
 
+Files in `src/lib/db/`:
+
+| File | Policy | What it holds |
+|---|---|---|
+| `open.ts` | owned | `createDBOpener()` — one cached connection and its lifecycle |
+| `mutations.ts` | owned | `mutationChannel()`, `notifyMutation()`, `clearStores()` |
+| `useLiveQuery.ts` | owned | the reactive query hook |
+| `db.ts` | scaffold | `AppSchema`, the database name, the migration ladder, `clearAll()` |
+| `index.ts` | scaffold | barrel |
+
+Edit `db.ts` only. The owned files are overwritten by `web-base update`.
+
 ## Opening the DB
 
 ```typescript
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { DBSchema } from "idb";
+import { clearStores } from "./mutations.ts";
+import { createDBOpener } from "./open.ts";
 
 export interface AppSchema extends DBSchema {
   tenants: {
@@ -16,25 +30,56 @@ export interface AppSchema extends DBSchema {
   };
 }
 
-const DB_NAME = "app";
-const DB_VERSION = 1;
+export const getDB = createDBOpener<AppSchema>({
+  name: "hausverwaltung", // unique per app: in local dev every app shares localhost
+  version: 2,
+  upgrade(db, oldVersion, _newVersion, tx) {
+    if (oldVersion < 1) {
+      db.createObjectStore("tenants", { keyPath: "id" });
+    }
+    if (oldVersion < 2) {
+      tx.objectStore("tenants").createIndex("byName", "name");
+    }
+  },
+});
 
-let dbPromise: Promise<IDBPDatabase<AppSchema>> | null = null;
-
-export function getDB() {
-  if (!dbPromise) {
-    dbPromise = openDB<AppSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("tenants")) {
-          const store = db.createObjectStore("tenants", { keyPath: "id" });
-          store.createIndex("byName", "name");
-        }
-      },
-    });
-  }
-  return dbPromise;
+export async function clearAll(): Promise<void> {
+  await clearStores(await getDB());
 }
+
+export { notifyMutation } from "./mutations.ts";
 ```
+
+Delete the scaffold's `[storeName: string]` index signature as soon as the
+first real store exists — while it is there any string typechecks as a store
+name and every value is `unknown`.
+
+### The migration ladder
+
+- One `if (oldVersion < N)` step per schema version, in ascending order.
+- `oldVersion` is 0 on a fresh install, so a new user runs every step and an
+  existing user only the ones they're missing.
+- **Never edit a step that has shipped.** Users who already ran it won't run it
+  again. Bump `version` and add a step.
+- Inside `upgrade`, use the `tx` argument (the versionchange transaction) to
+  reach existing stores — e.g. to add an index or migrate records. Don't open
+  another transaction there.
+
+### Connection lifecycle
+
+`createDBOpener` caches one connection and handles what IndexedDB leaves to
+the app:
+
+| Event | What happens |
+|---|---|
+| Another tab opens a newer version (`blocking`) | The connection closes so that upgrade isn't blocked, then `onVersionChange()` runs — default: `location.reload()` |
+| The browser drops the connection (`terminated`, Safari) | Forgotten; the next `getDB()` reopens |
+| The open fails (`VersionError`, quota, private mode) | Not cached; the next `getDB()` retries |
+| This tab's upgrade waits for another tab (`blocked`) | `console.warn` |
+
+Pass `onVersionChange` when a reload could lose unsaved input — show a
+"Neue Version verfügbar — bitte neu laden" banner instead. Until the reload,
+`getDB()` rejects with `VersionError`.
 
 ## useLiveQuery hook
 
@@ -46,8 +91,9 @@ function useLiveQuery<T>(
 ): { data: T | undefined; loading: boolean; error: Error | undefined };
 ```
 
-Subscribes to the `db:<storeName>` and `db:*` BroadcastChannels. Re-runs
-the query whenever a mutation is signalled.
+Subscribes to the `db:<storeName>` and `db:*` BroadcastChannels
+(`mutationChannel(storeName)` / `mutationChannel("*")`). Re-runs the query
+whenever a mutation is signalled.
 
 Usage:
 
@@ -73,6 +119,9 @@ async function addTenant(t: Tenant) {
 }
 ```
 
+For a multi-store transaction, notify each store after `await tx.done` — or
+`notifyMutation("*")` to re-run every live query.
+
 ## Migrating from Dexie
 
 | Dexie | idb |
@@ -80,7 +129,7 @@ async function addTenant(t: Tenant) {
 | `db.tenants.toArray()` | `db.getAll("tenants")` |
 | `db.tenants.where("name").equals(x).toArray()` | `db.getAllFromIndex("tenants", "byName", x)` |
 | `useLiveQuery(() => ...)` (`dexie-react-hooks`) | `useLiveQuery("tenants", () => ...)` |
-| `db.version(2).stores({...})` | `upgrade(db, oldVersion, newVersion)` callback |
+| `db.version(2).stores({...})` | `if (oldVersion < 2) { … }` in `upgrade` |
 
 Drop `dexie` and `dexie-react-hooks` from `package.json`. The local
 `useLiveQuery` replaces both.
@@ -104,8 +153,8 @@ Keep in localStorage when:
 
 ## Testing
 
-`clearAll()` wipes every store and emits a global mutation event. Use it
-in test `beforeEach`.
+`clearAll()` wipes every store in one transaction and emits a global mutation
+event. Use it in test `beforeEach`:
 
 ```typescript
 beforeEach(async () => {

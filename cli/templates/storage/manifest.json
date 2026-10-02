@@ -1,8 +1,10 @@
 {
   "name": "storage",
-  "description": "idb wrapper + useLiveQuery hook for reactive IndexedDB",
+  "description": "idb connection lifecycle + mutation channels + useLiveQuery hook for reactive IndexedDB",
   "files": [
     { "from": "db.ts", "to": "src/lib/db/db.ts", "policy": "scaffold" },
+    { "from": "open.ts", "to": "src/lib/db/open.ts" },
+    { "from": "mutations.ts", "to": "src/lib/db/mutations.ts" },
     { "from": "useLiveQuery.ts", "to": "src/lib/db/useLiveQuery.ts" },
     { "from": "index.ts", "to": "src/lib/db/index.ts", "policy": "scaffold" }
   ],
@@ -10,7 +12,11 @@
     "idb": "^8.0.3"
   },
   "postInstall": [
-    "Define your schema in src/lib/db/db.ts (replace the placeholder interface)",
-    "Use `useLiveQuery(db.<store>, q => q.getAll())` in components"
+    "Give the database a unique name in src/lib/db/db.ts (in local dev every app shares the localhost origin)",
+    "Define your stores in AppSchema, then delete its index signature",
+    "Schema changes: bump `version` and add one `if (oldVersion < N)` step per version — never edit a step that has shipped",
+    "Read in components: `useLiveQuery(\"<store>\", async () => (await getDB()).getAll(\"<store>\"))`",
+    "After every write call `notifyMutation(\"<store>\")` so live queries re-run",
+    "Never edit open.ts, mutations.ts or useLiveQuery.ts — `update` overwrites them"
   ]
 }

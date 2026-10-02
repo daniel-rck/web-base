@@ -15,7 +15,7 @@ templates only have an `extends` array.
 | `hygiene` | leaf | LICENSE, CONTRIBUTING, SECURITY, .editorconfig |
 | `oxc` | leaf | oxlint + oxfmt configs + lint/format scripts + devDeps |
 | `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, ThemeToggle, OfflineIndicator, tokens.css + theme.css |
-| `storage` | leaf | idb wrapper + useLiveQuery hook |
+| `storage` | leaf | idb connection lifecycle, mutation channels, useLiveQuery hook |
 | `pwa` | leaf | service worker (injectManifest: precache, offline navigation, prompt-based updates) + `useAppUpdate`/`UpdatePrompt` |
 | `router` | leaf | router.tsx with the root layout route (`src/App.tsx`), error/404 pages, a starter `HomePage` |
 | `worker` | leaf | worker/index.ts + wrangler.toml + Cloudflare types |
@@ -220,34 +220,84 @@ the router's root layout route; give every page a `<PageHeader>`; set
 
 ## storage
 
-The idb-based storage layer.
+The idb-based storage layer: a connection that survives the IndexedDB
+lifecycle, a naming contract for mutation broadcasts, and a reactive query hook.
 
 Files:
-- `db.ts` → `src/lib/db/db.ts` — wraps `idb`'s `openDB`, defines the schema interface
-- `useLiveQuery.ts` → `src/lib/db/useLiveQuery.ts` — React hook for reactive queries
-- `index.ts` → `src/lib/db/index.ts`
+- `open.ts` → `src/lib/db/open.ts` — `createDBOpener()`: one cached connection and its lifecycle. **owned**
+- `mutations.ts` → `src/lib/db/mutations.ts` — `mutationChannel()`, `notifyMutation()`, `clearStores()`. **owned**
+- `useLiveQuery.ts` → `src/lib/db/useLiveQuery.ts` — React hook for reactive queries. **owned**
+- `db.ts` → `src/lib/db/db.ts` — the app's schema, database name and migration ladder. **scaffold**
+- `index.ts` → `src/lib/db/index.ts` — barrel. **scaffold**
 
 dependencies:
 - `idb`: `^8.0.3`
 
-The `db.ts` ships as a template with placeholders for the app's schema. It
-must include:
-- An `openDB`-based factory exporting a typed promise (`AppDB`)
-- An `upgrade` callback skeleton with comments
-- A `clearAll()` helper for tests
+`db.ts` is the per-app seam and stays thin. A fix in a scaffold file only
+reaches *new* apps, so everything that has to be right in every app lives in
+the owned siblings, where `update` delivers it. `db.ts` ships:
+- `AppSchema extends DBSchema` with a commented example store and an index
+  signature the app deletes once real stores exist — while it is there, any
+  string typechecks as a store name and every value is `unknown`.
+- `getDB = createDBOpener<AppSchema>({ name: "<app-name>", version: 1, upgrade })`.
+  The name must be unique per app: in local dev every app shares the
+  `localhost` origin, so two apps called `"app"` would share — and upgrade —
+  one database.
+- The migration ladder in `upgrade(db, oldVersion)`: one `if (oldVersion < N)`
+  step per version. `oldVersion` is 0 on a fresh install, so a new user runs
+  every step and an existing one only those they're missing. A step that has
+  shipped is never edited; a schema change bumps `version` and adds a step.
+- `clearAll()` = `clearStores(await getDB())`, for tests and a "delete all
+  data" action, and a re-export of `notifyMutation`, so the barrel's exports
+  (`AppSchema`, `clearAll`, `getDB`, `notifyMutation`) stay as they were.
 
-`useLiveQuery.ts` ships ~30-50 lines:
-- Subscribes to a BroadcastChannel named after the store
-- Re-runs the query whenever the channel signals a mutation
-- Returns `{ data, loading, error }`
-- Mutation helpers (`tx.objectStore(name).put(value)` wrappers) emit on the channel
+`open.ts` — `createDBOpener<S>({ name, version, upgrade, onVersionChange? })`
+returns a `getDB()` that caches the `openDB()` promise (`pending ??= …`) and
+wires the callbacks IndexedDB leaves to the app:
+- `blocking` (another tab opened a newer version): close this connection,
+  forget it, then call `onVersionChange` — default `location.reload()`.
+- `terminated` (the browser dropped the connection — Safari does): forget it;
+  the next call reopens.
+- a rejected open (`VersionError` after a downgrade, quota, private mode):
+  forget it; the next call retries instead of replaying the cached rejection.
+- `blocked` (this tab's upgrade waits for another tab): `console.warn`.
+
+`mutations.ts`:
+- `mutationChannel(store)` → `"db:<store>"`, with `"*"` standing for every
+  store — the naming contract between writers and `useLiveQuery`.
+- `notifyMutation(store)` posts once on that channel and closes it; a no-op
+  where `BroadcastChannel` doesn't exist.
+- `clearStores(db)` empties every store in one `readwrite` transaction, then
+  calls `notifyMutation("*")`. A database with no stores is a no-op, because
+  `transaction([])` throws.
+
+`useLiveQuery.ts`:
+- Subscribes to `mutationChannel(storeName)` and `mutationChannel("*")`
+- Re-runs the query whenever one of them signals a mutation; there are no
+  write wrappers — writers call `notifyMutation` after their transaction
+- Returns `{ data, loading, error }`; latest-wins, so an overtaken run never
+  commits
+
+**Decision: a newer schema in another tab closes the connection and reloads.**
+An IndexedDB upgrade waits until every other connection to the database is
+closed. A tab that keeps its old connection blocks the upgrade in the new tab
+indefinitely: the new code's `openDB` never settles and the app never loads.
+Closing in `blocking` unblocks it. The closed tab is now running code built for
+the old schema against a database it can no longer open (`VersionError`), so
+the default is to reload into the new build. An app with unsaved input at stake
+passes `onVersionChange` to prompt instead ("Neue Version verfügbar — bitte neu
+laden"); until the reload, `getDB()` rejects, and retries on every call.
 
 Full TypeScript signatures in `references/storage.md` of the skill (and so the
 template implementation must produce equivalent code).
 
 postInstall:
-- "Define your schema in src/lib/db/db.ts (replace the placeholder interface)"
-- "Use `useLiveQuery(db.<store>, q => q.getAll())` in components"
+- "Give the database a unique name in src/lib/db/db.ts (in local dev every app shares the localhost origin)"
+- "Define your stores in AppSchema, then delete its index signature"
+- "Schema changes: bump `version` and add one `if (oldVersion < N)` step per version — never edit a step that has shipped"
+- "Read in components: `useLiveQuery("<store>", async () => (await getDB()).getAll("<store>"))`"
+- "After every write call `notifyMutation("<store>")` so live queries re-run"
+- "Never edit open.ts, mutations.ts or useLiveQuery.ts — `update` overwrites them"
 
 ---
 

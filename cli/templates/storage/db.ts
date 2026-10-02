@@ -1,7 +1,9 @@
-import { type DBSchema, type IDBPDatabase, openDB } from "idb";
+import type { DBSchema } from "idb";
+import { clearStores } from "./mutations.ts";
+import { createDBOpener } from "./open.ts";
 
-// Replace this interface with your app's schema. Each store gets a
-// `key`/`value` shape and (optionally) named indexes.
+// Your app's schema. Each store gets a `key`/`value` shape and (optionally)
+// named indexes.
 export interface AppSchema extends DBSchema {
   // Example:
   // tenants: {
@@ -9,43 +11,34 @@ export interface AppSchema extends DBSchema {
   //   value: { id: string; name: string; createdAt: number };
   //   indexes: { byName: string };
   // };
+  //
+  // Delete this index signature once real stores exist: while it is here any
+  // string typechecks as a store name and every value is `unknown`.
   [storeName: string]: { key: IDBValidKey; value: unknown };
 }
 
-const DB_NAME = "app";
-const DB_VERSION = 1;
+export const getDB = createDBOpener<AppSchema>({
+  // Unique per app: in local dev every app shares the localhost origin, so two
+  // apps with the same name would share (and upgrade) one database.
+  name: "<app-name>",
+  version: 1,
+  upgrade(db, oldVersion) {
+    // The migration ladder. `oldVersion` is 0 on a fresh install, so a new user
+    // runs every step and an existing one only the steps they're missing.
+    // Never edit a step that has shipped: bump `version` and add a new
+    // `if (oldVersion < N)` below the last one.
+    if (oldVersion < 1) {
+      // Example:
+      // db.createObjectStore("tenants", { keyPath: "id" }).createIndex("byName", "name");
+    }
+    // if (oldVersion < 2) { … }
+    void db;
+  },
+});
 
-let dbPromise: Promise<IDBPDatabase<AppSchema>> | null = null;
-
-export function getDB(): Promise<IDBPDatabase<AppSchema>> {
-  if (!dbPromise) {
-    dbPromise = openDB<AppSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db, _oldVersion, _newVersion, _tx) {
-        // Create stores and indexes here. Example:
-        // if (!db.objectStoreNames.contains("tenants")) {
-        //   const store = db.createObjectStore("tenants", { keyPath: "id" });
-        //   store.createIndex("byName", "name");
-        // }
-        void db;
-      },
-    });
-  }
-  return dbPromise;
-}
-
-/** Test helper: wipe all stores in the current DB. */
+/** Wipe every store (tests' `beforeEach`, a "delete all data" action). */
 export async function clearAll(): Promise<void> {
-  const db = await getDB();
-  const tx = db.transaction(Array.from(db.objectStoreNames), "readwrite");
-  await Promise.all(Array.from(db.objectStoreNames).map((name) => tx.objectStore(name).clear()));
-  await tx.done;
-  notifyMutation("*");
+  await clearStores(await getDB());
 }
 
-/** Notify subscribers of mutations. Channels are per-store. */
-export function notifyMutation(storeName: string): void {
-  if (typeof BroadcastChannel === "undefined") return;
-  const channel = new BroadcastChannel(`db:${storeName}`);
-  channel.postMessage({ type: "mutation", at: Date.now() });
-  channel.close();
-}
+export { notifyMutation } from "./mutations.ts";
