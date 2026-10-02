@@ -583,6 +583,20 @@ Vitest tests live next to the code in `cli/src/**/*.test.ts`:
 - `templates.test.ts`: every shipped manifest loads and validates, no template
   ships a file its manifest doesn't list, the `core` chain writes each
   destination once, and every template has a skill reference.
+- `e2e/dist.test.ts`: the **built bundle** (`node cli/dist/index.js`, as
+  `bunx github:…` runs it) against scratch apps — exactly one shebang, the
+  executable bit, `--version`, template resolution from the bundle's layout,
+  exit codes 1 and 2 across the process boundary, and the regressions that
+  used to be shell steps in `tools-ci.yml` (`add hygiene`, `check core
+  --strict` on a fresh scaffold, the `webBase.unmanaged` exemption, a leftover
+  `biome.json`, `update core --apply` not being a no-op, `--force` keeping
+  `wrangler.toml`). Its `globalSetup` (`e2e/build-dist.ts`) runs `bun run
+  build` first, so the suite always tests the current source.
+
+**Decision: smoke tests live in vitest, not in workflow YAML.** As shell steps
+they only ran in CI; a contributor (or Claude) could not run them before
+pushing. `bun run test` rebuilds `cli/dist` as a side effect — a source change
+needs a rebuilt, committed bundle anyway.
 - `docs.test.ts`: version pins in `07-conventions.md` and the skill's
   `tech-stack.md` match the template manifests (and each other);
   `01-monorepo-structure.md` shows the current version and root pins; the

@@ -19,7 +19,7 @@ describe("runCli", () => {
   it("prints the version", async () => {
     const run = await runInProcess(["--version"]);
     expect(run.code).toBe(0);
-    expect(run.text).toContain(WEB_BASE_VERSION);
+    expect(run.stdout).toBe(`${WEB_BASE_VERSION}\n`);
   });
 
   it("exits 2 for an unknown command", async () => {

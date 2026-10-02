@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     include: ["cli/src/**/*.test.ts", "cli/test/**/*.test.ts"],
     unstubEnvs: true,
+    // The e2e suite runs the bundle; rebuild it from the current source first.
+    globalSetup: ["cli/src/e2e/build-dist.ts"],
   },
 });

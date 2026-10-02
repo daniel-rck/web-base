@@ -79,6 +79,12 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ### Added
 
+- **The CI smoke tests run locally.** The shell steps in `tools-ci.yml`
+  (`add hygiene`, `check --strict` on a fresh scaffold, the
+  `webBase.unmanaged` exemption, a leftover `biome.json`, `update core`
+  restoring files, `--force` keeping `wrangler.toml`) are a vitest e2e suite
+  against the built bundle, plus checks for the shebang, `--version` and exit
+  codes across the process boundary. `bun run test` rebuilds `cli/dist` first.
 - **Root `vitest.config.ts`** scopes the repo's tests to `cli/src` and
   `cli/test`, so test files shipped inside templates are never collected here.
 - **A `SessionStart` hook** (`.claude/`) installs dependencies in Claude Code

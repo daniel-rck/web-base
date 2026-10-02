@@ -2,6 +2,7 @@ import { type CommandDef, runCommand, showUsage } from "citty";
 import { consola } from "consola";
 import { main, subCommands } from "./cli.ts";
 import { errorMessage, EXIT, type ExitCode } from "./exit.ts";
+import { writeOut } from "./lib/text.ts";
 import { WEB_BASE_VERSION } from "./version.ts";
 
 function isSubCommand(name: string): name is keyof typeof subCommands {
@@ -24,7 +25,7 @@ export async function runCli(rawArgs: string[]): Promise<ExitCode> {
     return EXIT.ok;
   }
   if (first === "--version" && rest.length === 0) {
-    consola.log(WEB_BASE_VERSION);
+    writeOut(WEB_BASE_VERSION);
     return EXIT.ok;
   }
   if (!isSubCommand(first)) {
