@@ -14,10 +14,19 @@ const bin = resolve(root, "cli/dist/index.js");
 afterEach(cleanupScratch);
 
 function cli(cwd: string, ...args: string[]): { code: number; out: string } {
+  return cliWith({}, cwd, ...args);
+}
+
+function cliWith(
+  extra: Record<string, string>,
+  cwd: string,
+  ...args: string[]
+): { code: number; out: string } {
   // Run it as a user would: no template override, no test-mode env (consola
-  // silences info output under NODE_ENV=test).
-  const env = { ...process.env };
+  // silences info output under TEST=1).
+  const env: Record<string, string | undefined> = { ...process.env };
   for (const key of ["WEB_BASE_TEMPLATES_DIR", "NODE_ENV", "TEST", "VITEST"]) delete env[key];
+  Object.assign(env, extra);
   const result = spawnSync(process.execPath, [bin, ...args], { cwd, env, encoding: "utf8" });
   return { code: result.status ?? -1, out: `${result.stdout}${result.stderr}` };
 }
@@ -41,6 +50,13 @@ describe("the built bundle", () => {
     const run = cli(root, "--version");
     expect(run.code).toBe(0);
     expect(run.out.trim()).toBe(version);
+  });
+
+  it("logs the same whatever NODE_ENV the bundle was built or is run under", async () => {
+    const app = await scratchApp();
+    const plain = cli(app, "add", "hygiene", "--dry-run");
+    expect(plain.out).toContain("LICENSE");
+    expect(cliWith({ NODE_ENV: "test" }, app, "add", "hygiene", "--dry-run").out).toBe(plain.out);
   });
 
   it("adds hygiene, resolving templates from the bundle's layout", async () => {

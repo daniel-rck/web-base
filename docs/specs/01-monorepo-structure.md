@@ -25,7 +25,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
   },
   "files": ["cli/dist", "cli/templates", "skill"],
   "scripts": {
-    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
+    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --define 'process.env.NODE_ENV=\"production\"' --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.templates.json",
     "lint": "oxlint && oxfmt --check",
@@ -60,6 +60,14 @@ bundled) because the CLI reads them at runtime.
 prepended with `sed -i '1i…'`, which is GNU-only — on macOS (BSD sed) the build,
 and with it `prepare` and every `bun install`, failed — and which stacked a
 second shebang when run twice.
+
+**Decision: the build defines `process.env.NODE_ENV` as `"production"`.**
+`bun build` inlines `process.env.NODE_ENV` from the *building* shell. The e2e
+globalSetup builds under vitest (`NODE_ENV=test`), so the bundle came out
+with `"test"` baked in. In that state consola (via std-env) only printed
+warnings, and CI's fresh build no longer matched the committed one. Pinning
+the value makes the bundle byte-identical however it is built, and keeps the
+CLI's output independent of the caller's `NODE_ENV`.
 
 **Decision: `cli/dist/index.js` is committed.** Bun installs Git dependencies
 from the repo tarball as-is and runs no lifecycle scripts (`prepare` is
