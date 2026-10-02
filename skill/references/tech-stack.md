@@ -38,6 +38,7 @@ TypeScript configs. The pins mirror `cli/templates/pins.json` in web-base;
   "jsdom": "^30.0.1",
   "fake-indexeddb": "^6.2.5",
   "@testing-library/react": "^16.3.3",
+  "@testing-library/dom": "^10.4.2",
   "@testing-library/user-event": "^14.6.7",
   "@testing-library/jest-dom": "^7.0.1",
   "wrangler": "^4.128.0",
@@ -93,6 +94,12 @@ it also documents which Bun the lockfile was written with.
 Shipped by the `oxc` template: `oxlint.base.json` + `.oxfmtrc.json` (owned) and
 `.oxlintrc.json` + `.prettierignore` (per-app seams). The full content is in
 `oxc.md`.
+
+## vitest.config.ts (per app)
+
+Shipped by the `testing` template: it merges `vite.config.ts` and loads the
+owned `src/test/setup.ts`. Include it in `tsconfig.node.json` next to
+`vite.config.ts`. The full content is in `testing.md`.
 
 ## tsconfig.app.json (per app)
 

@@ -11,9 +11,10 @@ templates only have an `extends` array.
 | Template | Kind | What it installs |
 |---|---|---|
 | `app` | leaf + extends `core` | everything in `core`, plus `index.html`, `vite.config.ts`, the tsconfigs, `src/main.tsx`, `src/index.css`, `.gitignore` — what `init` applies |
-| `core` | meta | hygiene + oxc + router + storage + pwa + worker + layout |
+| `core` | meta | hygiene + oxc + testing + router + storage + pwa + worker + layout |
 | `hygiene` | leaf | LICENSE, CONTRIBUTING, SECURITY, .editorconfig |
 | `oxc` | leaf | oxlint + oxfmt configs + lint/format scripts + devDeps |
+| `testing` | leaf | vitest.config.ts (merges vite.config.ts) + src/test/setup.ts + an environment test + Vitest/jsdom/Testing Library/fake-indexeddb devDeps |
 | `layout` | leaf | AppShell, AppHeader, AppNav, PageHeader, primitives, InstallButton, ThemeToggle, OfflineIndicator, tokens.css + theme.css |
 | `storage` | leaf | idb connection lifecycle, mutation channels, useLiveQuery hook |
 | `pwa` | leaf | service worker (injectManifest: precache, offline navigation, prompt-based updates) + `useAppUpdate`/`UpdatePrompt` |
@@ -34,7 +35,7 @@ files a brand-new app needs (`init`). `sync` is opt-in.
 {
   "name": "core",
   "description": "Everything every daniel-rck web app shares",
-  "extends": ["hygiene", "oxc", "router", "storage", "pwa", "worker", "layout"]
+  "extends": ["hygiene", "oxc", "testing", "router", "storage", "pwa", "worker", "layout"]
 }
 ```
 
@@ -42,7 +43,8 @@ No files of its own. The order of `extends` only decides the order of the log
 and of the `postInstall` steps; the templates' code depends on each other like
 this: `layout` → react-router-dom (`NavLink` in `AppNav`); `router` → `layout`
 (`App.tsx` renders `AppShell`; the error pages use the primitives); `pwa`'s
-`UpdatePrompt` → `layout` (`useAppUpdate` itself has no dependency).
+`UpdatePrompt` → `layout` (`useAppUpdate` itself has no dependency). `testing`
+sits with the tooling: its setup imports from no other template.
 
 ---
 
@@ -188,6 +190,86 @@ the spinner is correct; `<output>` is for computed results). The full file is
 oxlint does not lint CSS or JSON. oxfmt formats both, and parses the Tailwind 4
 directives (`@theme`, `@apply`, `@custom-variant`, `@utility`) in the `layout`
 template's `tokens.css` and `theme.css` without extra config.
+
+---
+
+## testing
+
+Vitest with jsdom, Testing Library and fake-indexeddb, run through the app's
+own Vite config. Part of `core`.
+
+Files:
+- `vitest.config.ts` → `vitest.config.ts` — merges `vite.config.ts` with the test settings. **scaffold**
+- `setup.ts` → `src/test/setup.ts` — the shared test environment. **owned**
+- `environment-test.tsx` → `src/test/environment.test.tsx` — guards that environment. **owned**
+
+(The source has no `.test.` in its name — like `editorconfig` in `hygiene`,
+only the destination carries the real name — so this repo's own Vitest never
+discovers the template's test and tries to run it without jsdom.)
+
+devDependencies:
+- `vitest`: `^4.1.11`
+- `jsdom`: `^30.0.1`
+- `fake-indexeddb`: `^6.2.5`
+- `@testing-library/react`: `^16.3.3`
+- `@testing-library/dom`: `^10.4.2`
+- `@testing-library/jest-dom`: `^7.0.1`
+- `@testing-library/user-event`: `^14.6.7`
+
+`@testing-library/dom` is listed explicitly: it is a peer dependency of
+Testing Library React 16, jest-dom 7 and user-event, so the fleet pins it
+rather than taking whatever the peer resolution picks.
+
+`vitest.config.ts` is `mergeConfig(viteConfig, defineConfig({ test: { … } }))`
+with `environment: "jsdom"`, `setupFiles: ["./src/test/setup.ts"]`,
+`include: ["src/**/*.test.{ts,tsx}"]` and `restoreMocks: true`. Merging the Vite
+config means plugins (React, Tailwind, PWA), aliases and virtual modules
+resolve in tests exactly as in the build. It imports `./vite.config.ts`, so
+`tsconfig.node.json` must include `vitest.config.ts`, and a `vite.config.ts`
+that exports a function has to be called before merging.
+
+`setup.ts`:
+- `import "fake-indexeddb/auto"` — an in-memory IndexedDB (`indexedDB`,
+  `IDBKeyRange`, …) as globals, so the `storage` machinery runs unmodified.
+- `import "@testing-library/jest-dom/vitest"` — the DOM matchers and their types.
+- `afterEach(cleanup)` — Testing Library only unmounts by itself when
+  `afterEach` is a global (vitest's `globals: true`, which the template
+  doesn't turn on).
+- A `matchMedia` stub, installed only where `window.matchMedia` is missing
+  (jsdom has none): every query reports `matches: false`, and listener
+  methods (including the legacy `addListener`/`removeListener`) are no-ops.
+  Tests override it with `vi.spyOn(window, "matchMedia")`.
+- No BroadcastChannel polyfill: in the jsdom environment the global is Node's
+  built-in, which delivers between instances, so `notifyMutation` →
+  `useLiveQuery` works in tests as in the browser.
+
+`environment.test.tsx` asserts that IndexedDB opens, that two
+`BroadcastChannel` instances deliver to each other, that `matchMedia` exists
+and that a jest-dom matcher works. It guards `setup.ts` — a broken piece of the
+environment fails here with an obvious name instead of in every test that
+uses it — and makes `vitest run` on a fresh scaffold non-empty: vitest exits 1
+when it finds no test files.
+
+No `scripts`: `init` already writes `test` (`vitest run`) and `test:watch`
+(`vitest`), and `add` would overwrite an app's differing scripts (several apps
+run Vitest projects or extra flags).
+
+**Decision: testing is part of `core`.** The pin table always listed Vitest,
+jsdom and Testing Library, but no template installed or configured them: every
+app that tests wired its own setup, and a fresh `init` scaffold's `bun run
+test` failed for want of a single test file. Every app has IndexedDB data and
+reactive hooks; testing
+those needs the same three pieces everywhere (fake IndexedDB, a matchMedia
+stub, cleanup). Owned `setup.ts`, per-app `vitest.config.ts`: an app with its
+own Vitest config keeps it and lists `./src/test/setup.ts` in `setupFiles`.
+App-specific setup goes in its own file, listed next to it.
+
+postInstall:
+- "vitest.config.ts merges your vite.config.ts — if vite.config.ts exports a function, call it with the mode and merge the result"
+- "Include vitest.config.ts in tsconfig.node.json (next to vite.config.ts)"
+- "If the app already had a vitest config, keep it and add `./src/test/setup.ts` to its `setupFiles` instead"
+- "Apps created before the testing template: add the scripts by hand — `"test": "vitest run"`, `"test:watch": "vitest"`"
+- "Never edit src/test/setup.ts or src/test/environment.test.tsx — `update` overwrites them; put app-specific setup in its own file and list it in `setupFiles`"
 
 ---
 

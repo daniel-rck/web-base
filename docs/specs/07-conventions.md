@@ -51,6 +51,7 @@ in place and adds nothing. See `02-cli.md`.
   "jsdom": "^30.0.1",
   "fake-indexeddb": "^6.2.5",
   "@testing-library/react": "^16.3.3",
+  "@testing-library/dom": "^10.4.2",
   "@testing-library/user-event": "^14.6.7",
   "@testing-library/jest-dom": "^7.0.1",
   "wrangler": "^4.128.0",
@@ -242,6 +243,7 @@ src/
 │       ├── <Feature>Page.tsx
 │       ├── components/
 │       └── db.ts              # feature-specific idb queries
+├── test/                      # setup.ts + environment.test.tsx (testing)
 └── sw/
     ├── base.ts                # owned SW baseline (pwa)
     └── index.ts               # the app's SW: registerAppShell() + handlers
