@@ -71,3 +71,66 @@ export function formatPairingCode(code: string): string {
       ?.join("-") ?? ""
   );
 }
+
+/**
+ * `<base>#sync=<code>` — the same string people type, so one parser serves
+ * both. Browsers never send the fragment to the server. `base` defaults to the
+ * current page without query or hash.
+ */
+export function pairingUrl(code: string, base: string = currentPage()): string {
+  return `${base}#sync=${normalizeCrockford(code)}`;
+}
+
+function currentPage(): string {
+  const location: Location | undefined = globalThis.location;
+  return location ? `${location.origin}${location.pathname}` : "";
+}
+
+/** A hash as route + parameters: `#sync=…`, `#a=1&sync=…` or HashRouter's `#/path?sync=…`. */
+function splitHash(hash: string): { route: string | null; params: URLSearchParams } {
+  const fragment = hash.replace(/^#/, "");
+  const query = fragment.indexOf("?");
+  if (query >= 0) {
+    return {
+      route: fragment.slice(0, query),
+      params: new URLSearchParams(fragment.slice(query + 1)),
+    };
+  }
+  if (fragment.startsWith("/")) return { route: fragment, params: new URLSearchParams() };
+  return { route: null, params: new URLSearchParams(fragment) };
+}
+
+/** The unvalidated `sync` parameter of a location hash, or `null`. */
+export function readPairingCode(hash: string): string | null {
+  return splitHash(hash).params.get("sync") || null;
+}
+
+export type PairingWindow = {
+  location: Pick<Location, "hash" | "pathname" | "search">;
+  history: Pick<History, "state" | "replaceState">;
+};
+
+/**
+ * Take the code out of the address bar: returns it and replaces the URL with
+ * one without it, keeping `history.state` (React Router keeps its index
+ * there). Call it in main.tsx before the router mounts. `null` without a code
+ * or outside a browser.
+ */
+export function consumePairingFragment(
+  win: PairingWindow | undefined = globalThis.window,
+): string | null {
+  if (!win) return null;
+  const { hash, pathname, search } = win.location;
+  const code = readPairingCode(hash);
+  if (code === null) return null;
+  const { route, params } = splitHash(hash);
+  params.delete("sync");
+  const rest = params.toString();
+  const fragment = route === null ? rest : rest ? `${route}?${rest}` : route;
+  win.history.replaceState(
+    win.history.state,
+    "",
+    `${pathname}${search}${fragment ? `#${fragment}` : ""}`,
+  );
+  return code;
+}

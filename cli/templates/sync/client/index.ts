@@ -6,7 +6,7 @@ import { SyncClient } from "./client.ts";
 
 export { SyncClient };
 export { isSyncError, SyncError, syncErrorMessage, type SyncErrorCode } from "./errors.ts";
-export { formatPairingCode } from "./pairing.ts";
+export { consumePairingFragment, formatPairingCode } from "./pairing.ts";
 export type { PullResult, RequestOptions, StorageLike, SyncClientOptions } from "./types.ts";
 
 export const syncClient = new SyncClient();

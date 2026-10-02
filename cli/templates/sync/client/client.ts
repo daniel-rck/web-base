@@ -1,7 +1,13 @@
 import { deriveKeys, open, seal, type SyncKeys } from "./crypto.ts";
-import { isSyncError } from "./errors.ts";
+import { isSyncError, SyncError } from "./errors.ts";
 import { readEnvelope, requireEtag, send, statusError, type SyncResponse } from "./http.ts";
-import { decodePairingCode, encodePairingCode, generateSecret } from "./pairing.ts";
+import {
+  decodePairingCode,
+  encodePairingCode,
+  formatPairingCode,
+  generateSecret,
+  pairingUrl,
+} from "./pairing.ts";
 import { safeLocalStorage, SyncStore } from "./storage.ts";
 import type { PullResult, RequestOptions, SyncClientOptions } from "./types.ts";
 
@@ -39,6 +45,29 @@ export class SyncClient {
     if (this.#store.load()) return;
     const code = await encodePairingCode(generateSecret());
     if (!this.#store.load()) this.#store.save({ v: 2, code, etag: null });
+  }
+
+  /** The code to type on another device, in groups of four. Throws `not_enabled`. */
+  pairingCode(): string {
+    return formatPairingCode(this.#store.require().code);
+  }
+
+  /** A link that pairs whoever opens it (render it as a QR code). Throws `not_enabled`. */
+  pairingUrl(base?: string): string {
+    return pairingUrl(this.#store.require().code, base);
+  }
+
+  /**
+   * Adopt another device's secret. Throws `invalid_code`, or `already_enabled`
+   * while this device holds a different one — pass `replace` once the user
+   * confirmed. The same code again is a no-op.
+   */
+  async importPairingCode(code: string, options: { replace?: boolean } = {}): Promise<void> {
+    const canonical = await encodePairingCode(await decodePairingCode(code));
+    const current = this.#store.load();
+    if (current?.code === canonical) return;
+    if (current && !options.replace) throw new SyncError("already_enabled");
+    this.#store.save({ v: 2, code: canonical, etag: null });
   }
 
   async pull<T>(options: RequestOptions = {}): Promise<PullResult<T>> {
