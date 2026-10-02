@@ -5,6 +5,7 @@ import { resolve } from "pathe";
 import { CliError, EXIT } from "../exit.ts";
 import { applyTemplates } from "../lib/apply.ts";
 import { gitInit, gitWorkTreeState } from "../lib/git.ts";
+import { loadPins } from "../lib/pins.ts";
 import { createPackageJson, savePackageJson } from "../lib/pkg/doc.ts";
 import { stampVersion } from "../lib/pkg/webbase.ts";
 import { WEB_BASE_VERSION } from "../version.ts";
@@ -85,7 +86,8 @@ export const initCommand = defineCliCommand({
       if (dryRun) consola.info(`  ${targetDir} — would create`);
       else await mkdir(targetDir, { recursive: true });
     }
-    const pkg = createPackageJson(targetDir, renderPackageJson(name));
+    const { packageManager } = await loadPins();
+    const pkg = createPackageJson(targetDir, renderPackageJson(name, packageManager));
     const result = await applyTemplates({
       targetDir,
       chain,

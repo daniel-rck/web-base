@@ -136,13 +136,6 @@ app raises its own `compatibility_date` in its own PR, with a deploy check.
 The same applies to `nodejs_compat`: add it where a worker actually needs a Node
 built-in, remove it where nothing does, one app at a time.
 
-**`web-base pins`.** The CLI cannot apply the pin table: `patchPackageJson` is
-additive-only and the templates declare only nine packages, so React, Vite,
-TypeScript, Tailwind, Vitest, jsdom and every `@types/*` are unmanaged. Pins are
-applied by hand today. A read-only `web-base pins` report (compare an app's
-`package.json` against a machine-readable form of the `07-conventions.md` table,
-exit non-zero on mismatch) is the next step; `--apply` after that.
-
 **`init` produces a scaffold that does not build.** `router.tsx` lazy-imports
 `../features/home/HomePage.tsx`, which no template ships, and `init` writes no
 React/Vite/TS/Tailwind dependencies, no `vite.config.ts`, `index.html`,
@@ -162,7 +155,7 @@ Re-verify after any base change:
 - [ ] All React repos have identical `src/lib/ui/` except `theme.css`'s `--accent-h`
 - [ ] All nine repos call `web-app-ci.yml` and wire `web-base-check.yml`
 - [ ] All nine repos have `packageManager: "bun@1.3.11"` and a `bun.lock`
-- [ ] All nine repos match the pin table in `07-conventions.md`
+- [ ] `bunx github:daniel-rck/web-base#vX.Y.Z pins` is clean in all nine
 - [ ] All nine repos have LICENSE, CONTRIBUTING.md, SECURITY.md, `.editorconfig`
 - [ ] All nine repos have `CLAUDE.md` and `docs/specs/`
 - [ ] Every app's `--accent-h` is distinct and ≥25° from the reserved semantic hues

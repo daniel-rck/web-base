@@ -5,11 +5,17 @@ template. When in doubt, fall back here.
 
 ## Stack pins
 
-These are the versions every app targets after migration. The CLI templates
-ship with these. Bump them as a group through a PR to this repo (which then
-flows into apps via `web-base update`). `cli/src/docs.test.ts` fails when a pin
-here disagrees with a template manifest, or when the skill's `tech-stack.md`
-disagrees with this file — bump all three together.
+These are the versions every app targets after migration. The single source
+is `cli/templates/pins.json`; the tables below, the skill's `tech-stack.md` and
+every template manifest must match it exactly (`cli/src/docs/pins.test.ts`
+fails otherwise, including on a package missing from one side). Bump them as a
+group through a PR to this repo: edit `pins.json`, then the tables and any
+manifest that installs the package.
+
+Apps check themselves against the table with `web-base pins` (exit 1 on any
+mismatch; packages the app doesn't use are ignored) and catch up with
+`web-base pins --apply`, which rewrites mismatched ranges and `packageManager`
+in place and adds nothing. See `02-cli.md`.
 
 ### Production dependencies
 
@@ -32,6 +38,9 @@ disagrees with this file — bump all three together.
   "@vitejs/plugin-react": "^6.1.1",
   "vite-plugin-pwa": "^1.3.0",
   "workbox-precaching": "^7.4.1",
+  "workbox-routing": "^7.4.1",
+  "workbox-strategies": "^7.4.1",
+  "workbox-expiration": "^7.4.1",
   "workbox-window": "^7.4.1",
   "tailwindcss": "^4.3.3",
   "@tailwindcss/vite": "^4.3.3",
@@ -57,7 +66,8 @@ builds, and the fleet has always pinned it that way. Everything else takes a
 caret.
 
 `workbox-routing`, `workbox-strategies` and `workbox-expiration` follow
-`workbox-precaching` at `^7.4.1` in the apps that use them.
+`workbox-precaching`; the table pins them so `web-base pins` covers the apps
+that use them.
 
 Domain dependencies stay per-app and out of this table: `chart.js`,
 `react-chartjs-2`, `@dnd-kit/*`, `framer-motion`, `qrcode`, `canvas-confetti`,
@@ -73,8 +83,9 @@ Domain dependencies stay per-app and out of this table: `chart.js`,
 }
 ```
 
-This field is required in every app's `package.json`. CI uses it; Bun's
-`corepack` integration uses it.
+This field is required in every app's `package.json`, and `web-base pins`
+fails without it. `oven-sh/setup-bun` reads it in CI; it also documents which
+Bun the lockfile was written with. (Bun does not use corepack.)
 
 ## package.json template
 

@@ -18,7 +18,7 @@ export function validateAppName(name: string): string {
 }
 
 /** The fresh package.json `init` writes (see `07-conventions.md`). */
-export function renderPackageJson(name: string): PackageJson {
+export function renderPackageJson(name: string, packageManager: string): PackageJson {
   return {
     name,
     private: true,
@@ -34,7 +34,7 @@ export function renderPackageJson(name: string): PackageJson {
       url: `https://github.com/daniel-rck/${name}.git`,
     },
     bugs: { url: `https://github.com/daniel-rck/${name}/issues` },
-    packageManager: "bun@1.3.11",
+    packageManager,
     scripts: {
       dev: "vite",
       build: "tsc -b && vite build",

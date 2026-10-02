@@ -79,6 +79,14 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ### Added
 
+- **`web-base pins`** compares an app's `package.json` against the fleet's pin
+  table and exits 1 on any mismatch (`behind` / `ahead` / `different`, and a
+  missing `packageManager`); packages the app doesn't use are ignored.
+  `--apply` rewrites mismatched ranges in place and adds nothing; `--json`
+  for CI. The table moved into `cli/templates/pins.json`, the single source
+  that `07-conventions.md`, the skill's `tech-stack.md` (which was missing
+  `fake-indexeddb`) and every manifest are now tested against in both
+  directions. `workbox-routing`, `-strategies` and `-expiration` join it.
 - **`check --diff` and `update --diff`** print a unified diff (local →
   template, `git apply -p1`-compatible) for every differing file; `update`
   includes scaffold seams, so upstream seam changes can be ported by hand.

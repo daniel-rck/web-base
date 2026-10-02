@@ -24,12 +24,15 @@ cli/
 │   │   ├── add.ts              # copy a template (or meta-template) into an app
 │   │   ├── update.ts           # diff local files vs template source, --apply
 │   │   ├── check.ts            # read-only drift guard for CI
-│   │   └── check-render.ts     # check's human-readable output
+│   │   ├── check-render.ts     # check's human-readable output
+│   │   ├── check-json.ts       # check --json (schemaVersion 1)
+│   │   └── pins.ts             # compare package.json against the pin table
 │   ├── lib/
 │   │   ├── manifest/           # types, validate (shape + paths), load, resolve (extends)
 │   │   ├── files/              # compare (EOL-insensitive), copy (policy-aware)
 │   │   ├── pkg/                # doc (load/save package.json), patch, webbase (stamp, unmanaged), splice
-│   │   ├── diff/lines.ts       # line diff (LCS) and change counts
+│   │   ├── diff/               # lines (LCS line diff, counts), unified (--diff output)
+│   │   ├── pins.ts             # loadPins / comparePins / applyPins
 │   │   ├── apply.ts            # applyTemplates — the one install path of init and add
 │   │   ├── update-plan.ts      # planUpdate / applyUpdate
 │   │   ├── check.ts            # collectCheck / judgeCheck
@@ -38,8 +41,11 @@ cli/
 │   │   ├── templates-dir.ts    # where the templates live
 │   │   ├── git.ts              # work-tree detection, git init
 │   │   └── text.ts             # normalizeEol, writeOut
+│   ├── docs/                   # doc guards: the specs show what the repo does
+│   ├── e2e/                    # the built bundle against scratch apps
 │   └── test/                   # test helpers: runInProcess, scratch fixtures
 └── templates/
+    ├── pins.json               # the fleet's version pins (single source)
     └── <template-name>/
         ├── manifest.json
         └── (files to copy)
@@ -64,7 +70,7 @@ process.exitCode = await runCli(process.argv.slice(2));
 ```
 
 `cli.ts` holds the citty command tree (`main` with `init`, `add`, `update`,
-`check`). `runCli` dispatches it itself: no arguments → usage, exit 2;
+`check`, `pins`). `runCli` dispatches it itself: no arguments → usage, exit 2;
 `--help`/`-h` (also after a subcommand) → usage, exit 0; `--version` alone →
 the version, exit 0; an unknown command → usage, exit 2; otherwise
 `runCommand(sub, { rawArgs })` and the command's own exit code. An argument
@@ -85,7 +91,7 @@ Modelled on diff(1), defined once in `exit.ts`:
 | Code | Meaning |
 |---|---|
 | `0` | Did what was asked; for `check`, the app conforms |
-| `1` | Ran fine, but the app does not conform (`check` drift, `--strict` findings) |
+| `1` | Ran fine, but the app does not conform (`check` drift, `--strict` findings, `pins` mismatch) |
 | `2` | Could not run: bad usage, unknown option, malformed `package.json` or manifest, missing target directory, I/O error |
 
 Every command is defined with `defineCliCommand`, whose `run` returns an exit
@@ -563,6 +569,41 @@ This is what makes the "owned files stay identical across apps" rule
 (`07-conventions.md`) machine-enforceable — see the `web-base-check.yml`
 reusable workflow in `06-workflows.md`.
 
+### `web-base pins`
+
+Read-only by default: compares the app's `package.json` against the fleet's
+pin table, `cli/templates/pins.json` (the single source of the tables in
+`07-conventions.md`).
+
+```
+web-base pins [--cwd <dir>] [--json] [--apply]
+```
+
+Behavior:
+
+1. Load the app's `package.json` (none → exit 2) and the pin table.
+2. For every pinned package the app lists — in either dependency section — the
+   range must equal the pin exactly. A mismatch is labelled `behind` / `ahead`
+   (same operator, older / newer version) or `different` (another operator or
+   syntax). A package pinned under `dependencies` but listed in
+   `devDependencies` (or vice versa) is a note, not a failure. Packages the app
+   doesn't use are ignored: the table is a ceiling for the fleet, not a list
+   every app must install.
+3. `packageManager` must equal the pinned one; a missing field is `missing`.
+4. Exit 1 on any mismatch, 0 otherwise.
+5. `--apply` rewrites every mismatched range where the app has it and sets
+   `packageManager`, then saves (keeping the file's indentation and line
+   endings) and exits 0 — it never adds or removes packages. Run `bun install`
+   afterwards.
+6. `--json` prints `{ schemaVersion: 1, command: "pins", ok, exitCode, applied,
+   matched, mismatches: [{ name, section, expected, actual, kind }], notes }`.
+
+**Decision: the pin table is a template-directory file, read at runtime.**
+Like the manifests, `pins.json` is data the CLI reads from `cli/templates/`,
+so bumping a pin needs no rebuild of the bundle, and tests can point
+`WEB_BASE_TEMPLATES_DIR` at a fixture. `init` takes its `packageManager` from
+it too.
+
 ## File copy: behavior contract
 
 `copyTemplateFile(spec, { targetDir, template, force, forceScaffold, dryRun, unmanaged })`
@@ -638,6 +679,11 @@ Vitest tests live next to the code in `cli/src/**/*.test.ts`:
   the real templates in scratch directories (`test/cli.ts` → `runInProcess`
   captures consola and stdout and returns the exit code). Each bug fixed in
   the 0.6.0 rework has a test here.
+- `docs/pins.test.ts`: `07-conventions.md` and the skill's `tech-stack.md`
+  show exactly the pins in `cli/templates/pins.json` (both directions), and
+  every manifest installs the pinned range in the pinned section.
+- `docs/specs.test.ts`: `01-monorepo-structure.md` shows the current version
+  and root pins; the skill spec and `SKILL.md` describe the same stack.
 - `templates.test.ts`: every shipped manifest loads and validates, no template
   ships a file its manifest doesn't list, the `core` chain writes each
   destination once, and every template has a skill reference.
