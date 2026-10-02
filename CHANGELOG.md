@@ -41,6 +41,29 @@ The version is bumped on every change (driven by the conventional-commit type:
   once, saved once) and one install path (`applyTemplates`) shared by `init`
   and `add`; `pkg.ts`, `manifest.ts` and `copy.ts` are split into
   `lib/pkg/`, `lib/manifest/` and `lib/files/`.
+- **`web-base-check.yml` runs the CLI at the app's stamped version.** `ref`
+  now defaults to `""`, which resolves to `v<webBase.version>` from the app's
+  `package.json`, or to `main` with a warning when that tag doesn't exist. A
+  change on web-base `main` no longer turns every app red. An explicit `ref:`
+  works as before.
+- **The reusable workflows take Bun from the app.** `bun-version` defaults to
+  `""`, so setup-bun reads `packageManager: "bun@x.y.z"`; a warning appears
+  when neither is set.
+- **`web-app-ci.yml` caches `~/.bun/install/cache`** (setup-bun only caches the
+  binary) and skips the separate typecheck when the build script already runs
+  `tsc`.
+- **`notify-apps.yml` is called by `release.yml`** instead of listening for
+  `release: published`, which never fires for a release created with
+  `GITHUB_TOKEN`. The issue lists the update steps pinned to the release tag
+  (`check` first, then `update core --apply`, `add <template>` for
+  package.json changes), and the previous version's issue is closed as not
+  planned ("Ersetzt durch #N").
+- **All workflows are hardened.** `permissions: {}` with per-job grants,
+  timeouts, `persist-credentials: false`, job-level concurrency, actions pinned
+  by commit SHA, and inputs only via `env:`, validated. Callers must leave
+  `contents: read` to the called jobs (omit `permissions:` or grant it;
+  `permissions: {}` fails at startup). Apps should pin `@vX.Y.Z` and let their
+  Dependabot bump it.
 
 ### Fixed
 
@@ -76,6 +99,14 @@ The version is bumped on every change (driven by the conventional-commit type:
   on *untracked* files in `cli/dist` too (`git status --porcelain`).
 - **Tests stub `WEB_BASE_TEMPLATES_DIR` with `vi.stubEnv`.** Assigning
   `undefined` to `process.env` stores the string `"undefined"`.
+- **`web-base-check.yml` put `inputs.ref` and `inputs.template` straight into
+  the shell.** They now go through `env:` and are validated against a pattern.
+- **The `strict` input description was wrong.** It fails on drift, blocks not
+  adopted, partial adoption and obsolete leftovers.
+- **`notify-apps.yml` had no timeout, and its dedupe relied on the lagging
+  search index.**
+- **The CI docs named tags that don't exist** (`@v0.3.0`, `ref: v0.2.1`) and
+  contradicted each other on `@main` versus tags.
 
 ### Added
 
@@ -103,6 +134,19 @@ The version is bumped on every change (driven by the conventional-commit type:
   `cli/test`, so test files shipped inside templates are never collected here.
 - **A `SessionStart` hook** (`.claude/`) installs dependencies in Claude Code
   cloud sessions so the `typecheck`/`lint`/`test` gatekeepers can run.
+- **Releases are cut from the version in `package.json`.** `release.yml` runs
+  on every push to `main`; when that version has no release yet it tags
+  `vX.Y.Z` (lightweight) on the commit and publishes a GitHub release whose
+  notes are the version's CHANGELOG section, then notifies the apps. Pushes
+  that don't bump are a no-op; a missing CHANGELOG section or a tag that
+  already points elsewhere fails the run. `workflow_dispatch` with a `sha`
+  backfills an older `main` commit (`06-workflows.md` lists the SHAs for
+  0.3.0–0.5.0, which were never tagged).
+- **`web-base-check.yml` takes `pins` and `bun-version` inputs.** `pins: true`
+  also runs `web-base pins` (needs a ref of v0.6.0 or later). Every check now
+  passes `--diff`, so a failing run shows what drifted.
+- **Dependabot keeps the pinned actions current:** one grouped `chore(deps)`
+  PR a week, for releases at least seven days old.
 
 ## [0.5.0] - 2026-09-22
 
