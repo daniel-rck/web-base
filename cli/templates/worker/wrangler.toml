@@ -1,17 +1,25 @@
 name = "<app-name>"
 main = "worker/index.ts"
-compatibility_date = "2026-05-01"
-compatibility_flags = ["nodejs_compat"]
+# Set to today's date when you create the app, then raise it deliberately, one
+# deploy-checked PR at a time. Keep it >= 2025-04-01: from that date on,
+# navigations that match no asset get index.html without invoking the Worker.
+# It must stay a real date — a placeholder breaks `wrangler dev` and `--dry-run`.
+compatibility_date = "2026-08-31"
+# No compatibility_flags by default. Add `compatibility_flags = ["nodejs_compat"]`
+# only when the worker imports a Node built-in (node:buffer, node:crypto, …).
 
 [assets]
 directory = "./dist"
 binding = "ASSETS"
+# Navigations without a matching file get index.html with a 200, so reloading
+# a client route such as /mieter/123 works. Every other unmatched request —
+# fetch() to /api/*, a monitor on /healthz, a stale /assets/*.js — runs the
+# Worker (worker/base.ts).
+not_found_handling = "single-page-application"
+# No run_worker_first: listing paths there hands every *other* unmatched path
+# to the assets layer, so a stale /assets/*.js would get index.html with a 200
+# (and the immutable cache header) instead of the Worker's 404. Add
+# `run_worker_first = ["/api/*"]` only if a browser must *navigate* to an API
+# route (OAuth callback, download link) — and accept that trade-off.
 
-# Uncomment when adding R2/KV (see sync template):
-# [[r2_buckets]]
-# binding = "SYNC"
-# bucket_name = "<app-name>-sync"
-#
-# [[kv_namespaces]]
-# binding = "SYNC_KV"
-# id = "<kv-namespace-id>"
+# R2/KV bindings: see the sync template's docs/sync.md.

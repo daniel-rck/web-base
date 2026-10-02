@@ -191,6 +191,9 @@ Rejected approaches with the reason and the replacement:
 | `text-white` on a fill, `text-success` on its own tint | Fails 4.5:1 at several accent hues | `text-fg-on-accent`, `text-*-fg` |
 | shadcn/ui as a dependency | Brings Radix UI, their token system, implicit decisions | shadcn-style copy (the CLI does this) |
 | Adding `clsx` everywhere "just in case" | Tiny lib but creates expectation it's used | String concat until a real need appears |
+| `nodejs_compat` by default | Changes the Workers runtime for workers that import no Node built-in | Add the flag only where a worker imports one |
+| Security headers only in `_headers` (or only in the Worker) | Cloudflare applies `_headers` to static assets, never to Worker-generated responses | `public/_headers` for the document policy, `worker/base.ts` for Worker responses (`nosniff`, `no-store`) |
+| `run_worker_first` patterns next to SPA mode | Every path the list doesn't match gets the SPA fallback — a stale `/assets/*.js` becomes `index.html` with a 200 | SPA mode alone: navigations get `index.html`, other misses reach the Worker |
 
 ## German/English language rules
 
@@ -243,7 +246,11 @@ src/
     ├── base.ts                # owned SW baseline (pwa)
     └── index.ts               # the app's SW: registerAppShell() + handlers
 
+public/
+└── _headers                   # from `web-base add worker` (CSP, HSTS, asset caching)
+
 worker/
+├── base.ts                    # from `web-base add worker` (shared router, owned)
 └── index.ts                   # from `web-base add worker`
 ```
 

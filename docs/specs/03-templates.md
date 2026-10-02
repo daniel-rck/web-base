@@ -18,7 +18,7 @@ templates only have an `extends` array.
 | `storage` | leaf | idb connection lifecycle, mutation channels, useLiveQuery hook |
 | `pwa` | leaf | service worker (injectManifest: precache, offline navigation, prompt-based updates) + `useAppUpdate`/`UpdatePrompt` |
 | `router` | leaf | router.tsx with the root layout route (`src/App.tsx`), error/404 pages, a starter `HomePage` |
-| `worker` | leaf | worker/index.ts + wrangler.toml + Cloudflare types |
+| `worker` | leaf | shared router (SPA fallback, /api error boundary, headers) + worker/index.ts + wrangler.toml + public/_headers |
 | `sync` | leaf (extra) | client + worker for R2 end-to-end encrypted sync with QR/link pairing |
 
 `core` is the meta-template every app uses; `app` is `core` plus the entry
@@ -441,33 +441,111 @@ export const ROUTES = {
 
 ## worker
 
-Cloudflare Worker scaffolding.
+Cloudflare Worker scaffolding: a shared router that owns the SPA, header and
+error-boundary plumbing, and a thin per-app seam for `/api`.
 
 Files:
-- `worker.ts` → `worker/index.ts`
-- `wrangler.toml` → `wrangler.toml`
-- `tsconfig.worker.json` → `tsconfig.worker.json`
+- `base.ts` → `worker/base.ts` — `routeRequest()` and `json()`. **owned**
+- `worker.ts` → `worker/index.ts` — `Env`, the default export, `handleApi()`. **scaffold**
+- `wrangler.toml` → `wrangler.toml`. **scaffold**
+- `headers` → `public/_headers` — security and caching headers for static assets. **scaffold**
+- `tsconfig.worker.json` → `tsconfig.worker.json`. **scaffold**
 
 devDependencies:
-- `@cloudflare/workers-types`: `^4.20260504.1`
-- `wrangler`: `^4.87.0`
+- `@cloudflare/workers-types`: `^5.20260902.1`
+- `wrangler`: `^4.128.0`
 
 scripts:
 - `worker:dev`: `wrangler dev`
 - `worker:deploy`: `wrangler deploy`
 
-The worker template ships a 30-40 line `index.ts` that:
-- Serves static assets via the `ASSETS` binding (`env.ASSETS.fetch(request)`)
-- Routes `/api/*` to a `handleApi(request, env, ctx)` stub
-- Falls through to static-asset serving via Workers Assets
-- Has a `/healthz` endpoint returning `{ ok: true }`
+`base.ts` — `routeRequest(request, env, ctx, handleApi)`:
+- `/healthz` → `{ ok: true }`
+- `/api` and `/api/*` → `handleApi`, inside an error boundary: a throw is
+  logged as `[api] <message>` (the message only — no stack, no request data)
+  and answered with `500 { error: "internal" }`.
+- `/assets/*` → plain 404. The Worker only sees such a request when no asset
+  matched: a hashed file an older `index.html` still references. Passing it on
+  would hit the SPA fallback, and the browser would get `index.html` with a 200
+  where it expects JavaScript.
+- everything else → `env.ASSETS.fetch(request)`, SPA fallback included.
+- `json(data, status = 200)` for handlers. Every response the Worker generates
+  itself (healthz, API, the assets 404) gets `X-Content-Type-Options: nosniff`
+  and `Cache-Control: no-store` unless the handler set them; a `101` WebSocket
+  upgrade passes through untouched.
 
-`wrangler.toml` ships with placeholders for `name` and `compatibility_date`.
+`worker/index.ts` is ~20 lines: `export interface Env { ASSETS: Fetcher }`,
+`export default { fetch: (r, e, c) => routeRequest(r, e, c, handleApi) }
+satisfies ExportedHandler<Env>`, and a `handleApi` stub that answers
+`404 { error: "not_found" }`, with a comment showing where `/api/<feature>` is
+routed. The app never edits `base.ts`.
+
+`wrangler.toml` ships `name = "<app-name>"`, a real `compatibility_date`
+(`2026-08-31` — the newest date the minimum pinned wrangler, 4.128.0, supports;
+a placeholder breaks `wrangler dev` and `--dry-run`), no `compatibility_flags`,
+and `[assets]` with `directory = "./dist"`, `binding = "ASSETS"` and
+`not_found_handling = "single-page-application"`. R2/KV bindings are the `sync`
+template's business; the file only points at its `docs/sync.md`.
+
+`public/_headers` (Vite copies `public/` into `dist/`) sets, for `/*`, a CSP of
+`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:
+blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src
+'self'; object-src 'none'; base-uri 'self'; form-action 'self';
+frame-ancestors 'none'`, HSTS (`max-age=31536000; includeSubDomains`),
+`nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy:
+strict-origin-when-cross-origin`, a `Permissions-Policy` denying camera,
+microphone, geolocation, payment, usb and browsing-topics, and
+`Cross-Origin-Opener-Policy: same-origin`; and `Cache-Control: public,
+max-age=31536000, immutable` for Vite's content-hashed `/assets/*`. The CSP
+needs no hashes or `'unsafe-inline'`: `theme-init.js` (layout) is an external
+file, Vite's module scripts and vite-plugin-pwa's `registerSW.js` are
+same-origin, and React `style` props go through the CSSOM, which `style-src`
+doesn't restrict. There is no `upgrade-insecure-requests` — it breaks
+`wrangler dev` on `http://localhost`. CSP and Permissions-Policy are per app.
+
+`tsconfig.worker.json` adds `allowImportingTsExtensions` (index.ts imports
+`./base.ts`), `noUnusedLocals`, `noUnusedParameters`, `moduleDetection:
+"force"` and a `tsBuildInfoFile` under `node_modules/.tmp/` to the strict base.
+
+**Decision: SPA mode, without `run_worker_first`.** Without
+`not_found_handling = "single-page-application"`, reloading a client route such
+as `/mieter/123` is a 404. With it and a `compatibility_date` ≥ 2025-04-01
+(`assets_navigation_prefers_asset_serving`), a *navigation* that matches no
+file gets `index.html` without invoking the Worker, while every other unmatched
+request — `fetch("/api/…")`, a monitor on `/healthz`, a stale `/assets/*.js` —
+still runs it. `run_worker_first = ["/api/*", "/healthz"]` was considered and
+rejected: once any `run_worker_first` patterns exist, the assets layer applies
+the SPA fallback to *every* path the list doesn't match (workers-shared
+`asset-worker` `canFetch`: `has_static_routing` keeps `not_found_handling` for
+all requests), so the Worker never sees a stale `/assets/*.js`; it would get
+`index.html` with a 200 — and `_headers`' immutable cache rule. Verified with
+`wrangler dev` 4.147. The price of leaving it out: a browser *navigating* to
+`/api/…` or `/healthz` gets `index.html`. API calls are `fetch()`es and monitors
+send no `Sec-Fetch-Mode`, so nothing in the fleet navigates there; an app that
+needs it (an OAuth callback, a download link) adds `run_worker_first =
+["/api/*"]` and accepts the stale-asset trade-off.
+
+**Decision: headers split between `_headers` and the Worker.** Cloudflare
+applies `_headers` to static-asset responses only — also when the Worker
+returns `env.ASSETS.fetch()` unmodified — never to responses the Worker
+generates ([Workers docs: Headers](https://developers.cloudflare.com/workers/static-assets/headers/)).
+So the document-level policy (CSP, HSTS, framing, permissions) lives in
+`_headers`, where it covers `index.html` and its SPA fallback, and `base.ts`
+gives its own JSON and 404 responses `nosniff` + `no-store`. A per-app seam for
+the policy, an owned file for the plumbing.
+
+**Decision: no `nodejs_compat` by default.** It was set in the template — and
+in five of nine apps — without any worker importing a Node built-in. The flag
+changes the runtime (polyfills, globals), so it is added only where a worker
+needs it. Existing apps drop or keep it one app at a time, with a deploy check
+(`08-app-migrations.md`).
 
 postInstall:
-- "Edit wrangler.toml: set `name` to your app name"
-- "Set compatibility_date to today's date"
-- "If using R2/KV: add bindings under [[r2_buckets]] / [[kv_namespaces]] (see sync template)"
+- "Edit wrangler.toml: set `name` to your app name and `compatibility_date` to today (keep it >= 2025-04-01 — SPA navigation serving needs it)"
+- "Review public/_headers: the CSP and Permissions-Policy are per app — widen them only for what the app really uses"
+- "Add `compatibility_flags = ["nodejs_compat"]` only if the worker imports a Node built-in"
+- "Route `/api/<feature>` in handleApi() in worker/index.ts; never edit worker/base.ts — `update` overwrites it"
+- "If using R2/KV: see the sync template's docs/sync.md"
 
 ---
 
