@@ -27,7 +27,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
   "scripts": {
     "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.templates.json",
     "lint": "oxlint && oxfmt --check",
     "format": "oxfmt",
     "test": "vitest run",
@@ -105,6 +105,27 @@ too). The alternative — publishing to npm so a packed tarball with a
 `allowImportingTsExtensions` is required because the source uses
 `import { foo } from "./bar.ts"`. Bun resolves this natively; the bundler
 strips the extension. Don't drop the `.ts` suffix on imports.
+
+## tsconfig.templates.json
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["cli/templates/sync/client/**/*.ts", "cli/test/sync/**/*.ts"],
+  "exclude": ["cli/test/sync/worker*.ts", "cli/test/sync/e2e.test.ts"]
+}
+```
+
+The sync client is plain TypeScript over Web Crypto and `fetch`, so it is
+typechecked here, with DOM types and without Node's; its tests in
+`cli/test/sync/` run in this repo's vitest. The worker half needs Cloudflare's
+types and is typechecked in the scaffold job instead (`06-workflows.md`).
+React templates are typechecked only there.
 
 ## vitest.config.ts
 
@@ -226,6 +247,7 @@ web-base/
 │   └── (these files)
 ├── package.json
 ├── tsconfig.json
+├── tsconfig.templates.json
 └── vitest.config.ts
 ```
 

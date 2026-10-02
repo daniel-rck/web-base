@@ -111,6 +111,23 @@ The version is bumped on every change (driven by the conventional-commit type:
 - **`vite.snippet.md` is gone**; the VitePWA block lives in the `app`
   template's `vite.config.ts` and the skill's `pwa.md`. `check` reports a
   leftover copy as obsolete.
+- **Breaking: the `sync` template speaks protocol v2.** v1 state, envelopes,
+  object ids and the `/api/sync/<id>/data.json` route are gone without a
+  migration — no app used the template's sync code. A 128-bit root secret feeds
+  HKDF-SHA256 with separate labels for a non-extractable AES-GCM-256 key, an
+  80-bit object id and a 256-bit bearer token; envelopes are `{ v: 2, iv, ct }`
+  with the object id as AAD. Client and worker are split into one-concern files
+  under `client/` and `worker/`; `src/lib/sync/index.ts` and `docs/sync.md` are
+  scaffold seams, everything else is owned.
+- **Breaking: the sync worker authenticates every request and no longer uses
+  KV.** `GET`/`PUT`/`DELETE /api/sync/<objectId>` need `Authorization: Bearer
+  <token>`; the first write binds the object to `SHA-256(token)`, so a leaked
+  object id gives neither read nor write. Creates need `If-None-Match: *`,
+  updates `If-Match`, bodies are capped at 8 MiB and must be v2 envelopes,
+  responses are `no-store`. Rate limiting moves from a KV bucket keyed by raw
+  IPs to the optional Rate Limiting binding `SYNC_RATE_LIMIT`, keyed by object
+  id — no IP addresses at rest. Apps bind R2 as `SYNC` (plus optional
+  `[[ratelimits]]`).
 
 ### Fixed
 
@@ -172,6 +189,14 @@ The version is bumped on every change (driven by the conventional-commit type:
 - **`init` produced a scaffold that did not build** (no entry files, no
   React/Vite/TypeScript dependencies, a lazy import of a page no template
   shipped). The deferred item in `08-app-migrations.md` is resolved.
+- **The sync client no longer overwrites or wedges remote data.** The first push
+  overwrote the remote object; a pull `404` kept a stale ETag so every later push
+  failed with `412`; `push`/`pull` threw after a reload unless `isEnabled()` ran
+  first; `enable()` replaced an existing secret; `304` and `404` looked the same;
+  a blocked `localStorage` crashed the app; unvalidated JSON reached the caller.
+- **The sync docs described OTP pairing routes that never existed and could not
+  have been secure** (the server could unwrap the secret, and 10⁶ codes are
+  guessable), and the postInstall referenced a `syncClient` that did not exist.
 
 ### Added
 
@@ -234,6 +259,21 @@ The version is bumped on every change (driven by the conventional-commit type:
   screen before.
 - **`import/no-unassigned-import` allows CSS imports** in the shared oxlint
   config (every app imports its stylesheet).
+- **Devices pair by QR link or typed code; the server never sees the key.**
+  `syncClient.pairingCode()` shows a checksummed 31-character Crockford code
+  (forgiving input), `pairingUrl()` puts the same string in a `#sync=` fragment
+  for a QR code, `importPairingCode()` adopts it (`already_enabled` unless
+  `{ replace: true }`), and `consumePairingFragment()` removes it from the
+  address bar in `main.tsx`, keeping `history.state`. No QR library ships;
+  `docs/sync.md` shows `uqr`.
+- **`syncClient.sync(local, merge)`, `disable({ deleteRemote })` and typed
+  errors.** Pull → merge → push with retry on conflict; `SyncError` carries a
+  stable `code`, `status`, `retryAfter` and a German message
+  (`syncErrorMessage()`); requests time out after 30 s and honour an `AbortSignal`.
+- **The sync template is typechecked and tested in this repo.**
+  `tsconfig.templates.json` runs as part of `bun run typecheck`; `cli/test/sync/`
+  covers encodings, pinned key-schedule vectors, pairing, storage, the client
+  state machine, the worker and an end-to-end run against a fake R2 bucket.
 
 ## [0.5.0] - 2026-09-22
 

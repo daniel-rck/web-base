@@ -37,7 +37,7 @@ As of web-base 0.3.0.
 |---|---|---|---|---|---|---|---|
 | ErinnerMich | 0.3.0 | react-router 7 (`BrowserRouter`) | idb | injectManifest | Assets + `/api` | reusable | own shell over base tokens |
 | HamsterFlight | 0.3.0 | — | — | — | Assets only | reusable + own gates | — (canvas game) |
-| Hausverwaltung | 0.3.0 | react-router 7 (`HashRouter`) | idb + query layer | injectManifest | Assets + R2/KV sync | reusable | own design system |
+| Hausverwaltung | 0.3.0 | react-router 7 (`HashRouter`) | idb + query layer | injectManifest | Assets + own R2/KV sync (not the template) | reusable | own design system |
 | Minispiele | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + e2e | base |
 | Pizzateig | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable | base + warm fork |
 | Tankzettel | 0.3.0 | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + guard | **base, zero drift** |
@@ -73,9 +73,13 @@ rewritten; `AppHeader` and `AppNav` are replaced by `layout/Nav.tsx`.
 
 Also: `HashRouter` rather than `createBrowserRouter`, because the app shares
 data through hash-encoded URLs (`#/import/:payload`) and wants zero server
-config. Its worker sync (OTP pairing, R2 snapshots with `If-Match`, KV,
-rate-limit) is the source the `sync` template was derived from and stays ahead
-of it. Its `vitest.config.ts` uses `@cloudflare/vitest-pool-workers` projects.
+config. Its own worker sync (OTP pairing, R2 snapshots with `If-Match`, KV rate
+limits) predates the template and is not wire-compatible with sync v2. **Do not
+run `web-base add sync` or `web-base check sync` in Hausverwaltung.** Adopting
+the template would be a migration of its own (new object ids under `v2/`,
+re-pair every device). Follow-up: review whether its OTP pairing derives a wrap
+key from the OTP alone — the design the template abandoned in 0.6.0 because
+the server could unwrap the secret. Its `vitest.config.ts` uses `@cloudflare/vitest-pool-workers` projects.
 
 ### Pizzateig — warm theme fork
 
