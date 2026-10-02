@@ -2,9 +2,9 @@
 
 End-to-end encrypted device sync of one JSON document over Cloudflare R2,
 paired by QR link or typed code. Extra, not in `core`. Optional per app.
-Protocol v2; the normative description is the `sync` section of
-`docs/specs/03-templates.md`, and every app gets `docs/sync.md` with the
-protocol, threat model and recipes.
+Protocol v2; the normative description is the `sync` section of web-base's
+[`03-templates.md`](https://github.com/daniel-rck/web-base/blob/main/docs/specs/03-templates.md), and every app gets
+`docs/sync.md` with the protocol, threat model and recipes.
 
 ```bash
 bunx github:daniel-rck/web-base add sync

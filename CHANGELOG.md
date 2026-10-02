@@ -4,10 +4,13 @@ All notable changes to `web-base` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The version is bumped on every change (driven by the conventional-commit type:
-`fix:` → patch, `feat:` → minor, breaking → major). Apps catch up with
-`web-base update <template> --apply`; the stamped `webBase.version` in an app's
-`package.json` records which base it last pulled.
+Versions follow the rule in `docs/specs/02-cli.md` (*Versioning*): until 1.0.0
+a breaking change or a `feat:` bumps the minor, a `fix:` the patch; only
+changes to the shipped CLI, templates and reusable workflows are versioned.
+Entries collect under `[Unreleased]` until the release commit. Apps catch up
+with `web-base update <template> --apply` (and `add <template>` for new
+dependencies); the stamped `webBase.version` in an app's `package.json`
+records which base it last pulled.
 
 ## [Unreleased]
 
@@ -131,6 +134,22 @@ The version is bumped on every change (driven by the conventional-commit type:
 - **`tools-ci.yml` follows the workflow rules too:** `permissions: {}` with
   per-job grants, a concurrency group, SHA-pinned actions, `persist-credentials:
   false`, and Bun from `packageManager` instead of a hard-coded version.
+- **Breaking: `useLiveQuery` needs React ≥ 19.2 and imports `./mutations.ts`.**
+  It runs the query through `useEffectEvent` instead of writing a ref during
+  render, returns `{ data: undefined, loading: true }` while `[storeName,
+  ...deps]` changes (it used to show the previous key's data as current), and
+  keeps the last good data on error. `update storage --apply` brings
+  `mutations.ts` along.
+- **`storage`'s `db.ts` is a thin seam** over the new owned `open.ts`
+  (`createDBOpener`) and `mutations.ts` (`mutationChannel`, `notifyMutation`,
+  `clearStores`), with a per-app database name and an `if (oldVersion < N)`
+  migration ladder.
+- **`worker/index.ts` delegates to the owned `worker/base.ts`**
+  (`routeRequest`, `json`); `wrangler.toml` turns on SPA mode
+  (`not_found_handling = "single-page-application"`), drops `nodejs_compat`
+  from the default, and `tsconfig.worker.json` gains
+  `allowImportingTsExtensions`.
+- **`core` extends `testing`.**
 
 ### Fixed
 
@@ -200,6 +219,18 @@ The version is bumped on every change (driven by the conventional-commit type:
 - **The sync docs described OTP pairing routes that never existed and could not
   have been secure** (the server could unwrap the secret, and 10⁶ codes are
   guessable), and the postInstall referenced a `syncClient` that did not exist.
+- **A failed IndexedDB open was cached forever** (VersionError, quota, private
+  mode); the next `getDB()` now retries. **An open tab no longer blocks a newer
+  tab's schema upgrade** — it closes its connection and reloads — and a
+  connection the browser dropped (Safari) is reopened. `clearAll()` on a
+  database without stores no longer throws.
+- **The storage postInstall showed a call form that doesn't exist**
+  (`useLiveQuery(db.<store>, …)`).
+- **Reloading a client route 404'd** on Workers Assets without SPA mode (new
+  apps; existing apps add one `wrangler.toml` line). **A throwing API handler
+  returns 500 `{ "error": "internal" }`** instead of Cloudflare's exception
+  page, and **a stale hashed asset gets a 404** instead of `index.html`
+  served as JavaScript.
 
 ### Added
 
@@ -285,6 +316,19 @@ The version is bumped on every change (driven by the conventional-commit type:
   shellcheck) and zizmor. Typecheck and build of a scaffold were left out
   before as "slow and flaky", which is how an `init` that didn't build went
   unnoticed.
+- **`testing` template**: `vitest.config.ts` (scaffold, merges
+  `vite.config.ts`), owned `src/test/setup.ts` (fake-indexeddb, jest-dom
+  matchers, cleanup, a `matchMedia` stub) and `src/test/environment.test.tsx`;
+  pins Vitest, jsdom, fake-indexeddb and Testing Library, including the new
+  `@testing-library/dom`.
+- **`public/_headers`** (worker, scaffold): CSP `script-src 'self'`, HSTS,
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, COOP, and
+  immutable caching for `/assets/*`. Worker responses get `nosniff` and
+  `no-store` from `base.ts` (Cloudflare doesn't apply `_headers` to them).
+- **`backup` extra**: export, import and wipe of the whole IndexedDB as a
+  versioned JSON file, with a codec that keeps Dates, Maps, Sets, Blobs,
+  binary data and `undefined`; an atomic restore; persistent-storage helpers;
+  a German `BackupCard` for the settings page.
 
 ## [0.5.0] - 2026-09-22
 
@@ -344,6 +388,9 @@ The version is bumped on every change (driven by the conventional-commit type:
 
 ### Fixed
 
+- **`useLiveQuery` opened the wildcard channel twice** when called with `"*"`
+  as the store name, so every mutation ran the query twice.
+
 - **`AppShell` broke `position: sticky` for the whole page.** `<main>` had
   `overflow-y-auto`, which makes it the scroll container — and an overflow
   container captures every descendant sticky element without ever scrolling
@@ -376,6 +423,35 @@ The version is bumped on every change (driven by the conventional-commit type:
   Found by wiring the drift guard into the apps for the first time: Pizzateig
   had fixed this locally and the divergence showed up as drift. Promoted here
   so every app gets it, which is what the owned/scaffold split is for.
+
+### Added
+
+These shipped with PR #12, which merged while the version still read 0.3.1;
+they were listed under 0.3.0 before.
+
+- **`AppShell` takes an optional `themeToggle` slot.** The built-in toggle is
+  labelled in German, so an app with i18n previously had to either drop it from
+  the shell or ship a second control elsewhere — Tennisturnier did both.
+
+- **`SectionCard` and `Chip` primitives, and a `Card interactive` prop.**
+  Promoted from Pizzateig, which had grown all three locally. A titled section
+  wrapper and a selectable pill are needed in every app in the fleet, and
+  writing them per repo is how design systems diverge. `Chip` uses
+  `text-fg-on-accent` rather than the hard-coded `text-white` it was promoted
+  with.
+
+- **The bottom nav marks its active item with a pill behind the icon**, not
+  just a tint on icon and label. At that size a tint alone is easy to miss.
+  Promoted from Pizzateig; the label keeps the template's `truncate`, which the
+  original had dropped.
+
+- **`webBase.unmanaged` lets one app take a single owned file off the base.**
+  `check` skips a listed file and reports it, so Hausverwaltung's
+  `useLiveQuery` — 85 call sites predating the template's signature — doesn't
+  keep its CI red forever.
+- **`AppHeader` survives a notch and takes `maxWidthClass`.** The header
+  absorbs `env(safe-area-inset-top)` with its height on the inner container,
+  and an app with a wider content column sets the header's width to match.
 
 ### Changed
 
@@ -464,22 +540,6 @@ that machinery first, then raises the baseline it distributes.
 
 ### Added
 
-- **`AppShell` takes an optional `themeToggle` slot.** The built-in toggle is
-  labelled in German, so an app with i18n previously had to either drop it from
-  the shell or ship a second control elsewhere — Tennisturnier did both.
-
-- **`SectionCard` and `Chip` primitives, and a `Card interactive` prop.**
-  Promoted from Pizzateig, which had grown all three locally. A titled section
-  wrapper and a selectable pill are needed in every app in the fleet, and
-  writing them per repo is how design systems diverge. `Chip` uses
-  `text-fg-on-accent` rather than the hard-coded `text-white` it was promoted
-  with.
-
-- **The bottom nav marks its active item with a pill behind the icon**, not
-  just a tint on icon and label. At that size a tint alone is easy to miss.
-  Promoted from Pizzateig; the label keeps the template's `truncate`, which the
-  original had dropped.
-
 - `web-base check --strict` fails when an owned base file is *missing*, not only
   when it differs. Without it, an app that has adopted nothing passes the guard;
   the default stays lenient (an absent block can legitimately mean the app does
@@ -502,7 +562,7 @@ that machinery first, then raises the baseline it distributes.
 ### Changed
 
 - Stack pins raised to the newest coherent set across the fleet: TypeScript
-  `^7.0.2`, `@types/node` `^26.4.0`, `@cloudflare/workers-types` `^5.20260706.1`,
+  `~7.0.2`, `@types/node` `^26.4.0`, `@cloudflare/workers-types` `^5.20260706.1`,
   `@biomejs/biome` `^2.5.11`, `wrangler` `^4.127.1`.
 - `biome.json` migrated to the Biome 2.5 schema (`rules.recommended: true` →
   `rules.preset: "recommended"`).
@@ -551,8 +611,17 @@ that machinery first, then raises the baseline it distributes.
 - The CLI version is now a single source of truth in `cli/src/version.ts`
   (`WEB_BASE_VERSION`), kept in sync with `package.json` by a drift-guard test.
 
-## [0.1.0]
+## [0.1.0] - 2026-05-20
 
 - Initial baseline: CLI (`init`/`add`/`update`), templates (`core`, `hygiene`,
   `biome`, `layout`, `storage`, `pwa`, `router`, `worker`, `sync`), the Claude
   Code skill, and the reusable GitHub Actions workflow.
+
+[Unreleased]: https://github.com/daniel-rck/web-base/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/daniel-rck/web-base/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/daniel-rck/web-base/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/daniel-rck/web-base/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/daniel-rck/web-base/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/daniel-rck/web-base/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/daniel-rck/web-base/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/daniel-rck/web-base/releases/tag/v0.1.0

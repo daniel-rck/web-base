@@ -186,7 +186,7 @@ Rejected approaches with the reason and the replacement:
 | Skip react-router | Painful to retrofit when a second view appears | Always include the router |
 | Per-repo CI duplication | Drift across apps, hard to bump versions everywhere | Reusable workflow from web-base |
 | Starter-template GitHub feature for existing apps | Doesn't help with updates after initial copy | The CLI |
-| Custom-built monorepo with Turborepo/Nx | Overkill for three independent apps | Three repos, one tooling repo |
+| Custom-built monorepo with Turborepo/Nx | Overkill for nine independent apps | Nine app repos, one tooling repo |
 | Tailwind config overrides per app | Drift, hard to reason about | Owned `tokens.css`; the `theme.css` seam sets `--accent-h` and adds app tokens |
 | `focus-visible:outline-none` + a ring | Forced-colors mode drops box-shadows, so focus disappears | The outline in `cn.ts` (`FOCUS_RING`) |
 | `text-white` on a fill, `text-success` on its own tint | Fails 4.5:1 at several accent hues | `text-fg-on-accent`, `text-*-fg` |
@@ -258,13 +258,20 @@ worker/
 
 This maps onto the file `policy` in the template manifests (`02-cli.md`):
 
-- **owned** building blocks should remain identical across apps — `primitives`,
-  the layout shell, `useLiveQuery`, router/worker plumbing, `oxlint.base.json`, `.oxfmtrc.json`. Diff
-  drift here is a signal something's wrong: either the convention changes (update
-  the template) or the app runs `web-base update --apply` to pull the base back.
-- **scaffold** seams are expected to differ per app — `theme.css` (`--accent-h`),
-  `db.ts` (`AppSchema`), `routes.ts`/`router.tsx`, `sw.ts`/`worker.ts`,
-  `wrangler.toml`. `update` reports their drift but never overwrites them.
+- **owned** building blocks should remain identical across apps — the
+  primitives, the layout shell, `tokens.css`, `useLiveQuery` and the DB
+  opener, `src/sw/base.ts`, `worker/base.ts`, the routing pages, the sync
+  machinery, `oxlint.base.json`, `.oxfmtrc.json`. Drift here is a signal
+  something's wrong: either the convention changes (update the template) or
+  the app runs `web-base update --apply` to pull the base back.
+- **scaffold** seams are expected to differ per app — `theme.css`
+  (`--accent-h`), `db.ts` (`AppSchema`, migrations), `routes.ts`/`router.tsx`,
+  `src/App.tsx`, `src/sw/index.ts`, `worker/index.ts`, `wrangler.toml`,
+  `public/_headers`. `update` reports their drift but never overwrites them.
+
+Machinery that has to evolve lives in an owned file next to a thin seam (the
+pattern `oxlint.base.json` + `.oxlintrc.json` started), so a fix reaches every
+app through `update`.
 
 Files inside `features/` are per-app and never copied — except
 `features/home/HomePage.tsx`, the router template's starting page.
@@ -274,5 +281,5 @@ Files inside `features/` are per-app and never copied — except
 Apps are private (`"private": true`) and don't use semver. Version stays at
 `0.0.0`. The deployed URL is the user-facing identifier.
 
-The CLI (`@daniel-rck/web-base`) uses semver. Breaking changes to template
-output bump the minor; breaking changes to the CLI interface bump the major.
+The CLI (`@daniel-rck/web-base`) uses semver; the rule — including what counts
+as breaking during 0.x — is in *Versioning* in `02-cli.md`.

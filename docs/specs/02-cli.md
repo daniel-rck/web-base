@@ -111,13 +111,41 @@ web-base carries one incrementing version, the single source of truth being
 `cli/src/version.ts`:
 
 ```typescript
-export const WEB_BASE_VERSION = "0.2.1";
+export const WEB_BASE_VERSION = "X.Y.Z";
 export function compareVersions(a: string, b: string): -1 | 0 | 1 { /* x.y.z */ }
 ```
 
-- **SemVer, driven by conventional commits.** Bump on every change: `fix:` →
-  patch, `feat:` → minor, breaking → major. The root `package.json` `version`
-  must match `WEB_BASE_VERSION`; `cli/src/version.test.ts` fails if they drift.
+The root `package.json` `version` must match it; `cli/src/version.test.ts`
+fails if they drift. (The literal above is deliberately a placeholder — a
+copied version number here would be one more thing to fall behind.)
+
+**The version rule.** This is the one place it is stated; the CHANGELOG
+header and `07-conventions.md` point here.
+
+- **Until 1.0.0:** a breaking change bumps the **minor** and is marked with
+  `!` in the commit and a **Breaking** note in the CHANGELOG; a `feat:` also
+  bumps the minor; a `fix:`, or a `refactor:`/`perf:` that changes shipped
+  output, bumps the patch.
+- **Breaking** means an app has to act: a changed CLI interface (flags,
+  output an app's CI parses, exit codes), a changed reusable-workflow input,
+  or template output that needs migration (a seam to rewrite, a new required
+  file).
+- **Only the shipped surface is versioned:** `cli/src` / `cli/dist`,
+  `cli/templates`, `web-app-ci.yml` and `web-base-check.yml`. A change that
+  only touches specs, the skill, the README, `tools-ci.yml`, `release.yml` or
+  `notify-apps.yml` needs no bump and produces no release.
+- **From 1.0.0:** standard SemVer — breaking (including template output) →
+  major.
+- Several changes can share one bump: entries collect under `## [Unreleased]`
+  in `CHANGELOG.md`, and the release commit renames it to the new version.
+  `release.yml` tags and releases every version that lands on `main`.
+
+**Decision: breaking → minor during 0.x.** That is what the history already
+did (0.4.0 replaced Biome and was a minor), and SemVer treats 0.x as
+unstable. The earlier specs contradicted each other — "breaking → major" here,
+"breaking template output → minor, CLI → major" in 07, "additive → patch" in
+03 — which is why the rule now lives only here.
+
 - **Stamping.** `init`, `add`, and `update --apply` write the current version
   into the consuming app's `package.json` under `webBase.version` (via
   `stampVersion`, additive — other `webBase` fields are preserved). The
@@ -127,8 +155,9 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 { /* x.y.z */ 
 - **Reporting.** `update` reads the stamp (`readWebBase`) and reports
   `current` / `behind (X → Y)` / `ahead` / `unstamped` so an app knows whether
   to pull. The catch-up path is `web-base update <template> --apply`.
+  `web-base-check.yml` runs the CLI at the app's stamped version by default.
 - **CHANGELOG.** `CHANGELOG.md` (Keep a Changelog) records what each version
-  changed.
+  changed, with a **Migration** section when apps have to act.
 
 `web-base --version` prints `WEB_BASE_VERSION`.
 

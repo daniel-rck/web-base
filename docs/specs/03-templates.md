@@ -854,29 +854,36 @@ local copy.
 
 To add a new template (e.g. `notifications`):
 
-1. Create `cli/templates/notifications/`.
-2. Add `manifest.json` with name, description, files, deps.
-3. Add the actual files referenced by `files[]`.
-4. Add a section to this spec.
-5. If it should be in `core`, add it to `cli/templates/core/manifest.json`
-   `extends` array (consider ordering — see the core section above).
-6. Add a `skill/references/notifications.md` if the template embodies
-   non-trivial conventions.
-7. Bump the CLI's `package.json` version (patch for additive, minor for changes
-   to existing templates that affect output).
+1. Create `cli/templates/notifications/` with a `manifest.json` (name =
+   directory name, description, files with their `policy`, dependencies) and
+   the files it lists — nothing else; `templates.test.ts` rejects unlisted
+   files and invalid manifests.
+2. Take every dependency version from `cli/templates/pins.json`; a new
+   package goes into `pins.json`, `07-conventions.md` and the skill's
+   `tech-stack.md` together (`pins.test.ts`).
+3. Add a section to this spec and a row to the inventory.
+4. If it should be in `core`, add it to `cli/templates/core/manifest.json`
+   `extends`.
+5. Add `skill/references/notifications.md` (required — `skill.test.ts`) and
+   list it in `SKILL.md` and `05-skill.md`.
+6. If its code needs React, jsdom or the Vite plugins to test, put the tests
+   in `cli/template-tests/notifications/`; pure TypeScript can be tested in
+   this repo under `cli/test/`.
+7. Record it under `## [Unreleased]` in the CHANGELOG; the version follows
+   the rule in `02-cli.md`.
 
 ## Verifying a template
 
-For each template, the smoke test:
+`bun run test` validates every manifest and the doc guards. For the output
+itself:
 
 ```bash
 # from web-base root
-bun run build
-mkdir -p /tmp/scratch && cd /tmp/scratch
-echo '{"name": "scratch", "version": "0.0.0"}' > package.json
-node /path/to/web-base/cli/dist/index.js add <template>
-# inspect output: files present, package.json patched
+node cli/dist/index.js init --cwd "$(mktemp -d)/scratch-app" --name scratch-app
+node cli/dist/index.js add <template> --cwd <that dir>
+# then, in it: bun install && bun run lint && bun run typecheck && bun run test && bun run build
 ```
 
-This is automated for `hygiene` in `tools-ci.yml`. Other templates can be
-added to the CI matrix as they stabilize.
+That is exactly what the `scaffold` job in `tools-ci.yml` runs on every
+change (with `backup`, `sync` and the template tests), so a template that
+doesn't install, lint, typecheck, test and build fails CI.

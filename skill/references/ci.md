@@ -147,5 +147,5 @@ workflows/`, e.g. `lint-only.yml`, a lighter check for draft PRs.
 
 Each new workflow needs:
 - `workflow_call` definition
-- Documentation in `web-base/docs/specs/06-workflows.md`
+- Documentation in web-base's [`06-workflows.md`](https://github.com/daniel-rck/web-base/blob/main/docs/specs/06-workflows.md)
 - An update to this reference

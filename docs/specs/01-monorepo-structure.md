@@ -14,7 +14,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
   "type": "module",
   "description": "Shared tooling, conventions, and templates for personal web apps",
   "keywords": ["cli", "scaffolding", "react", "vite", "pwa", "cloudflare-workers"],
-  "author": "<author>",
+  "author": "daniel-rck",
   "license": "MIT",
   "homepage": "https://github.com/daniel-rck/web-base",
   "repository": { "type": "git", "url": "https://github.com/daniel-rck/web-base.git" },
@@ -171,7 +171,7 @@ The lint config is tuned for a small Node CLI — no React/a11y plugins, and
     "suspicious": "warn"
   },
   "env": { "builtin": true, "node": true, "es2024": true },
-  "ignorePatterns": ["cli/dist/**", "cli/templates/**"],
+  "ignorePatterns": ["cli/dist/**", "cli/templates/**", "cli/template-tests/**"],
   "rules": {
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "warn",
@@ -196,11 +196,18 @@ changelog hand-wrapped:
   "trailingComma": "all",
   "sortImports": { "newlinesBetween": false },
   "sortPackageJson": false,
-  "ignorePatterns": ["cli/dist/**", "cli/templates/**", "bun.lock", "**/*.md"]
+  "ignorePatterns": [
+    "cli/dist/**",
+    "cli/templates/**",
+    "cli/template-tests/**",
+    "bun.lock",
+    "**/*.md"
+  ]
 }
 ```
 
-**Decision: templates are lint- and format-ignored.** Files under `cli/templates/` are
+**Decision: templates are lint- and format-ignored.** Files under `cli/templates/`
+(and the template tests in `cli/template-tests/`) are
 *source material to be copied verbatim* into target apps. Linting them here
 would either force them to match this repo's rules (wrong scope) or require
 double maintenance. They're checked with their *shipped* config by the
@@ -234,12 +241,18 @@ web-base/
 ├── .claude/
 │   ├── hooks/session-start.sh
 │   └── settings.json
-├── .github/workflows/
-│   ├── tools-ci.yml
-│   └── web-app-ci.yml
+├── .github/
+│   ├── dependabot.yml
+│   └── workflows/
+│       ├── notify-apps.yml
+│       ├── release.yml
+│       ├── tools-ci.yml
+│       ├── web-app-ci.yml
+│       └── web-base-check.yml
 ├── .gitignore
 ├── .oxfmtrc.json
 ├── .oxlintrc.json
+├── CHANGELOG.md
 ├── CLAUDE.md
 ├── LICENSE
 ├── README.md
@@ -251,4 +264,5 @@ web-base/
 └── vitest.config.ts
 ```
 
-The `cli/` and `skill/` directories are populated per their own specs.
+The `cli/` and `skill/` directories are populated per their own specs
+(`02-cli.md`, `03-templates.md`, `05-skill.md`).
