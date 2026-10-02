@@ -93,7 +93,30 @@ function useLiveQuery<T>(
 
 Subscribes to the `db:<storeName>` and `db:*` BroadcastChannels
 (`mutationChannel(storeName)` / `mutationChannel("*")`). Re-runs the query
-whenever a mutation is signalled.
+on mount, when `storeName` or `deps` change, and whenever a mutation is
+signalled — in this tab or another one.
+
+What the component sees:
+
+| Situation | Result |
+|---|---|
+| First run for the current `[storeName, ...deps]` pending | `{ data: undefined, loading: true, error: undefined }` — never the previous key's data |
+| Re-run after a mutation (same key) | the current data, `loading: false`, until the new data arrives |
+| A run failed | the last good data for that key, `loading: false`, `error` set (non-`Error` throws wrapped) |
+| Two runs overlap | the newest one wins; an overtaken run never commits |
+
+The result object keeps its identity until it changes, so it is safe in a
+dependency list. `query` may be an inline closure — the hook always calls the
+newest one (`useEffectEvent`) without re-subscribing. Pass everything the
+query closes over that should trigger a re-run as `deps`:
+
+```typescript
+const { data: tenant } = useLiveQuery(
+  "tenants",
+  async () => (await getDB()).get("tenants", tenantId),
+  [tenantId],
+);
+```
 
 Usage:
 

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
+import { mutationChannel } from "./mutations.ts";
 
 export type LiveQueryResult<T> = {
   data: T | undefined;
@@ -6,71 +7,84 @@ export type LiveQueryResult<T> = {
   error: Error | undefined;
 };
 
+const LOADING: LiveQueryResult<never> = Object.freeze({
+  data: undefined,
+  loading: true,
+  error: undefined,
+});
+
+type Settled<T> = { key: readonly unknown[]; result: LiveQueryResult<T> };
+
 /**
- * Reactive IndexedDB query. Re-runs whenever the BroadcastChannel for the
- * named store (or "*") fires.
+ * Reactive IndexedDB query. Runs `query` on mount, whenever `storeName` or
+ * `deps` change, and whenever `notifyMutation(storeName)` or
+ * `notifyMutation("*")` fires — in this tab or another one.
+ *
+ * - Until the first run for the current `[storeName, ...deps]` settles, the
+ *   result is `{ loading: true, data: undefined }`, never the previous key's
+ *   data. Re-runs after a mutation keep the current data until the new arrives.
+ * - A failed run keeps the last good data for the same key and sets `error`.
+ * - The returned object keeps its identity until the result changes.
  */
 export function useLiveQuery<T>(
   storeName: string,
   query: () => Promise<T>,
   deps: unknown[] = [],
 ): LiveQueryResult<T> {
-  const [state, setState] = useState<LiveQueryResult<T>>({
-    data: undefined,
-    loading: true,
-    error: undefined,
-  });
-  const queryRef = useRef(query);
-  // oxlint-disable-next-line react/refs -- latest-ref: the effect must call the newest `query` without re-subscribing on every render
-  queryRef.current = query;
+  const key = [storeName, ...deps];
+  const [settled, setSettled] = useState<Settled<T> | null>(null);
+  // Always the newest `query`, without re-subscribing on every render.
+  const runQuery = useEffectEvent(() => query());
 
   useEffect(() => {
     let cancelled = false;
-    // Latest-wins. A mutation can fire `run` again while an earlier run is
-    // still awaiting, and IndexedDB gives no ordering guarantee between them —
-    // so without this token the slower, older query can resolve last and
-    // overwrite fresh data with stale data. Only the most recently started run
-    // is allowed to commit.
+    // Latest-wins. A mutation can start a run while an earlier one is still
+    // awaiting, and IndexedDB doesn't order them — without this token the
+    // slower, older run could resolve last and overwrite fresh data.
     let runToken = 0;
 
     const run = async () => {
       const token = ++runToken;
       try {
-        const data = await queryRef.current();
-        if (!cancelled && token === runToken) {
-          setState({ data, loading: false, error: undefined });
-        }
+        const data = await runQuery();
+        if (cancelled || token !== runToken) return;
+        setSettled({ key, result: { data, loading: false, error: undefined } });
       } catch (err) {
-        if (!cancelled && token === runToken) {
-          setState({ data: undefined, loading: false, error: err as Error });
-        }
+        if (cancelled || token !== runToken) return;
+        setSettled((prev) => {
+          const data = prev && sameKey(prev.key, key) ? prev.result.data : undefined;
+          return { key, result: { data, loading: false, error: toError(err) } };
+        });
       }
     };
 
-    run();
-
+    void run();
     if (typeof BroadcastChannel === "undefined") {
       return () => {
         cancelled = true;
       };
     }
 
-    // Deduped: a caller that passes "*" as the store name would otherwise open
-    // two channels on the same name and run every query twice per mutation.
-    const names = Array.from(new Set([`db:${storeName}`, "db:*"]));
-    const channels = names.map((name) => new BroadcastChannel(name));
-    for (const channel of channels) {
-      channel.addEventListener("message", () => {
-        run();
-      });
-    }
+    // Deduped, so a caller passing "*" doesn't run every query twice.
+    const names = new Set([mutationChannel(storeName), mutationChannel("*")]);
+    const channels = [...names].map((name) => new BroadcastChannel(name));
+    const onMutation = () => void run();
+    for (const channel of channels) channel.addEventListener("message", onMutation);
 
     return () => {
       cancelled = true;
       for (const channel of channels) channel.close();
     };
-    // oxlint-disable-next-line react/exhaustive-deps, react/exhaustive-effect-dependencies -- `deps` is the caller's dependency list, forwarded as-is
+    // oxlint-disable-next-line react/exhaustive-deps -- `deps` is the caller's dependency list, forwarded as-is
   }, [storeName, ...deps]);
 
-  return state;
+  return settled && sameKey(settled.key, key) ? settled.result : LOADING;
+}
+
+function sameKey(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
+}
+
+function toError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err), { cause: err });
 }

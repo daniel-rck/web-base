@@ -178,7 +178,7 @@ Rejected approaches with the reason and the replacement:
 |---|---|---|
 | ESLint + Prettier | Two tools, two configs, slower | oxlint + oxfmt |
 | Biome | Own rule names and formatting dialect; ESLint plugin rules (`react-hooks`, `jsx-a11y`, `unicorn`) only partly ported | oxlint + oxfmt (ESLint-compatible rule names, Prettier-compatible output) |
-| Dexie | Too magical, IndexedDB abstraction unneeded for these use cases | idb + custom `useLiveQuery` (~50 lines) |
+| Dexie | Too magical, IndexedDB abstraction unneeded for these use cases | idb + custom `useLiveQuery` (~90 lines) |
 | localStorage for app data | Synchronous, size-limited, no queries | idb |
 | generateSW (vite-plugin-pwa) | Can't add message handlers / push handlers / background sync | injectManifest + hand-written sw.ts |
 | `skipWaiting()` on install | Open tabs lose their lazy chunks after a deploy | `registerType: "prompt"` + `UpdatePrompt` |

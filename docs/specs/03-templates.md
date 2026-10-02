@@ -271,12 +271,19 @@ wires the callbacks IndexedDB leaves to the app:
   calls `notifyMutation("*")`. A database with no stores is a no-op, because
   `transaction([])` throws.
 
-`useLiveQuery.ts`:
-- Subscribes to `mutationChannel(storeName)` and `mutationChannel("*")`
-- Re-runs the query whenever one of them signals a mutation; there are no
-  write wrappers — writers call `notifyMutation` after their transaction
-- Returns `{ data, loading, error }`; latest-wins, so an overtaken run never
-  commits
+`useLiveQuery.ts` (~90 lines) — `useLiveQuery<T>(storeName, query, deps = [])`
+returns `{ data, loading, error }`:
+- Runs `query` on mount, when `[storeName, ...deps]` changes, and on every
+  message on `mutationChannel(storeName)` or `mutationChannel("*")` (deduped,
+  so passing `"*"` opens one channel; listens via `addEventListener`). There
+  are no write wrappers — writers call `notifyMutation` after their transaction.
+- Reads the newest `query` through `useEffectEvent` (stable in React 19.2), so
+  the effect re-subscribes only when the key changes and nothing writes a ref
+  during render. The one lint suppression left is `react/exhaustive-deps` on
+  the `[storeName, ...deps]` line, which forwards the caller's list.
+- Latest-wins: a run overtaken by a newer one never commits.
+- The returned object keeps its identity between renders until the result
+  changes.
 
 **Decision: a newer schema in another tab closes the connection and reloads.**
 An IndexedDB upgrade waits until every other connection to the database is
@@ -287,6 +294,20 @@ the old schema against a database it can no longer open (`VersionError`), so
 the default is to reload into the new build. An app with unsaved input at stake
 passes `onVersionChange` to prompt instead ("Neue Version verfügbar — bitte neu
 laden"); until the reload, `getDB()` rejects, and retries on every call.
+
+**Decision: `useLiveQuery` resets when its key changes and keeps the last data
+on error.** The hook stores each settled result together with the key it was
+computed for. While that key differs from the current `[storeName, ...deps]`,
+it returns a module constant `{ data: undefined, loading: true, error:
+undefined }` — derived during render rather than set in the effect — so a
+detail view switching from tenant A to tenant B never shows A's data as B's,
+not even for one frame. A re-run for the *same* key (after a mutation) keeps
+the current data with `loading: false`: re-queries follow every write, and a
+spinner flash on each would be worse than data that is about to be replaced.
+A failed run keeps the last good data for that key and sets `error` (non-`Error`
+throws are wrapped), so a transient failure doesn't blank the screen; the
+component decides what to show. Hausverwaltung keeps its own cross-store hook
+through `webBase.unmanaged` (see `02-cli.md`).
 
 Full TypeScript signatures in `references/storage.md` of the skill (and so the
 template implementation must produce equivalent code).
