@@ -6,8 +6,9 @@
 |---|---|---|---|
 | `web-app-ci.yml` | `workflow_call` | every app | lint, typecheck, test, build |
 | `web-base-check.yml` | `workflow_call` | every app | owned-drift guard (`web-base check`) |
-| `notify-apps.yml` | release published, `workflow_dispatch` | web-base | "update available" issue per app |
 | `tools-ci.yml` | push to `main`, pull requests | web-base | CI for this repo |
+| `release.yml` | push to `main`, `workflow_dispatch` | web-base | tag + GitHub release for the `package.json` version |
+| `notify-apps.yml` | `workflow_call` from `release.yml`, `workflow_dispatch` | web-base | "update available" issue per app |
 
 The workflow files are the reference for their YAML. This spec describes the
 contract (inputs, behavior) and the decisions behind it, and deliberately does
@@ -27,12 +28,13 @@ rules:
 - **`timeout-minutes` on every job.**
 - **`persist-credentials: false` on every `actions/checkout`**, so no token is
   left in `.git/config` for later steps (or a compromised dependency) to use.
-- **Job-level `concurrency`.** A reusable workflow's group is set on the job
-  and prefixed with the workflow's own name, e.g.
+- **A `concurrency` group.** In a reusable workflow it is set on the job and
+  prefixed with the workflow's own name, e.g.
   `web-app-ci-${{ github.workflow }}-${{ github.ref }}`: a workflow-level group
   in a called workflow is evaluated in the caller's context and can collide
-  with the caller's own group. `cancel-in-progress` is on only for
-  `pull_request`, so a push to `main` is never cut off mid-run.
+  with the caller's own group. Only `release.yml`, which nothing calls, uses a
+  workflow-level group. `cancel-in-progress` is on only for `pull_request`, so
+  a push to `main` is never cut off mid-run.
 - **Every action pinned by full commit SHA**, with a `# vX.Y.Z` comment naming
   the release it resolves to.
 - **No `${{ }}` expansion inside `run:`.** Inputs and event data reach a script
@@ -124,9 +126,9 @@ adopted at all, was adopted only partially, or a superseded setup is left over
 on the full template; never set it in HamsterFlight.
 
 **`--diff` is always passed**, so a failing run shows what drifted. CLIs from
-v0.6.0 on print the diff; older ones (citty 0.1.6 ignores unknown flags) ignore
-it. It follows the template argument, because an unknown flag in front of a
-positional would take the positional as its value.
+v0.6.0 on print the diff; older CLIs ignore it, because their citty 0.1.6
+silently accepts unknown flags. It follows the template argument: an unknown
+flag in front of a positional would take the positional as its value.
 
 **`pins`** runs `web-base pins` (exit 1 on a mismatch) after the check, also
 when the check failed, so one run reports both. The command exists from v0.6.0
@@ -278,37 +280,167 @@ check. Typecheck/build of the scaffolded app are intentionally left out: they
 need a full dependency install (React, idb, lucide-react, Vite …) and would be
 slow and flaky; revisit if template type errors start slipping through.
 
-## Releasing web-base versions
+## release.yml (tag + GitHub release from the version)
 
-Every version bump (`package.json` + `cli/src/version.ts`, see `02-cli.md`)
-gets an annotated tag on `main` once the bump has merged:
+Every push to `main` runs `release.yml`. Its `tag` job reads the version from
+`package.json` at the pushed commit and makes sure web-base has a release for
+it:
 
-```
-git tag -a v0.2.1 -m "v0.2.1" && git push origin v0.2.1
-```
+1. **Resolve the commit.** `GITHUB_SHA` on a push; on `workflow_dispatch` the
+   `sha` input (or `GITHUB_SHA` when empty). The SHA must be 7–40 lowercase
+   hex digits, must resolve with `git rev-parse`, and must be on `main`
+   (`git merge-base --is-ancestor "$sha" HEAD` in a full-history checkout of
+   `main`). A dispatch is only accepted from `refs/heads/main`.
+2. **Read the version** with `git show "$sha:package.json" | jq -r .version`.
+   It must be SemVer; a `-` part marks a prerelease.
+3. **Already released → done.** If `gh release view vX.Y.Z` finds a release
+   (drafts included), the job sets `created=false` and stops. Most pushes do
+   not bump the version, so this is the normal, green no-op.
+4. **Tag conflicts fail.** If the tag `vX.Y.Z` exists but points at another
+   commit, the job fails rather than guess; a tag at the same commit is
+   released as is.
+5. **Notes.** The release notes are the version's section of `CHANGELOG.md`
+   on `main`: everything between `## [X.Y.Z]` and the next `## [` heading (or
+   the link-reference footer, `[Unreleased]: …` / `[X.Y.Z]: …`), blank lines
+   trimmed. An empty section fails the run, so a bump without a CHANGELOG
+   entry is visible on `main`. Write the entry, migration notes included, in
+   the same PR as the bump.
+6. **Create** with `gh release create vX.Y.Z --target "$sha" --title vX.Y.Z
+   --notes-file notes.md`, plus `--latest` on a push, `--latest=false` on a
+   dispatch, and `--prerelease --latest=false` for a prerelease. The API
+   creates the tag, so tags are **lightweight**, like the original `v0.2.1`.
 
-The tags are what apps pin in `web-base-check.yml` (`ref:`) and what
-`notify-apps.yml` announces. Tag after merge, never on a feature branch —
-otherwise the tag points at a commit that may never reach `main`.
+The job (`contents: write`, 5 minutes) outputs `version`, `created` and
+`prerelease`. A second job, `notify`, calls `notify-apps.yml` with the version
+and the `APP_NOTIFY_TOKEN` secret when a release was created, it is not a
+prerelease, and the run is a push or a dispatch with `notify: true`.
+
+Runs share the concurrency group `release` (backfills get
+`release-backfill-<sha>`) without cancelling each other. GitHub keeps at most
+one *pending* run per group, though: when three pushes land while a release
+is running, the middle one is dropped. If that one carried a version bump,
+backfill it (below).
+
+So releasing is: bump `package.json` + `cli/src/version.ts` (see `02-cli.md`),
+write the `CHANGELOG.md` section, merge to `main`. Never tag by hand on a
+feature branch: the tag would point at a commit that may never reach `main`.
+
+**Decision: release on `push`, not `workflow_run`.** Chaining the release to a
+green Tools CI with `workflow_run` would gate it on CI, but `workflow_run`
+runs in the base repository's privileged context and is a known injection
+path (zizmor flags it as dangerous). Instead `main` is protected: Tools CI is a
+required status check, so nothing reaches `main` without passing it (see
+*Recommended repository settings*).
+
+**Decision: notify through `workflow_call`.** A release created with
+`GITHUB_TOKEN` triggers no `release:` (or `push: tags`) workflow, by GitHub's
+design against recursive runs. Listening for `release: published` would
+therefore never fire for the releases this workflow creates, so `release.yml`
+calls `notify-apps.yml` directly instead, and only for a release it just
+created.
+
+### Backfilling releases
+
+Versions 0.3.0–0.5.0 were bumped and merged before `release.yml` existed;
+only `v0.2.1` had a tag. They are released with **Actions → Release → Run
+workflow** on `main`, once per version, oldest first, with `notify` off (the
+apps get one issue for the current version, not four):
+
+| Version | `sha` | Commit |
+|---|---|---|
+| 0.3.0 | `f22cd06579356913f0d4eed188d260b8ad332806` | merge of #10 |
+| 0.3.1 | `48b285122c6d4985598af5bfd724ad952afbbd9e` | merge of #12 |
+| 0.4.0 | `940418ad7530c355a9de964f73e96d005bfc36cf` | `feat!: replace Biome with oxlint + oxfmt` (in #13) |
+| 0.5.0 | `ca6d3db8bc8f8747985fd7bae9631691aad16c7d` | merge of #13 |
+
+Each SHA is the last first-parent commit on `main` carrying that version,
+except 0.4.0, which was never the head of `main` (#13 bumped to 0.4.0 and then
+to 0.5.0 before merging); its commit is reachable from `main` and carries a
+`cli/dist` bundle built at 0.4.0, so `bunx github:daniel-rck/web-base#v0.4.0`
+runs that version. `v0.2.1` (lightweight, on `443c3c8`) has a tag but no
+release; dispatching `sha=443c3c81e3a084f1b86b6c377f6cb3bdcc6514e3` adds one.
+
+A dispatch never moves the *Latest* badge (`--latest=false`), so the newest
+release stays Latest however the backfills are ordered.
+
+The first `release.yml` run is the push that merges it. If `main` is at a new
+version by then (0.6.0), that push releases it and the table above is the
+whole backfill. If `main` is still at 0.5.0, that push releases v0.5.0 at the
+merge commit instead of `ca6d3db` (the same 0.5.0 CLI as long as nothing else
+changed `cli/`); skip the 0.5.0 row then.
 
 ## notify-apps.yml (release → issue notifications)
 
-When a web-base release is published, `notify-apps.yml` opens an "update
-available" issue in each consuming app repo (the repo list is a matrix in the
-workflow). Updates stay manual — the issue is the reminder to run
-`web-base update`. It also fires on `workflow_dispatch` with a `version` input.
+`notify-apps.yml` opens an "update available" issue in each consuming app repo
+(a matrix of the nine apps). Updates stay manual: the issue is the reminder to
+run `web-base update`.
 
-Requirements and behavior:
-- Needs an `APP_NOTIFY_TOKEN` secret with `issues:write` on the app repos (a PAT
-  or GitHub App token). No write access to app *code* is required. The job's
-  own `GITHUB_TOKEN` gets no permissions.
-- If the secret is absent, each matrix job no-ops (so the workflow is safe to
-  merge before the secret exists).
-- Deduplicates: skips a repo if an open issue with the same title already exists.
+Triggers: `workflow_call` from `release.yml` (input `version`, required;
+secret `APP_NOTIFY_TOKEN`, optional) and `workflow_dispatch` (input `version`)
+to re-announce a version by hand. It has no `release:` trigger (see the
+decision above).
 
-This is the Stage-2 "issue-notification" propagation model. A future, more
-automated variant could open `web-base update --apply` PRs instead of issues
-(needs code-write access); the issue path was chosen to avoid granting that.
+Each matrix job (5 minutes, job-level concurrency group
+`notify-apps-<owner/repo>`, never cancelled):
+
+1. **No token → no-op.** Without `APP_NOTIFY_TOKEN` it logs a notice and exits
+   0, so the workflow is safe before the secret exists.
+2. **Version.** Normalized to `vX.Y.Z` and validated as SemVer; a prerelease
+   is not announced.
+3. **The release must exist.** `gh release view` on web-base (with
+   `github.token`, hence the job's `contents: read`; the app token may not
+   reach web-base) must find a published release that is not a prerelease.
+4. **One issue per version.** If an open issue titled
+   `web-base vX.Y.Z verfügbar` exists, nothing is created. If an open issue
+   already announces a *newer* version, nothing is created either.
+5. **Create** the issue (German; body below).
+6. **Close what it supersedes.** Every other open issue whose title matches
+   `^web-base v[0-9]+\.[0-9]+\.[0-9]+ verfügbar$` and names an older version
+   is closed as *not planned* with the comment `Ersetzt durch #N`. An app
+   therefore has at most one open update issue, for the newest release.
+
+The open issues are listed with `gh issue list` without `--search`: the search
+index lags, which would break the dedupe on a quick re-run.
+
+The issue body links the release
+(`https://github.com/daniel-rck/web-base/releases/tag/vX.Y.Z`, whose notes are
+the CHANGELOG section including its migration notes) and lists the steps, all
+pinned to the release tag:
+
+1. `bunx github:daniel-rck/web-base#vX.Y.Z check` first.
+2. `bunx github:daniel-rck/web-base#vX.Y.Z update core --apply`: updates only
+   the blocks the app already uses, never scaffold seams or files listed in
+   `webBase.unmanaged`.
+3. New dependencies, scripts or blocks in the release:
+   `bunx github:daniel-rck/web-base#vX.Y.Z add <template>`, since `update`
+   never changes `package.json`.
+4. `bun install && bun run lint && bun run typecheck && bun run test`.
+5. Optionally `bunx github:daniel-rck/web-base#vX.Y.Z pins`.
+
+It ends with "Migrationshinweise im Release beachten." and a footer saying the
+issue was opened by `notify-apps.yml` and closes with the next release's.
+
+**`APP_NOTIFY_TOKEN`** is a repository secret of web-base: a fine-grained
+personal access token with access to the nine app repos and the repository
+permissions **Issues: read and write** and **Metadata: read** (no code
+access), or a GitHub App installation token with the same permissions. Opening
+`web-base update --apply` PRs instead of issues would need code-write access
+to every app; the issue path was chosen to avoid granting that.
+
+## Recommended repository settings
+
+Settings the workflows assume but cannot set themselves:
+
+- **Default `GITHUB_TOKEN` permissions: read-only** (Settings → Actions →
+  General → Workflow permissions). The workflows request what they need per
+  job; read-only is the fallback for anything that does not.
+- **Protect `main`** (branch ruleset): require pull requests and the Tools CI
+  status check. `release.yml` relies on this instead of chaining to CI.
+- **Optionally protect release tags** (tag ruleset on `refs/tags/v*`): block
+  deletion and updates, so a published version cannot be moved. Do not
+  restrict creation, or `release.yml` cannot create tags.
+- **App repos:** pin the web-base workflows to `@vX.Y.Z` and enable Dependabot
+  for `github-actions` there, so a new web-base release arrives as a PR.
 
 ## Versioning the reusable workflows
 
@@ -320,10 +452,8 @@ that says what callers must change. Apps take it when they bump their `@` ref.
 
 ## Future workflows
 
-When/if we want additional reusable workflows, add them as new files:
-
-- `release.yml` — for tagging + GitHub release on a worker app
-- `lint-only.yml` — a lighter check for draft PRs
+When/if we want additional reusable workflows, add them as new files, e.g.
+`lint-only.yml`, a lighter check for draft PRs.
 
 Each new reusable workflow gets:
 - Its own `workflow_call` definition

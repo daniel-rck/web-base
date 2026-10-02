@@ -1,0 +1,164 @@
+name: Release
+
+# Tags and releases web-base from the version in package.json. Every push to
+# main runs it; when that version already has a release (most pushes do not
+# bump) the run is a no-op. A new release gets the version's CHANGELOG.md
+# section as its notes and a lightweight vX.Y.Z tag on the pushed commit, and
+# the apps are notified through notify-apps.yml (called directly: a release
+# created with GITHUB_TOKEN triggers no `release:` workflow).
+#
+# workflow_dispatch backfills a release for an older main commit; see
+# docs/specs/06-workflows.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Backfill: the main commit to release (empty = the head of main)"
+        required: false
+        type: string
+      notify:
+        description: "Also open update issues in the apps"
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && format('release-backfill-{0}', inputs.sha) || 'release' }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # create the tag and the release
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      created: ${{ steps.release.outputs.created }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the commit and its version
+        id: resolve
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow from main, not $GITHUB_REF."
+            exit 1
+          fi
+
+          sha="${INPUT_SHA:-$GITHUB_SHA}"
+          if ! [[ "$sha" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::\"$sha\" is not a commit SHA (7 to 40 lowercase hex digits)."
+            exit 1
+          fi
+          if ! sha=$(git rev-parse --verify --quiet "$sha^{commit}"); then
+            echo "::error::Commit $INPUT_SHA does not exist."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$sha" HEAD; then
+            echo "::error::Commit $sha is not on main."
+            exit 1
+          fi
+
+          version=$(git show "$sha:package.json" | jq -r '.version // ""')
+          semver_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          if ! [[ "$version" =~ $semver_re ]]; then
+            echo "::error::package.json at $sha has no SemVer version (\"$version\")."
+            exit 1
+          fi
+          prerelease=false
+          if [ -n "${BASH_REMATCH[4]}" ]; then
+            prerelease=true
+          fi
+
+          echo "Commit $sha carries version $version (prerelease: $prerelease)."
+          {
+            echo "sha=$sha"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Create the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+
+          if view=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url 2>&1); then
+            echo "Release $tag already exists, nothing to do: $(jq -r .url <<<"$view")"
+            echo "created=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          elif [[ "$view" != *"release not found"* ]]; then
+            echo "$view" >&2
+            exit 1
+          fi
+
+          if tagged=$(git rev-parse --verify --quiet "refs/tags/$tag^{commit}"); then
+            if [ "$tagged" != "$SHA" ]; then
+              echo "::error::Tag $tag already points at $tagged, not $SHA. Release that commit (workflow_dispatch with sha=$tagged) or fix the tag by hand."
+              exit 1
+            fi
+            echo "Tag $tag already exists at $SHA; releasing it."
+          fi
+
+          # The notes are this version's section of main's CHANGELOG.md: from its
+          # heading to the next version heading or the link-reference footer
+          # ("[Unreleased]: …", "[0.6.0]: …"), with surrounding blank lines trimmed.
+          awk -v hdr="## [$VERSION]" '
+            index($0, hdr) == 1 { found = 1; next }
+            found && index($0, "## [") == 1 { exit }
+            found && $0 ~ /^\[([Uu]nreleased|v?[0-9]+\.[0-9]+\.[0-9]+[^]]*)\]: / { exit }
+            found && /^[[:space:]]*$/ { if (started) blanks++; next }
+            found { for (; blanks > 0; blanks--) print ""; started = 1; print }
+          ' CHANGELOG.md >notes.md
+          if ! [ -s notes.md ]; then
+            echo "::error::CHANGELOG.md on main has no section for [$VERSION]."
+            exit 1
+          fi
+
+          args=(--target "$SHA" --title "$tag" --notes-file notes.md)
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease --latest=false)
+          elif [ "$EVENT_NAME" = "push" ]; then
+            args+=(--latest)
+          else
+            args+=(--latest=false)
+          fi
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" "${args[@]}"
+          echo "created=true" >>"$GITHUB_OUTPUT"
+
+  notify:
+    needs: tag
+    if: >-
+      needs.tag.outputs.created == 'true' &&
+      needs.tag.outputs.prerelease != 'true' &&
+      (github.event_name == 'push' || inputs.notify)
+    permissions:
+      contents: read # the called job reads the release with github.token
+    # A job-level `./` call resolves from this run's commit, not the workspace.
+    # actionlint 1.7.12 rejects the newer `$/` form.
+    uses: ./.github/workflows/notify-apps.yml # zizmor: ignore[self-repository]
+    with:
+      version: ${{ needs.tag.outputs.version }}
+    secrets:
+      APP_NOTIFY_TOKEN: ${{ secrets.APP_NOTIFY_TOKEN }}

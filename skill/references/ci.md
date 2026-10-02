@@ -94,16 +94,25 @@ jobs:
   `v0.6.0` or later.
 - A failing run prints the diff of what drifted (CLI v0.6.0 or later).
 
-When it fails, either `bunx github:daniel-rck/web-base#vX.Y.Z update core --apply`
-to restore the base (that also bumps the stamp, so the check moves to the new
-tag in the same PR), or promote the change into the template upstream.
+When it fails, either restore the base with
+`bunx github:daniel-rck/web-base#v<stamp> update core --apply` (a newer tag
+updates and re-stamps in one go, and the check follows the new stamp in the
+same PR), or promote the change into the template upstream.
 
-## Update notifications (notify-apps.yml)
+## Releases and update notifications (release.yml, notify-apps.yml)
 
-This one lives **in web-base**, not in the apps. On a web-base release it opens
-an "update available" issue in each app repo (reminder to run
-`web-base update`). It needs an `APP_NOTIFY_TOKEN` secret with `issues:write` on
-the app repos; without it the workflow no-ops. See `06-workflows.md`.
+These live **in web-base**, not in the apps. A push to web-base `main` that
+bumps the version makes `release.yml` tag `vX.Y.Z` and publish a GitHub
+release with that version's CHANGELOG section; it then runs `notify-apps.yml`,
+which opens a "web-base vX.Y.Z verfügbar" issue in each app repo and closes the
+issue for the previous version. The issue lists the steps, pinned to the tag:
+`check`, `update core --apply`, `add <template>` for new dependencies or
+scripts, the local checks, optionally `pins`, and the release's migration
+notes.
+
+It needs an `APP_NOTIFY_TOKEN` secret in web-base (Issues read/write +
+Metadata read on the app repos); without it the notification no-ops. See
+`06-workflows.md`.
 
 ## Extending with additional jobs
 
@@ -134,10 +143,7 @@ dashboard's Git integration. CI's job is to gate the PR, not to deploy.
 ## Future workflows
 
 Additional reusable workflows can be added under `web-base/.github/
-workflows/`:
-
-- `release.yml` — for tagging + GitHub release on a worker app
-- `lint-only.yml` — a lighter check for draft PRs
+workflows/`, e.g. `lint-only.yml`, a lighter check for draft PRs.
 
 Each new workflow needs:
 - `workflow_call` definition

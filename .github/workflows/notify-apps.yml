@@ -1,19 +1,30 @@
 name: Notify apps
 
-# Opens an "update available" issue in each consuming app repo when a web-base
-# release is published. Updates stay manual: the issue is the reminder to run
-# `web-base update`. Writing to the app repos needs the APP_NOTIFY_TOKEN secret
-# (Issues read/write + Metadata read on the app repos; no access to app code).
-# Without it every matrix job is a no-op. See docs/specs/06-workflows.md.
+# Opens an "update available" issue in each consuming app repo for a published
+# web-base release, and closes the issue it supersedes. Updates stay manual:
+# the issue is the reminder to run `web-base update`. release.yml calls this
+# right after it creates a release (a release made with GITHUB_TOKEN triggers
+# no `release:` workflow); run it by hand to re-announce a version.
+#
+# Writing to the app repos needs the APP_NOTIFY_TOKEN secret (Issues
+# read/write + Metadata read on the app repos; no access to app code). Without
+# it every matrix job is a no-op. See docs/specs/06-workflows.md.
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: "Released version to announce (vX.Y.Z or X.Y.Z)"
+        required: true
+        type: string
+    secrets:
+      APP_NOTIFY_TOKEN:
+        required: false
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to announce (default: latest release tag)"
-        required: false
+        description: "Released version to announce (vX.Y.Z or X.Y.Z)"
+        required: true
         type: string
 
 permissions: {}
@@ -22,7 +33,8 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {} # the app repos are written with APP_NOTIFY_TOKEN only
+    permissions:
+      contents: read # `gh release view` on web-base with github.token
     concurrency:
       group: notify-apps-${{ matrix.repo }}
       cancel-in-progress: false
@@ -40,43 +52,134 @@ jobs:
           - daniel-rck/Tonspur
           - daniel-rck/Zeiterfassung
     steps:
-      - name: Open update-available issue
+      - name: Resolve the version
+        id: version
         env:
-          GH_TOKEN: ${{ secrets.APP_NOTIFY_TOKEN }}
-          VERSION: ${{ github.event.release.tag_name || inputs.version }}
+          HAS_TOKEN: ${{ secrets.APP_NOTIFY_TOKEN != '' }}
+          INPUT_VERSION: ${{ inputs.version }}
           TARGET: ${{ matrix.repo }}
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "APP_NOTIFY_TOKEN not set — skipping notification for $TARGET."
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::notice::APP_NOTIFY_TOKEN is not set, so $TARGET is not notified."
+            echo "proceed=false" >>"$GITHUB_OUTPUT"
             exit 0
           fi
-          if ! [[ "${VERSION:-}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::No valid version resolved (run from a release or pass the version input)."
+          version="${INPUT_VERSION#v}"
+          semver_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          if ! [[ "$version" =~ $semver_re ]]; then
+            echo "::error::\"$INPUT_VERSION\" is not a SemVer version."
             exit 1
           fi
-          title="web-base ${VERSION} verfügbar"
-          # Avoid duplicates: skip if an open issue with this title already exists.
-          existing=$(gh issue list --repo "$TARGET" --state open --search "in:title \"$title\"" --json title --jq 'length')
-          if [ "$existing" != "0" ]; then
-            echo "Issue already open in $TARGET — skipping."
+          if [ -n "${BASH_REMATCH[4]}" ]; then
+            echo "::notice::v$version is a prerelease; apps are not notified."
+            echo "proceed=false" >>"$GITHUB_OUTPUT"
             exit 0
           fi
-          body=$(cat <<'EOF'
-          Eine neue web-base-Version ist veröffentlicht.
+          echo "version=v$version" >>"$GITHUB_OUTPUT"
+          echo "proceed=true" >>"$GITHUB_OUTPUT"
 
-          Diese App auf den neuen Stand bringen:
+      - name: Require a published release
+        id: release
+        if: steps.version.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! info=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,url); then
+            echo "::error::web-base has no published release $VERSION."
+            exit 1
+          fi
+          if [ "$(jq -r .isDraft <<<"$info")" = "true" ]; then
+            echo "::error::Release $VERSION is still a draft."
+            exit 1
+          fi
+          if [ "$(jq -r .isPrerelease <<<"$info")" = "true" ]; then
+            echo "::notice::Release $VERSION is a prerelease; apps are not notified."
+            echo "proceed=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "proceed=true" >>"$GITHUB_OUTPUT"
 
-          ```
-          bunx github:daniel-rck/web-base update core --apply
-          ```
+      - name: Open the update issue
+        if: steps.release.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.APP_NOTIFY_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TARGET: ${{ matrix.repo }}
+        run: |
+          set -euo pipefail
+          title="web-base $VERSION verfügbar"
 
-          Nur **owned**-Bausteine werden aktualisiert; **scaffold**-Nähte
-          (theme.css-Akzent, db.ts-Schema, routes, Worker-Handler) bleiben
-          unangetastet. Mit `bunx github:daniel-rck/web-base check` prüfst du
-          vorab, ob owned-Bausteine lokal abgewichen sind.
+          # Not `--search`: the search index lags, which breaks the dedupe on a re-run.
+          open_issues=$(gh issue list --repo "$TARGET" --state open --limit 500 --json number,title)
+          announcements=$(jq -c '[.[] | select(.title | test("^web-base v[0-9]+\\.[0-9]+\\.[0-9]+ verfügbar$"))]' <<<"$open_issues")
 
-          Changelog: https://github.com/daniel-rck/web-base/blob/main/CHANGELOG.md
+          current=$(jq -r --arg t "$title" 'map(select(.title == $t)) | first | .number // empty' <<<"$announcements")
+          newest_open=$(jq -r '.[].title | capture("^web-base v(?<v>[^ ]+) ").v' <<<"$announcements" | sort -V | tail -n1)
+          if [ -z "$current" ] && [ -n "$newest_open" ] &&
+            [ "$(printf '%s\n' "$newest_open" "${VERSION#v}" | sort -V | tail -n1)" != "${VERSION#v}" ]; then
+            echo "::notice::$TARGET already has an open issue for the newer v$newest_open; not announcing $VERSION."
+            exit 0
+          fi
+
+          if [ -n "$current" ]; then
+            echo "$TARGET already has #$current for $VERSION."
+          else
+            cat >body.md <<'EOF'
+          Eine neue web-base-Version ist veröffentlicht: **__VERSION__**.
+
+          Release-Notes: https://github.com/daniel-rck/web-base/releases/tag/__VERSION__
+          Sie enthalten den CHANGELOG-Abschnitt dieser Version, samt Migrationshinweisen.
+
+          So bringst du diese App auf den neuen Stand:
+
+          1. Zuerst prüfen, ob owned-Bausteine lokal abgewichen sind:
+
+             ```sh
+             bunx github:daniel-rck/web-base#__VERSION__ check
+             ```
+
+          2. Die Bausteine aktualisieren:
+
+             ```sh
+             bunx github:daniel-rck/web-base#__VERSION__ update core --apply
+             ```
+
+             Das aktualisiert nur die Bausteine, die die App schon nutzt. Scaffold-Nähte (theme.css-Akzent, db.ts-Schema, Routen, Worker-Handler) und Dateien aus `webBase.unmanaged` bleiben unangetastet.
+
+          3. Nennt das Release neue Abhängigkeiten, Scripts oder Bausteine: `bunx github:daniel-rck/web-base#__VERSION__ add <template>` — `update` ändert keine package.json.
+
+          4. Prüfen:
+
+             ```sh
+             bun install && bun run lint && bun run typecheck && bun run test
+             ```
+
+          5. Optional die Versions-Pins abgleichen:
+
+             ```sh
+             bunx github:daniel-rck/web-base#__VERSION__ pins
+             ```
+
+          Migrationshinweise im Release beachten.
+
+          ---
+
+          Automatisch angelegt von `notify-apps.yml` in web-base. Das Issue zum nächsten Release schließt dieses.
           EOF
-          )
-          gh issue create --repo "$TARGET" --title "$title" --body "$body"
+            sed -i "s/__VERSION__/$VERSION/g" body.md
+            url=$(gh issue create --repo "$TARGET" --title "$title" --body-file body.md)
+            current="${url##*/}"
+            echo "Opened $url"
+          fi
+
+          # Close the announcements this one supersedes (older versions only).
+          jq -r '.[] | "\(.number) \(.title | capture("^web-base v(?<v>[^ ]+) ").v)"' <<<"$announcements" |
+            while read -r number version; do
+              [ "$number" = "$current" ] && continue
+              [ "$(printf '%s\n' "$version" "${VERSION#v}" | sort -V | tail -n1)" = "$version" ] && continue
+              gh issue close "$number" --repo "$TARGET" --reason "not planned" --comment "Ersetzt durch #$current"
+              echo "Closed #$number (v$version)."
+            done
