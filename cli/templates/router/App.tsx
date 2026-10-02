@@ -10,7 +10,7 @@ const NAV_ITEMS: NavItem[] = [
 /** The root layout route: the shell around every page. */
 export function App() {
   return (
-    <AppShell title="<App-Name>" navItems={NAV_ITEMS}>
+    <AppShell title="<app-name>" navItems={NAV_ITEMS}>
       <Outlet />
       <ScrollRestoration />
     </AppShell>

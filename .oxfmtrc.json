@@ -9,5 +9,11 @@
   "trailingComma": "all",
   "sortImports": { "newlinesBetween": false },
   "sortPackageJson": false,
-  "ignorePatterns": ["cli/dist/**", "cli/templates/**", "bun.lock", "**/*.md"]
+  "ignorePatterns": [
+    "cli/dist/**",
+    "cli/templates/**",
+    "cli/template-tests/**",
+    "bun.lock",
+    "**/*.md"
+  ]
 }

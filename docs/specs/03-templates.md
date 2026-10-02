@@ -2,6 +2,8 @@
 
 Each template under `cli/templates/<name>/` is a folder with a `manifest.json`
 and the files it ships. This spec defines what each template installs.
+Dependency **versions** are not repeated here: they all come from
+`cli/templates/pins.json`, shown in `07-conventions.md`.
 
 Templates listed below as **leaf** are real files-on-disk templates. **Meta**
 templates only have an `extends` array.
@@ -20,10 +22,11 @@ templates only have an `extends` array.
 | `pwa` | leaf | service worker (injectManifest: precache, offline navigation, prompt-based updates) + `useAppUpdate`/`UpdatePrompt` |
 | `router` | leaf | router.tsx with the root layout route (`src/App.tsx`), error/404 pages, a starter `HomePage` |
 | `worker` | leaf | shared router (SPA fallback, /api error boundary, headers) + worker/index.ts + wrangler.toml + public/_headers |
+| `backup` | leaf (extra) | JSON export/import of the whole IndexedDB, persistent storage, „Alle Daten löschen" (`BackupCard`) |
 | `sync` | leaf (extra) | client + worker for R2 end-to-end encrypted sync with QR/link pairing |
 
 `core` is the meta-template every app uses; `app` is `core` plus the entry
-files a brand-new app needs (`init`). `sync` is opt-in.
+files a brand-new app needs (`init`). `backup` and `sync` are opt-in.
 
 ---
 
@@ -149,9 +152,7 @@ base was rejected — it needs a Node runtime to load and is experimental.
 Apps put exceptions in `.oxlintrc.json` / `.prettierignore` and never touch
 `oxlint.base.json` or `.oxfmtrc.json` — `update` overwrites them.
 
-devDependencies:
-- `oxlint`: `^1.85.0`
-- `oxfmt`: `^0.70.0`
+devDependencies: `oxlint`, `oxfmt` (versions from `cli/templates/pins.json`).
 
 scripts:
 - `lint`: `oxlint && oxfmt --check`
@@ -207,14 +208,9 @@ Files:
 only the destination carries the real name — so this repo's own Vitest never
 discovers the template's test and tries to run it without jsdom.)
 
-devDependencies:
-- `vitest`: `^4.1.11`
-- `jsdom`: `^30.0.1`
-- `fake-indexeddb`: `^6.2.5`
-- `@testing-library/react`: `^16.3.3`
-- `@testing-library/dom`: `^10.4.2`
-- `@testing-library/jest-dom`: `^7.0.1`
-- `@testing-library/user-event`: `^14.6.7`
+devDependencies: `vitest`, `jsdom`, `fake-indexeddb`, `@testing-library/react`,
+`@testing-library/dom`, `@testing-library/jest-dom`,
+`@testing-library/user-event`.
 
 `@testing-library/dom` is listed explicitly: it is a peer dependency of
 Testing Library React 16, jest-dom 7 and user-event, so the fleet pins it
@@ -312,8 +308,7 @@ Files:
 - `db.ts` → `src/lib/db/db.ts` — the app's schema, database name and migration ladder. **scaffold**
 - `index.ts` → `src/lib/db/index.ts` — barrel. **scaffold**
 
-dependencies:
-- `idb`: `^8.0.3`
+dependencies: `idb`.
 
 `db.ts` is the per-app seam and stays thin. A fix in a scaffold file only
 reaches *new* apps, so everything that has to be right in every app lives in
@@ -533,9 +528,7 @@ Files:
 - `headers` → `public/_headers` — security and caching headers for static assets. **scaffold**
 - `tsconfig.worker.json` → `tsconfig.worker.json`. **scaffold**
 
-devDependencies:
-- `@cloudflare/workers-types`: `^5.20260902.1`
-- `wrangler`: `^4.128.0`
+devDependencies: `@cloudflare/workers-types`, `wrangler`.
 
 scripts:
 - `worker:dev`: `wrangler dev`
@@ -628,6 +621,51 @@ postInstall:
 - "Add `compatibility_flags = ["nodejs_compat"]` only if the worker imports a Node built-in"
 - "Route `/api/<feature>` in handleApi() in worker/index.ts; never edit worker/base.ts — `update` overwrites it"
 - "If using R2/KV: see the sync template's docs/sync.md"
+
+---
+
+## backup
+
+An extra for apps with real user data: a way out for the data, and a way to
+delete it. Needs `storage` (`src/lib/db/mutations.ts`) and `layout`.
+
+Files (→ `src/lib/backup/`, owned unless marked):
+- `codec.ts` — `encodeValue`/`decodeValue`: JSON with tagged objects for
+  `Date`, `Map`, `Set`, `Blob`/`File`, `ArrayBuffer`/typed arrays, `undefined`,
+  `NaN`/`±Infinity`, `bigint`; a real `$wb` key is escaped
+- `format.ts` — the `BackupFile` envelope (`format: "web-base-backup"`,
+  `formatVersion: 1`, `app` = the IndexedDB name, `dbVersion`, `exportedAt`,
+  per-store `keyPath`/`autoIncrement`/`records`), `parseBackupFile`,
+  `checkCompatibility`, `BackupError` (German messages)
+- `backup.ts` — `exportBackup`, `restoreBackup` (atomic), `importBackup`,
+  `wipeAllData`
+- `persistence.ts` — `getStorageStatus`, `requestPersistentStorage`,
+  `formatBytes` (de-DE), `useStorageStatus`
+- `BackupCard.tsx` — „Daten & Sicherung": export, import, persistent
+  storage, „Alle Daten löschen"; props `getDB`, `beforeWipe`, `migrate`
+- `index.ts` — **scaffold** barrel
+
+No dependencies (idb comes from `storage`, the primitives from `layout`).
+
+**Decision: restore replaces, atomically.** Every value is decoded before the
+transaction opens (only IndexedDB requests may be awaited inside one, or it
+commits early); then one readwrite transaction clears and refills every store.
+A failing record aborts it, so a bad file never leaves half a database.
+
+**Decision: plain JSON is not a backup format.** `JSON.stringify` turns Dates
+into strings and Blobs, Maps and Sets into `{}` without an error — the
+failure surfaces only on restore. The codec keeps them, so a round trip is
+exact.
+
+**Decision: older backups are accepted.** A backup whose `dbVersion` is lower
+than the database's is restored when all its stores exist; an app whose data
+shape changed passes `migrate`. A newer backup, another app's, or one with
+unknown stores is rejected with a German message.
+
+**Decision: `window.confirm`, no dialog primitive.** Import and wipe are rare,
+destructive actions; a native confirm is accessible and enough until a
+`ConfirmDialog` earns its place in `layout`. `persist()` is only requested
+behind a button, because Firefox shows a permission prompt.
 
 ---
 
