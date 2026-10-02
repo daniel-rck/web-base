@@ -32,22 +32,27 @@ on the same hue.
 `warning` 80, `success` 150, `info` 230. An app accent must sit at least 25°
 away from each of them — otherwise a `Badge variant="success"` and an accent
 chip are indistinguishable — and at least 25° from every other app's accent.
-`cli/src/docs/theme.test.ts` enforces both against the table below (the
+`cli/src/docs/hues.test.ts` enforces both against the table below (the
 reserved hues are read from `tokens.css`).
+
+**`theme_color`** — the PWA manifest's `theme_color` and `<meta
+name="theme-color">` — is the hue's `accent-600` as hex, the way browsers
+paint it (clipped to sRGB). It is computed rather than picked by eye, and
+`hues.test.ts` recomputes every value in the table from `tokens.css`.
 
 Per-app hues:
 
-| App | Accent name | `--accent-h` |
-|---|---|---|
-| Pizzateig | Orange | `50` |
-| Tankzettel | Frischgrün | `110` |
-| Tennisturnier | Smaragd | `175` |
-| Minispiele | Türkis | `200` |
-| Zeiterfassung | Blau | `255` |
-| Hausverwaltung | Indigo | `280` |
-| ErinnerMich | Violett | `305` |
-| Tonspur | Magenta | `330` |
-| (nächste App) | Himbeere | `355` |
+| App | Accent name | `--accent-h` | `theme_color` |
+|---|---|---|---|
+| Pizzateig | Orange | `50` | `#aa3100` |
+| Tankzettel | Frischgrün | `110` | `#696500` |
+| Tennisturnier | Smaragd | `175` | `#007e5a` |
+| Minispiele | Türkis | `200` | `#007a88` |
+| Zeiterfassung | Blau | `255` | `#005cc2` |
+| Hausverwaltung | Indigo | `280` | `#524bc2` |
+| ErinnerMich | Violett | `305` | `#793bb0` |
+| Tonspur | Magenta | `330` | `#952c8f` |
+| (nächste App) | Himbeere | `355` | `#a71f65` |
 
 HamsterFlight is not in the table: it is not a Tailwind app (a pixi.js canvas
 game with no `theme.css`) — excluded by decision, not by omission.

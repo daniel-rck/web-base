@@ -19,17 +19,17 @@ in web-base. This reference is the day-to-day terse version.
 
 ## Per-app accent hues
 
-| App | Accent | `--accent-h` |
-|---|---|---|
-| Pizzateig | Orange | `50` |
-| Tankzettel | Frischgrün | `110` |
-| Tennisturnier | Smaragd | `175` |
-| Minispiele | Türkis | `200` |
-| Zeiterfassung | Blau | `255` |
-| Hausverwaltung | Indigo | `280` |
-| ErinnerMich | Violett | `305` |
-| Tonspur | Magenta | `330` |
-| (nächste App) | Himbeere | `355` |
+| App | Accent | `--accent-h` | `theme_color` |
+|---|---|---|---|
+| Pizzateig | Orange | `50` | `#aa3100` |
+| Tankzettel | Frischgrün | `110` | `#696500` |
+| Tennisturnier | Smaragd | `175` | `#007e5a` |
+| Minispiele | Türkis | `200` | `#007a88` |
+| Zeiterfassung | Blau | `255` | `#005cc2` |
+| Hausverwaltung | Indigo | `280` | `#524bc2` |
+| ErinnerMich | Violett | `305` | `#793bb0` |
+| Tonspur | Magenta | `330` | `#952c8f` |
+| (nächste App) | Himbeere | `355` | `#a71f65` |
 
 Reserved for the semantic tokens: danger 25, warning 80, success 150, info
 230. Every accent keeps ≥25° from those and from every other app.

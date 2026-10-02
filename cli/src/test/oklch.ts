@@ -67,3 +67,12 @@ export function parseOklch(value: string, hue: number): Oklch {
   const h = m[3]?.startsWith("var") ? hue : Number(m[3]);
   return { l: Number(m[1]), c: Number(m[2]), h, alpha: m[4] === undefined ? 1 : Number(m[4]) };
 }
+
+/** `#rrggbb` of a linear-sRGB colour (already in gamut), as a CSS hex colour. */
+export function toHex(rgb: Rgb): string {
+  const byte = (v: number) =>
+    Math.round(Math.min(1, Math.max(0, toGamma(v))) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${rgb.map(byte).join("")}`;
+}

@@ -158,8 +158,10 @@ check. The CHANGELOG's *Migration* section has the snippets; in short:
    (`registerAppShell()`), `worker/index.ts` (`routeRequest`), the router
    (layout route, `ErrorBoundary`, `*`, `HydrateFallback`), `main.tsx`
    (`<UpdatePrompt />`).
-4. New accent hues (each a one-line change in `theme.css`, plus the PWA
-   `theme_color`):
+4. New accent hues (each a one-line change in `theme.css`). Every app also
+   takes its new `theme_color` (manifest and `<meta name="theme-color">`)
+   from the table in `04-layout-system.md` — Pizzateig and Tankzettel too,
+   because `accent-600` got darker:
 
    | App | Old → new `--accent-h` |
    |---|---|

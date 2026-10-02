@@ -19,8 +19,8 @@ After `init`:
 
 1. Replace `<one-line German description>` (index.html, vite.config.ts).
 2. Take your accent slot from the hue table in `layout-system.md`: set
-   `--accent-h` in `src/lib/ui/theme.css`, and the accent-600 hex as
-   `theme_color` and `<meta name="theme-color">`.
+   `--accent-h` in `src/lib/ui/theme.css`, and the row's `theme_color` in
+   `vite.config.ts` and `<meta name="theme-color">`.
 3. Add `public/icon-192.png`, `icon-512.png`, `icon-maskable.png`.
 4. Set `compatibility_date` in `wrangler.toml`; review `public/_headers`.
 5. `bun install`, then `bun run lint && bun run typecheck && bun run test && bun run build`.
