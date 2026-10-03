@@ -3,8 +3,9 @@
 The shared UI structure across all apps. Structure is identical; only the
 color accent in `theme.css` changes per app.
 
-The full spec is in `web-base/docs/specs/04-layout-system.md`. This
-reference is the day-to-day terse version.
+The full spec is
+[`04-layout-system.md`](https://github.com/daniel-rck/web-base/blob/main/docs/specs/04-layout-system.md)
+in web-base. This reference is the day-to-day terse version.
 
 ## Principles
 
@@ -18,18 +19,30 @@ reference is the day-to-day terse version.
 
 ## Per-app accent hues
 
-| App | `--accent-h` |
-|---|---|
-| Hausverwaltung | 250 (Slate-Blau) |
-| Tennisturnier | 155 (Emerald) |
-| ErinnerMich | 285 (Indigo) |
+| App | Accent | `--accent-h` | `theme_color` |
+|---|---|---|---|
+| Pizzateig | Orange | `50` | `#aa3100` |
+| Tankzettel | Frischgrün | `110` | `#696500` |
+| Tennisturnier | Smaragd | `175` | `#007e5a` |
+| Minispiele | Türkis | `200` | `#007a88` |
+| Zeiterfassung | Blau | `255` | `#005cc2` |
+| Hausverwaltung | Indigo | `280` | `#524bc2` |
+| ErinnerMich | Violett | `305` | `#793bb0` |
+| Tonspur | Magenta | `330` | `#952c8f` |
+| (nächste App) | Himbeere | `355` | `#a71f65` |
+
+Reserved for the semantic tokens: danger 25, warning 80, success 150, info
+230. Every accent keeps ≥25° from those and from every other app.
 
 Change *only* `--accent-h` in `theme.css` to change the app's accent. All
-accent shades derive from it via OKLCH on the same hue.
+tokens live in `tokens.css` (owned by web-base, never edited); all accent
+shades derive from the hue via OKLCH. Text on a semantic tint uses the
+matching `text-success-fg` / `-warning-fg` / `-danger-fg` / `-info-fg`.
 
 ## Components
 
-All exported from `src/lib/ui/index.ts`.
+All exported from `src/lib/ui/index.ts`; all owned (never edit them in an
+app) except `theme.css`, `public/theme-init.js` and `index.ts`.
 
 ### `AppShell`
 
@@ -39,12 +52,17 @@ type AppShellProps = {
   logo?: ReactNode;
   navItems: NavItem[];
   headerActions?: ReactNode;
+  themeToggle?: ReactNode; // replaces the German ThemeToggle (i18n apps)
   children: ReactNode;
 };
 ```
 
-Wraps the whole app. Sticky header (h-14), responsive sidebar/bottom-nav,
-container-constrained main content.
+Renders as the router's root layout route around `<Outlet />` (`src/App.tsx`
+from the router template) — `AppNav` needs the router. A skip link
+(„Zum Inhalt springen") targets `<main id="main">`. Header actions in order:
+theme toggle, `OfflineIndicator`, `InstallButton`, then `headerActions`. The
+window scrolls (no `overflow-y-auto` on `<main>`, which would break sticky
+elements).
 
 ### `AppHeader`
 
@@ -53,10 +71,12 @@ type AppHeaderProps = {
   title: string;
   logo?: ReactNode;
   actions?: ReactNode;
+  maxWidthClass?: string; // default "max-w-4xl"
 };
 ```
 
-Sticky, h-14, backdrop-blur, container max-w-4xl.
+Sticky, backdrop-blur, absorbs the notch inset; `h-14` on the inner container.
+The title is branding (a `<span>`), not a heading.
 
 ### `AppNav`
 
@@ -65,31 +85,24 @@ type NavItem = { to: string; label: string; icon: ReactNode };
 type AppNavProps = { items: NavItem[]; variant: "sidebar" | "bottom" };
 ```
 
-Renders as sidebar on `≥md`, bottom-bar on `<md`. Active state uses
-`bg-accent-100 text-accent-700` (sidebar) or `text-accent-600` (bottom).
+Sidebar on `≥md` (active: `bg-accent-100 text-accent-700`), bottom bar on
+`<md` (active: a pill behind the icon, label `text-accent-600`). `NavLink`
+with `end`.
 
 ### `PageHeader`
 
 ```typescript
-type PageHeaderProps = {
-  title: string;
-  subtitle?: string;
-  actions?: ReactNode;
-};
+type PageHeaderProps = { title: string; subtitle?: string; actions?: ReactNode };
 ```
 
-Section header inside a page. Title is `text-2xl font-semibold`.
+The page's `<h1>`. Every page renders one; `SectionCard` titles are `<h2>`.
 
 ### `InstallButton` + `useInstallPrompt`
 
-`src/lib/ui/InstallButton.tsx` is auto-mounted by `AppShell` in the
-header's right slot. It self-hides when the app is already running
-standalone or when the browser hasn't fired `beforeinstallprompt`
-(non-iOS). On iOS Safari it always shows (until standalone) and opens
-a `<dialog>` with German „Zum Home-Bildschirm" instructions, since
-iOS has no programmatic install prompt.
-
-`useInstallPrompt()` is exported for custom install UIs:
+Auto-mounted by `AppShell`. Hidden when standalone or when the browser hasn't
+fired `beforeinstallprompt` (captured at module load, so a late mount doesn't
+miss it). On iOS/iPadOS Safari it opens a `<dialog>` with German
+„Zum Home-Bildschirm" instructions.
 
 ```typescript
 type UseInstallPromptResult = {
@@ -100,16 +113,19 @@ type UseInstallPromptResult = {
 };
 ```
 
+### `OfflineIndicator` + `useOnlineStatus`
+
+Auto-mounted by `AppShell`: a warning badge „Offline" while the browser is
+offline, announced through an always-mounted `role="status"` region.
+`useOnlineStatus(): boolean` for custom UI.
+
 ### `ThemeToggle` + `useTheme`
 
-`src/lib/ui/ThemeToggle.tsx` is auto-mounted by `AppShell` in the header's
-right slot (before `InstallButton`). It's a ghost button that cycles
-system → light → dark, with `Monitor`/`Sun`/`Moon` icons and German labels.
-The choice persists in `localStorage` (key `theme`) and is written as
-`data-theme` on `<html>` (`"system"` removes it → falls back to
-`prefers-color-scheme`).
-
-`useTheme()` is exported for custom theme UIs:
+Auto-mounted first in the header. Cycles system → light → dark; the label says
+the state and the action („Design: Hell – wechseln zu Dunkel"). One
+module-level store: every `useTheme()` sees the same value; other tabs follow
+via the `storage` event. Persists in `localStorage["theme"]` as `data-theme`
+on `<html>` (`"system"` removes it). Works without `matchMedia` (jsdom).
 
 ```typescript
 type Theme = "light" | "dark" | "system";
@@ -120,39 +136,41 @@ type UseThemeResult = {
 };
 ```
 
-`themeInitScript` is an exported string to inline in `index.html` `<head>`
-before the stylesheet — it sets `data-theme` from `localStorage` before first
-paint to avoid a flash of the wrong theme.
+Prevent the theme flash with `<script src="/theme-init.js"></script>` in
+`index.html` `<head>`, before the stylesheet (an external file keeps a CSP at
+`script-src 'self'`). `themeInitScript` is the same logic as a string for apps
+that must inline it.
 
 ### Primitives
 
-Exported from `src/lib/ui/primitives.tsx`:
+One file each, re-exported from `primitives.tsx`:
 
-- `Card` — `<div class="rounded-lg border border-border bg-surface p-4
-  shadow-sm">`, forwards ref.
-- `EmptyState` — centered icon + title + description + optional CTA.
-- `Spinner` — animated SVG, sizes `sm | md | lg`, accent-colored.
-- `Badge` — pill, variants `neutral | accent | success | warning | danger`.
-- `Button` — variants `primary | secondary | ghost | danger`, sizes
-  `sm | md | lg`, forwards ref.
+- `Button` — `primary | secondary | ghost | danger`, `sm | md | lg`;
+  `buttonClassName({ variant, size })` styles a `<Link>` as a button.
+- `Card` (`interactive` hover lift), `SectionCard` (titled section, `<h2>`).
+- `Chip` — selectable pill, `aria-pressed`.
+- `Badge` — `neutral | accent | success | warning | danger | info`.
+- `Spinner` — `sm | md | lg`, `role="status"` with hidden text.
+- `EmptyState` — icon, title (`titleAs` `h2`/`h3`/`p`), description, action.
 
-All primitives:
-- Accept and merge `className` (simple concat, no `clsx` dep).
-- Forward refs where applicable.
-- Carry descriptive `aria-*` attributes for screen readers.
+All of them take `className` (merged with `cn`, no `clsx`), take `ref` as a
+prop (React 19, no `forwardRef`), show focus as an outline
+(`focus-visible:outline-2 outline-offset-2 outline-accent-500`), and use
+`text-fg-on-accent` on fills.
 
 ## Per-app customization
 
-After `web-base add layout`, the only file you should edit in `src/lib/ui/`
-is `theme.css`, and within that primarily the `--accent-h` value.
-Everything else stays untouched so `web-base update layout` works cleanly.
-
-If an app needs structural changes (e.g. a floating action button), add it
-to **this reference and the template at once**, not as a per-app edit.
+Edit only the seams: `theme.css` (`--accent-h`, app tokens) and, if needed,
+`index.ts`. Never `tokens.css` or a component — `web-base update layout
+--apply` overwrites them. Structural changes go into the template and spec at
+once, not into one app.
 
 ## Anti-patterns
 
 - Hard-coding accent colors like `bg-blue-500`. Use `bg-accent-500` only.
+- `text-white` on a fill — use `text-fg-on-accent`.
+- `focus-visible:outline-none` + ring — forced-colors mode drops the ring.
+- `text-success` on `bg-success/15` — use `text-success-fg`.
 - Adding `clsx`, `tailwind-merge`, `class-variance-authority`. Concat is
   fine until multiple files need composition.
 - shadcn/ui as a dependency.

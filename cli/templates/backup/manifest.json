@@ -1,0 +1,17 @@
+{
+  "name": "backup",
+  "description": "JSON export/import of the whole IndexedDB, persistent storage, „Alle Daten löschen“ (extra, not in core)",
+  "files": [
+    { "from": "codec.ts", "to": "src/lib/backup/codec.ts" },
+    { "from": "format.ts", "to": "src/lib/backup/format.ts" },
+    { "from": "backup.ts", "to": "src/lib/backup/backup.ts" },
+    { "from": "persistence.ts", "to": "src/lib/backup/persistence.ts" },
+    { "from": "BackupCard.tsx", "to": "src/lib/backup/BackupCard.tsx" },
+    { "from": "index.ts", "to": "src/lib/backup/index.ts", "policy": "scaffold" }
+  ],
+  "postInstall": [
+    "Needs the storage and layout templates (src/lib/db/mutations.ts, src/lib/ui/)",
+    "Render <BackupCard getDB={getDB} /> on the settings page",
+    "Sync apps pass beforeWipe (e.g. () => syncClient.disable({ deleteRemote: true })); apps whose schema changed pass migrate for older backups"
+  ]
+}

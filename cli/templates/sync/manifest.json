@@ -1,16 +1,28 @@
 {
   "name": "sync",
-  "description": "R2+KV end-to-end encrypted sync (extra, not in core)",
+  "description": "R2 end-to-end encrypted device sync with QR/link pairing (extra, not in core)",
   "files": [
-    { "from": "client.ts", "to": "src/lib/sync/client.ts" },
-    { "from": "crypto.ts", "to": "src/lib/sync/crypto.ts" },
-    { "from": "types.ts", "to": "src/lib/sync/types.ts" },
-    { "from": "worker-sync.ts", "to": "worker/sync.ts" },
-    { "from": "sync.md", "to": "docs/sync.md" }
+    { "from": "client/types.ts", "to": "src/lib/sync/types.ts" },
+    { "from": "client/errors.ts", "to": "src/lib/sync/errors.ts" },
+    { "from": "client/encoding.ts", "to": "src/lib/sync/encoding.ts" },
+    { "from": "client/crypto.ts", "to": "src/lib/sync/crypto.ts" },
+    { "from": "client/pairing.ts", "to": "src/lib/sync/pairing.ts" },
+    { "from": "client/storage.ts", "to": "src/lib/sync/storage.ts" },
+    { "from": "client/http.ts", "to": "src/lib/sync/http.ts" },
+    { "from": "client/client.ts", "to": "src/lib/sync/client.ts" },
+    { "from": "client/index.ts", "to": "src/lib/sync/index.ts", "policy": "scaffold" },
+    { "from": "worker/sync.ts", "to": "worker/sync.ts" },
+    { "from": "worker/sync-http.ts", "to": "worker/sync-http.ts" },
+    { "from": "sync.md", "to": "docs/sync.md", "policy": "scaffold" }
   ],
   "postInstall": [
-    "Bind R2 bucket as `SYNC` and KV namespace as `SYNC_KV` in wrangler.toml",
-    "Mount sync handlers in worker/index.ts at /api/sync/*",
-    "Initialize sync via `await syncClient.enable()` (generates a device secret)"
+    "wrangler.toml: bind an R2 bucket as `SYNC` ([[r2_buckets]] binding = \"SYNC\", bucket_name = \"<app-name>-sync\")",
+    "Optional rate limit: [[ratelimits]] name = \"SYNC_RATE_LIMIT\", namespace_id = \"1001\" with [ratelimits.simple] limit = 60, period = 60 (period must be 10 or 60)",
+    "worker/index.ts: add `SYNC: R2Bucket` (and `SYNC_RATE_LIMIT?: RateLimit`) to Env and route /api/sync/* to `handleSync(request, env)` from ./sync.ts",
+    "tsconfig.worker.json: set \"allowImportingTsExtensions\": true (worker/sync.ts imports ./sync-http.ts)",
+    "src/main.tsx: before the router mounts, call `consumePairingFragment()` and pass a returned code to `syncClient.importPairingCode(code)` (handle `already_enabled` with a confirmation, see docs/sync.md)",
+    "Use `syncClient.enable()` on the first device, `syncClient.sync(local, merge)` to sync and `syncClient.pairingUrl()` / `pairingCode()` to pair (merge recipe in docs/sync.md)",
+    "Render the pairing QR code yourself, e.g. `bun add uqr` and `renderSVG(syncClient.pairingUrl())` (example in docs/sync.md)",
+    "Apps with their own sync implementation (Hausverwaltung) must not run `web-base add sync` or `web-base check sync`"
   ]
 }

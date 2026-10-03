@@ -1,7 +1,7 @@
 {
   "name": "@daniel-rck/web-base",
   "private": false,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "description": "Shared tooling, conventions, and templates for personal web apps",
   "keywords": [
@@ -32,10 +32,9 @@
     "skill"
   ],
   "scripts": {
-    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify && bun run build:shebang && chmod +x cli/dist/index.js",
-    "build:shebang": "sed -i '1i#!/usr/bin/env node' cli/dist/index.js",
+    "build": "bun build cli/src/index.ts --outdir cli/dist --target node --format esm --minify --define 'process.env.NODE_ENV=\"production\"' --banner '#!/usr/bin/env node' && chmod +x cli/dist/index.js",
     "dev": "bun run cli/src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.templates.json",
     "lint": "oxlint && oxfmt --check",
     "format": "oxfmt",
     "test": "vitest run",

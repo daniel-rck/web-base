@@ -1,0 +1,18 @@
+# Keeps the SHA-pinned actions in .github/workflows/ current: Dependabot bumps
+# the commit SHA and its `# vX.Y.Z` comment together. One grouped PR a week,
+# and only for releases at least seven days old. See docs/specs/06-workflows.md.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: chore
+      include: scope

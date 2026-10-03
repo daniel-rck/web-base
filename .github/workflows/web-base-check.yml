@@ -2,8 +2,10 @@ name: web-base check
 
 # Reusable workflow: app repos call this to fail their CI when an owned
 # web-base building block has drifted from the base. Scaffold seams (theme
-# accent, db schema, routes, handlers) are ignored — only owned files are
-# guarded. See docs/specs/06-workflows.md for the caller pattern.
+# accent, db schema, routes, handlers) are ignored; only owned files are
+# guarded. The CLI runs at the app's stamped web-base version by default, so a
+# change on web-base main never turns an app red by itself. Inputs and the
+# caller pattern: docs/specs/06-workflows.md.
 
 on:
   workflow_call:
@@ -13,24 +15,126 @@ on:
         type: string
         default: core
       ref:
-        description: "web-base ref/tag to run the check with (pin to your app's webBase.version)"
+        description: >-
+          web-base tag or branch whose CLI runs the check. Empty (the default)
+          resolves to v<webBase.version> from the app's package.json, and
+          falls back to main with a warning when that tag does not exist.
         type: string
-        default: main
+        default: ""
       strict:
-        description: "Also fail when an owned base file is missing, not just when it differs"
+        description: >-
+          Fail not only on drift but also when a building block was not
+          adopted, was adopted only partially, or a superseded setup is left
+          over. Only for apps on the full template.
         type: boolean
         default: false
+      pins:
+        description: >-
+          Also run `web-base pins` (the app's dependency versions against the
+          base's pin table). Needs a web-base ref of v0.6.0 or later.
+        type: boolean
+        default: false
+      bun-version:
+        description: >-
+          Bun version to install. Empty (the default) lets setup-bun read the
+          app's package.json `packageManager` ("bun@x.y.z").
+        type: string
+        default: ""
+
+permissions: {}
 
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+    # Job-level and prefixed: a workflow-level group in a called workflow is
+    # evaluated in the caller's context and can collide with the caller's own.
+    concurrency:
+      group: web-base-check-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          bun-version: "1.3.11"
-      - name: Check owned base files
+          persist-credentials: false
+
+      - name: Check Bun version source
+        if: inputs.bun-version == ''
         run: |
-          bunx "github:daniel-rck/web-base#${{ inputs.ref }}" check "${{ inputs.template }}" \
-            ${{ inputs.strict && '--strict' || '' }}
+          if ! jq -e '(.packageManager // "" | startswith("bun@")) or ((.engines.bun // "") != "")' package.json >/dev/null; then
+            echo "::warning file=package.json::No \"packageManager\": \"bun@x.y.z\" in package.json and no bun-version input, so setup-bun installs the latest Bun. Pin it in package.json."
+          fi
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ inputs.bun-version }}
+
+      - name: Resolve the web-base ref
+        id: ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_TEMPLATE: ${{ inputs.template }}
+          PINS: ${{ inputs.pins }}
+        run: |
+          set -euo pipefail
+          template_re='^[a-z][a-z0-9-]*$'
+          ref_re='^[A-Za-z0-9][A-Za-z0-9._/-]*$'
+          stamp_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+
+          if ! [[ "$INPUT_TEMPLATE" =~ $template_re ]]; then
+            echo "::error::Invalid template input \"$INPUT_TEMPLATE\" (expected $template_re)."
+            exit 1
+          fi
+
+          ref="$INPUT_REF"
+          if [ -z "$ref" ]; then
+            stamp=$(jq -r '.webBase.version // ""' package.json)
+            if ! [[ "$stamp" =~ $stamp_re ]]; then
+              echo "::warning file=package.json::No webBase.version stamp of the form X.Y.Z, so the check runs web-base main. Run web-base update --apply, or pass the ref input."
+              ref=main
+            elif ! git ls-remote --exit-code --tags https://github.com/daniel-rck/web-base "refs/tags/v$stamp" >/dev/null; then
+              echo "::warning file=package.json::web-base has no tag v$stamp for this app's webBase.version, so the check runs web-base main."
+              ref=main
+            else
+              ref="v$stamp"
+            fi
+          fi
+
+          if ! [[ "$ref" =~ $ref_re ]]; then
+            echo "::error::Invalid ref \"$ref\" (expected $ref_re)."
+            exit 1
+          fi
+
+          # `pins` is new in v0.6.0; an older CLI fails with "Unknown command".
+          if [ "$PINS" = "true" ] && [[ "$ref" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+            if [ "$(printf '%s\n' "$version" 0.6.0 | sort -V | head -n1)" != "0.6.0" ]; then
+              echo "::error::pins needs web-base v0.6.0 or later; the check runs $ref."
+              exit 1
+            fi
+          fi
+
+          echo "Running the web-base CLI at $ref."
+          echo "ref=$ref" >>"$GITHUB_OUTPUT"
+
+      - name: Check owned base files
+        env:
+          WEB_BASE_REF: ${{ steps.ref.outputs.ref }}
+          TEMPLATE: ${{ inputs.template }}
+          STRICT: ${{ inputs.strict }}
+        run: |
+          set -euo pipefail
+          # --diff prints what drifted. CLIs before v0.6.0 ignore unknown flags,
+          # so it is always passed; it must not precede a positional argument.
+          args=(check "$TEMPLATE" --diff)
+          if [ "$STRICT" = "true" ]; then
+            args+=(--strict)
+          fi
+          bunx "github:daniel-rck/web-base#$WEB_BASE_REF" "${args[@]}"
+
+      - name: Check dependency pins
+        if: ${{ !cancelled() && inputs.pins && steps.ref.outcome == 'success' }}
+        env:
+          WEB_BASE_REF: ${{ steps.ref.outputs.ref }}
+        run: bunx "github:daniel-rck/web-base#$WEB_BASE_REF" pins

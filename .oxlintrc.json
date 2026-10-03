@@ -6,7 +6,7 @@
     "suspicious": "warn"
   },
   "env": { "builtin": true, "node": true, "es2024": true },
-  "ignorePatterns": ["cli/dist/**", "cli/templates/**"],
+  "ignorePatterns": ["cli/dist/**", "cli/templates/**", "cli/template-tests/**"],
   "rules": {
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "warn",

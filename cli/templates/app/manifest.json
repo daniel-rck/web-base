@@ -1,0 +1,35 @@
+{
+  "name": "app",
+  "description": "A whole new app: core plus the entry files and Vite/TypeScript config (what `init` applies)",
+  "extends": ["core"],
+  "files": [
+    { "from": "index.html", "to": "index.html", "policy": "scaffold" },
+    { "from": "vite.config.ts", "to": "vite.config.ts", "policy": "scaffold" },
+    { "from": "tsconfig.json", "to": "tsconfig.json", "policy": "scaffold" },
+    { "from": "tsconfig.app.json", "to": "tsconfig.app.json", "policy": "scaffold" },
+    { "from": "tsconfig.node.json", "to": "tsconfig.node.json", "policy": "scaffold" },
+    { "from": "main.tsx", "to": "src/main.tsx", "policy": "scaffold" },
+    { "from": "index.css", "to": "src/index.css", "policy": "scaffold" },
+    { "from": "gitignore", "to": ".gitignore", "policy": "scaffold" }
+  ],
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "typescript": "~7.0.2",
+    "vite": "^8.2.2",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@types/node": "^26.4.1"
+  },
+  "postInstall": [
+    "Replace the remaining placeholders: <one-line German description> in index.html and vite.config.ts",
+    "Set the accent: --accent-h in src/lib/ui/theme.css (your slot from the 04-layout-system.md hue table) and the matching accent-600 hex as theme_color / <meta name=\"theme-color\">",
+    "Add the PWA icons to public/: icon-192.png, icon-512.png, icon-maskable.png",
+    "Set compatibility_date in wrangler.toml to today and review public/_headers"
+  ]
+}

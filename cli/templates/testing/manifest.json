@@ -1,0 +1,25 @@
+{
+  "name": "testing",
+  "description": "Vitest + jsdom + Testing Library + fake-indexeddb, run through the app's Vite config",
+  "files": [
+    { "from": "vitest.config.ts", "to": "vitest.config.ts", "policy": "scaffold" },
+    { "from": "setup.ts", "to": "src/test/setup.ts" },
+    { "from": "environment-test.tsx", "to": "src/test/environment.test.tsx" }
+  ],
+  "devDependencies": {
+    "vitest": "^4.1.11",
+    "jsdom": "^30.0.1",
+    "fake-indexeddb": "^6.2.5",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/user-event": "^14.6.7"
+  },
+  "postInstall": [
+    "vitest.config.ts merges your vite.config.ts — if vite.config.ts exports a function, call it with the mode and merge the result",
+    "Include vitest.config.ts in tsconfig.node.json (next to vite.config.ts)",
+    "If the app already had a vitest config, keep it and add `./src/test/setup.ts` to its `setupFiles` instead",
+    "Apps created before the testing template: add the scripts by hand — `\"test\": \"vitest run\"`, `\"test:watch\": \"vitest\"`",
+    "Never edit src/test/setup.ts or src/test/environment.test.tsx — `update` overwrites them; put app-specific setup in its own file and list it in `setupFiles`"
+  ]
+}

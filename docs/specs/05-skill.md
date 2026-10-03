@@ -1,8 +1,8 @@
 # 05 — Claude Code Skill
 
 The skill at `skill/` documents the conventions for these web apps. It's a
-Claude Code skill (Markdown frontmatter + body), referenced by the apps via
-symlink or by a global Claude config.
+Claude Code skill (Markdown frontmatter + body), installed per user or per
+project (see *Distribution*).
 
 ## File layout
 
@@ -10,30 +10,38 @@ symlink or by a global Claude config.
 skill/
 ├── SKILL.md
 └── references/
-    ├── tech-stack.md
-    ├── layout-system.md
-    ├── storage.md
-    ├── pwa.md
-    ├── worker.md
-    ├── sync.md
+    ├── app.md
+    ├── backup.md
     ├── ci.md
-    └── hygiene.md
+    ├── hygiene.md
+    ├── layout-system.md
+    ├── oxc.md
+    ├── pwa.md
+    ├── router.md
+    ├── storage.md
+    ├── sync.md
+    ├── tech-stack.md
+    ├── testing.md
+    └── worker.md
 ```
 
 `SKILL.md` is loaded into Claude's context when the skill triggers. References
-are loaded on demand when SKILL.md instructs Claude to read them.
+are loaded on demand when SKILL.md instructs Claude to read them. Every
+template under `cli/templates/` (except the meta-template `core`) has a
+reference named after it (`layout` → `layout-system.md`); `tech-stack.md` and
+`ci.md` cover what no single template does. `cli/src/docs/skill.test.ts`
+enforces this in both directions, and that the tree above lists exactly the
+files on disk.
 
 ## SKILL.md frontmatter
 
 The `description` field is the trigger. It must be specific enough to fire on
 work in these web app repos but broad enough to catch related tasks. Pushy
-phrasing per the skill-creator guidelines.
+phrasing per the skill-creator guidelines. The frontmatter is exactly:
 
 ```yaml
----
 name: daniel-rck-web-app
-description: Conventions and patterns for the personal web apps under daniel-rck (Hausverwaltung, Tennisturnier, ErinnerMich, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
----
+description: Conventions and patterns for the personal web apps under daniel-rck (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", "Minispiele", "Tankzettel", "Zeiterfassung", "Pizzateig", "Tonspur", "HamsterFlight", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ```
 
 ## SKILL.md body
@@ -46,19 +54,24 @@ One-paragraph statement of purpose.
 
 ### `## The apps in scope`
 
-A table of the nine apps with their URL and one-line description.
+A table of the nine apps with their URL and one-line description, and a note
+that HamsterFlight shares only the tooling baseline.
 
 ### `## The baseline stack`
 
 A bulleted summary of the stack. Names only — no version pins (those live in
-`references/tech-stack.md` so they can be updated without touching the body).
+`references/tech-stack.md`, mirroring `cli/templates/pins.json`).
 
 ### `## The CLI`
 
-Brief description of `@daniel-rck/web-base` plus the most common commands as a
-code block. Explicitly states: "When working in any of these web app repos,
-prefer running the CLI over hand-copying snippets. The CLI is the source of
-truth; this skill documents the why and when."
+The most common commands, pinned to a release (`#vX.Y.Z`), and the rules a
+user of the CLI needs: owned vs scaffold, `update` changes files only (new
+dependencies arrive with `add`), `--force` / `--force-scaffold` / `--dry-run`,
+`webBase.unmanaged`, `check --strict` (never in HamsterFlight), the exit
+codes, and that `check` — not the stamp — is the authority on conformance.
+States explicitly: "When working in any of these web app repos, prefer running
+the CLI over hand-copying snippets. The CLI is the source of truth; this skill
+documents the why and when."
 
 ### `## Architecture invariants`
 
@@ -73,120 +86,59 @@ Numbered list of hard rules:
 
 ### `## When to consult which reference`
 
-A table mapping topics to reference files:
-
-| Working on… | Reference |
-|---|---|
-| Dependency versions, package.json template, oxlint/oxfmt config | `tech-stack.md` |
-| AppShell, design tokens, per-app accent | `layout-system.md` |
-| idb patterns, useLiveQuery, migration recipes | `storage.md` |
-| injectManifest, sw.ts skeleton, Workbox precache | `pwa.md` |
-| /api/* routing, R2/KV bindings, wrangler local dev | `worker.md` |
-| Hausverwaltung sync architecture | `sync.md` |
-| Reusable workflow caller pattern | `ci.md` |
-| LICENSE, CONTRIBUTING, SECURITY, package.json metadata | `hygiene.md` |
-
-The body says explicitly: "Don't read all references upfront. Pick what's
-relevant to the current task."
+A table mapping topics to the reference files above. The body says
+explicitly: "Don't read all references upfront — pick what's relevant to the
+current task."
 
 ### `## Anti-patterns`
 
-A list of rejected approaches with one-line rationale each:
-
-- ESLint + Prettier, Biome → oxlint + oxfmt (ESLint-compatible rules, Prettier-compatible output)
-- Dexie → idb (lighter, less magic)
-- localStorage for app data → idb (only settings in localStorage)
-- generateSW → injectManifest (custom message handlers needed)
-- Skipping react-router → always include it (cheap to add, painful to retrofit)
-- Per-repo CI duplication → reusable workflow from web-base
-- Starter template repo for existing apps → the CLI handles updates too
+Rejected approaches with a one-line rationale each (mirroring
+`07-conventions.md`).
 
 ### `## When this skill is wrong`
 
-Closing section noting that explicit deviations are fine but must be documented
-in the app's `docs/specs/`.
+Explicit deviations are fine but must be documented in the app's
+`docs/specs/`.
 
 ## Reference files: content guidance
 
 Each reference is a complete description of its topic, not a tutorial. Code
-examples are normative. References stay aligned with the matching CLI template
-under `cli/templates/<name>/`.
+examples are normative. References stay aligned with the matching CLI template.
+An installed skill cannot reach web-base's `docs/specs/`, so references link
+to specs by their GitHub URL, never by a bare path.
 
-### `references/tech-stack.md`
-
-- Exact version pins for production deps and devDeps — identical to
-  `07-conventions.md`, guarded by `cli/src/docs.test.ts`
-- The full `package.json` template (with `<placeholders>`)
-- The oxlint/oxfmt config content (matches `cli/templates/oxc/`)
-- The `tsconfig.app.json` content (strict, `noUncheckedIndexedAccess`)
-- The `vite.config.ts` skeleton with VitePWA injectManifest config
-
-### `references/layout-system.md`
-
-Mirrors `docs/specs/04-layout-system.md`. The skill reference is more terse —
-it shows the imports and the prop interface for each component, plus the
-theme.css. The full spec is for implementers; the skill reference is for
-people *using* the layout day-to-day.
-
-### `references/storage.md`
-
-- The idb opening pattern (`openDB<AppSchema>`, schema interface)
-- The `useLiveQuery` hook signature and usage example
-- Migration recipes:
-  - From Dexie: how to map Dexie tables to idb stores, how `dexie-react-hooks` maps to `useLiveQuery`
-  - From localStorage: when to move data to idb, when to leave it in localStorage (settings only)
-- Indexing patterns: when to add an `index`, how to query by it
-
-### `references/pwa.md`
-
-- The `vite.config.ts` injectManifest block
-- The sw.ts skeleton (precache, activate, claim clients, optional message handler stub)
-- How to add notification handlers (for ErinnerMich)
-- How to add background sync (for Hausverwaltung if it ever needs it)
-- The `tsconfig.sw.json` separate config (lib: WebWorker)
-
-### `references/worker.md`
-
-- The `worker/index.ts` routing pattern
-- How the `ASSETS` binding serves static files in Workers Assets
-- R2 and KV binding conventions (`SYNC` for R2, `SYNC_KV` for KV, etc.)
-- Local dev with `wrangler dev`
-- Deployment via Workers Builds (Git integration in the Cloudflare dashboard)
-
-### `references/sync.md`
-
-The full Hausverwaltung-style sync architecture:
-- R2 object layout
-- AES-GCM key derivation (HKDF-SHA256 from device secret)
-- Pairing protocol (6-digit OTP, KV slot, AES-GCM wrap of secret)
-- Conflict resolution (R2 ETag with If-Match / If-None-Match, automatic merge)
-- Rate limiting (KV token buckets, the specific limits documented in `03-templates.md`)
-- DSGVO compliance: server never sees plaintext, no user account, no email
-
-### `references/ci.md`
-
-- The reusable workflow's inputs (`bun-version`, `run-tests`, `run-build`)
-- The caller pattern (one-screen `.github/workflows/ci.yml`)
-- How to extend with additional jobs (e.g. deploy)
-- How to pin to a tag vs `@main`
-
-### `references/hygiene.md`
-
-- The LICENSE text (MIT, year placeholder)
-- The CONTRIBUTING.md template with branch strategy + PR checklist
-- The SECURITY.md template (GitHub Security Advisories path)
-- The package.json metadata fields (keywords, author, repository, bugs, homepage, packageManager)
+- `tech-stack.md` — the pins (deep-equal to `pins.json`, guarded), the
+  `package.json` template, `tsconfig.app.json`, the vite skeleton.
+- `app.md` — what `init` writes and the steps after it.
+- `oxc.md` — the shipped oxlint/oxfmt configs and the migration from Biome.
+- `hygiene.md` — LICENSE, CONTRIBUTING, SECURITY, `.editorconfig`.
+- `layout-system.md` — the terse version of `04-layout-system.md`: components
+  and props, tokens, the hue table (guarded against 04), a11y rules.
+- `storage.md` — the opener and migration ladder, `useLiveQuery`, writes and
+  `notifyMutation`, recipes from Dexie and localStorage.
+- `testing.md` — the Vitest setup, fake-indexeddb, the `matchMedia` mock.
+- `pwa.md` — the VitePWA block, the service worker split, the update prompt,
+  push and background-sync handlers.
+- `router.md` — the layout route, the error pages, adding a route.
+- `worker.md` — `routeRequest`, SPA mode, `public/_headers`, R2 and
+  rate-limit bindings (`SYNC`, `SYNC_RATE_LIMIT`), local dev.
+- `backup.md` — `BackupCard`, the file format, restore semantics.
+- `sync.md` — protocol v2, pairing, the client API, the threat model.
+- `ci.md` — the reusable workflows' inputs, caller pattern, release pinning.
 
 ## Distribution
 
-The skill is installed manually. Recommended approaches:
+The skill is installed manually:
 
-1. **Symlink** from `~/.config/claude/skills/daniel-rck-web-app` to
-   `<cloned-web-base>/skill/`. Updates are immediate.
-2. **Copy** the `skill/` directory into the Claude config dir. Updates require
-   re-copying — fine for stable phases.
-3. **Future: bundled with the CLI.** A `web-base install-skill` command could
-   write the skill to the appropriate path. Defer until the skill is stable.
+1. **Symlink** `~/.claude/skills/daniel-rck-web-app` (personal) or an app's
+   `.claude/skills/daniel-rck-web-app` (project) to `<cloned-web-base>/skill/`.
+   Updates are immediate.
+2. **Copy** the `skill/` directory there instead. Updates require re-copying —
+   fine for stable phases.
+
+**Decision: no `install-skill` command (yet).** A CLI command that writes the
+skill into a Claude config directory would have to track Claude Code's config
+layout; a symlink already gives instant updates.
 
 ## Maintenance
 
@@ -195,7 +147,3 @@ When a convention changes:
 2. Update the matching skill reference in the same PR
 3. If the change affects the body (a new section, an anti-pattern), update
    SKILL.md too
-
-The CI for this repo runs a lint check that fails if `cli/templates/<name>/`
-exists but `skill/references/<name>.md` doesn't (or vice versa). This is one
-job in `tools-ci.yml` — see `06-workflows.md`.

@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["cli/templates/sync/client/**/*.ts", "cli/test/sync/**/*.ts"],
+  "exclude": ["cli/test/sync/worker*.ts", "cli/test/sync/e2e.test.ts"]
+}

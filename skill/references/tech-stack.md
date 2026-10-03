@@ -1,7 +1,8 @@
 # Tech stack reference
 
 Version pins, the per-app `package.json` template, and the per-app oxlint/oxfmt and
-TypeScript configs.
+TypeScript configs. The pins mirror `cli/templates/pins.json` in web-base;
+`web-base pins` compares an app against them (`--apply` rewrites mismatches).
 
 ## Production dependencies
 
@@ -24,6 +25,9 @@ TypeScript configs.
   "@vitejs/plugin-react": "^6.1.1",
   "vite-plugin-pwa": "^1.3.0",
   "workbox-precaching": "^7.4.1",
+  "workbox-routing": "^7.4.1",
+  "workbox-strategies": "^7.4.1",
+  "workbox-expiration": "^7.4.1",
   "workbox-window": "^7.4.1",
   "tailwindcss": "^4.3.3",
   "@tailwindcss/vite": "^4.3.3",
@@ -32,7 +36,9 @@ TypeScript configs.
   "vitest": "^4.1.11",
   "@vitest/ui": "^4.1.11",
   "jsdom": "^30.0.1",
+  "fake-indexeddb": "^6.2.5",
   "@testing-library/react": "^16.3.3",
+  "@testing-library/dom": "^10.4.2",
   "@testing-library/user-event": "^14.6.7",
   "@testing-library/jest-dom": "^7.0.1",
   "wrangler": "^4.128.0",
@@ -49,7 +55,8 @@ TypeScript configs.
 { "packageManager": "bun@1.3.11" }
 ```
 
-Required in every app's `package.json`. Bun's corepack integration uses it.
+Required in every app's `package.json`. `oven-sh/setup-bun` reads it in CI;
+it also documents which Bun the lockfile was written with.
 
 ## package.json template (per app)
 
@@ -87,6 +94,12 @@ Required in every app's `package.json`. Bun's corepack integration uses it.
 Shipped by the `oxc` template: `oxlint.base.json` + `.oxfmtrc.json` (owned) and
 `.oxlintrc.json` + `.prettierignore` (per-app seams). The full content is in
 `oxc.md`.
+
+## vitest.config.ts (per app)
+
+Shipped by the `testing` template: it merges `vite.config.ts` and loads the
+owned `src/test/setup.ts`. Include it in `tsconfig.node.json` next to
+`vite.config.ts`. The full content is in `testing.md`.
 
 ## tsconfig.app.json (per app)
 

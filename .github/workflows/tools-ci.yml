@@ -5,19 +5,30 @@ on:
     branches: [main]
   pull_request:
 
+permissions: {}
+
+concurrency:
+  group: tools-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          bun-version: "1.3.11"
+          persist-credentials: false
+      # No bun-version: setup-bun reads package.json `packageManager`.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run typecheck
+      # Includes the e2e suite (cli/src/e2e), which rebuilds cli/dist and runs
+      # the bundle against scratch apps: add, check, update, --force, exit codes.
       - run: bun run test
       - run: bun run build
 
@@ -27,147 +38,123 @@ jobs:
           # the repo tarball as-is — Bun runs no prepare script for Git deps,
           # so the bin entry must already exist in the tree. Fail if the
           # committed bundle drifted from cli/src/ (fix: bun run build, commit).
-          git diff --exit-code -- cli/dist
-
-      - name: Verify CLI runs
-        run: |
-          chmod +x cli/dist/index.js
-          node cli/dist/index.js --help
-          node cli/dist/index.js add --help
-
-      - name: Smoke test - add hygiene
-        run: |
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add hygiene
-          test -f LICENSE
-          test -f CONTRIBUTING.md
-          test -f SECURITY.md
-          test -f .editorconfig
-
-      - name: Smoke test - scaffold core and lint
-        run: |
-          # Scaffold a full app from the templates and lint the result with the
-          # shipped oxlint/oxfmt configs. The repo's own `bun run lint` skips
-          # cli/templates, so this is the only guard that a freshly scaffolded app
-          # is lint-clean (a11y and hooks rules pass, imports sorted, formatted).
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore   # oxfmt reads .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          bunx oxlint@1.85.0
-          bunx oxfmt@0.70.0 --check
-
-      - name: Smoke test - check passes on a fresh scaffold
-        run: |
-          # `check` is the drift guard nine app CIs call. If it can't come back
-          # clean against templates it just installed itself, it is worthless.
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          node ${{ github.workspace }}/cli/dist/index.js check core
-          node ${{ github.workspace }}/cli/dist/index.js check core --strict
-
-      - name: Regression - webBase.unmanaged exempts one owned file
-        run: |
-          # An app can take a single owned file off the base (Hausverwaltung's
-          # useLiveQuery has 85 call sites predating the template signature).
-          # Without the opt-out its CI stays red forever, which trains everyone
-          # to ignore the guard. The exemption must be narrow: the listed file
-          # is skipped, every other drift still fails.
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          echo '// local fork' >> src/lib/db/useLiveQuery.ts
-          if node ${{ github.workspace }}/cli/dist/index.js check core; then
-            echo "FAIL: drift on an owned file was not reported"; exit 1
-          fi
-          node -e '
-            const fs = require("node:fs");
-            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-            pkg.webBase = { ...pkg.webBase, unmanaged: ["src/lib/db/useLiveQuery.ts"] };
-            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
-          '
-          node ${{ github.workspace }}/cli/dist/index.js check core
-          # A second, unlisted file must still fail the guard.
-          echo '// local fork' >> src/lib/ui/primitives.tsx
-          if node ${{ github.workspace }}/cli/dist/index.js check core; then
-            echo "FAIL: the exemption leaked to an unlisted file"; exit 1
+          # `git status` rather than `git diff`: an extra emitted chunk is untracked.
+          out=$(git status --porcelain -- cli/dist)
+          if [ -n "$out" ]; then
+            echo "$out"
+            echo "::error::cli/dist is stale — run bun run build and commit it"
+            exit 1
           fi
 
-      - name: Regression - check reports a leftover Biome setup
+  bunx-install:
+    # The distribution path itself: what an app's CI runs. Catches a bundle
+    # that builds but can't be installed from Git (the 0.2.1 failure).
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: bunx github:<repo>#<sha> --version
+        env:
+          REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          # After the switch to oxc, a biome.json left behind means a migration
-          # was never finished. Plain `check` warns (the base files still match);
-          # `--strict` must fail until the leftover is gone.
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          echo '{}' > biome.json
-          node ${{ github.workspace }}/cli/dist/index.js check core
-          if node ${{ github.workspace }}/cli/dist/index.js check core --strict; then
-            echo "FAIL: --strict passed with an obsolete biome.json"; exit 1
-          fi
-          rm biome.json
-          node ${{ github.workspace }}/cli/dist/index.js check core --strict
+          set -euo pipefail
+          expected=$(jq -r .version package.json)
+          cd "$RUNNER_TEMP"
+          actual=$(bunx "github:$REPO#$SHA" --version)
+          echo "bunx github:$REPO#$SHA --version → $actual"
+          test "$actual" = "$expected"
 
-      - name: Regression - update core is not a no-op
-        run: |
-          # `update` used to load a single manifest without expanding `extends`,
-          # so `update core --apply` — the command notify-apps.yml sends to every
-          # app — silently did nothing.
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          rm src/lib/ui/primitives.tsx
-          node ${{ github.workspace }}/cli/dist/index.js update core --apply
-          test -f src/lib/ui/primitives.tsx
+  scaffold:
+    # A new app from `init`, plus the extras, must install, lint, typecheck,
+    # test and build — the only place the React templates are typechecked and
+    # their tests (cli/template-tests) run. Resolves the newest caret versions,
+    # so an upstream release can break it; that is the point.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Where the app goes
+        run: echo "APP=$RUNNER_TEMP/scratch-app" >>"$GITHUB_ENV"
 
-      - name: Regression - --force must not clobber a scaffold seam
-        run: |
-          # wrangler.toml is a scaffold seam holding live Cloudflare R2/KV
-          # binding IDs. A --force that replaced it with the template's
-          # placeholders would take production sync down on the next deploy.
-          SCRATCH=$(mktemp -d)
-          trap 'rm -rf "$SCRATCH"' EXIT
-          cd "$SCRATCH"
-          git init -q && touch .gitignore
-          echo '{"name":"scratch","version":"0.0.0"}' > package.json
-          node ${{ github.workspace }}/cli/dist/index.js add core
-          echo 'id = "PRODUCTION-KV-ID"' >> wrangler.toml
-          node ${{ github.workspace }}/cli/dist/index.js add core --force
-          grep -q 'PRODUCTION-KV-ID' wrangler.toml
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
-      - name: Verify skill/template alignment
+      - name: Scaffold with init, add the extras and the template tests
         run: |
-          # Every cli/templates/<name>/ (except 'core') should have a matching
-          # skill/references/<name>.md (with -system suffix allowed for layout).
-          set -e
-          fail=0
-          for dir in cli/templates/*/; do
-            name=$(basename "$dir")
-            [ "$name" = "core" ] && continue
-            ref="skill/references/${name}.md"
-            alt="skill/references/${name}-system.md"
-            if [ ! -f "$ref" ] && [ ! -f "$alt" ]; then
-              echo "MISSING: $ref or $alt for template $name"
-              fail=1
-            fi
-          done
-          exit $fail
+          set -euo pipefail
+          cli="$GITHUB_WORKSPACE/cli/dist/index.js"
+          node "$cli" init --cwd "$APP" --name scratch-app
+          node "$cli" add backup --cwd "$APP"
+          node "$cli" add sync --cwd "$APP"
+          mkdir -p "$APP/src/__base_tests__"
+          cp -R cli/template-tests/. "$APP/src/__base_tests__/"
+          rm "$APP/src/__base_tests__/README.md"
+
+      - name: Install
+        working-directory: ${{ env.APP }}
+        run: bun install
+
+      - name: Lint (the shipped oxlint + oxfmt configs)
+        working-directory: ${{ env.APP }}
+        run: bun run lint
+
+      - name: Typecheck (app, node, service worker, worker)
+        working-directory: ${{ env.APP }}
+        run: bun run typecheck
+
+      - name: Test (template tests under the testing template's setup)
+        working-directory: ${{ env.APP }}
+        run: bun run test
+
+      - name: Build
+        working-directory: ${{ env.APP }}
+        run: bun run build
+
+      - name: The base's own guards are clean on the scaffold
+        working-directory: ${{ env.APP }}
+        run: |
+          set -euo pipefail
+          cli="$GITHUB_WORKSPACE/cli/dist/index.js"
+          node "$cli" check app --strict
+          node "$cli" check backup --strict
+          node "$cli" check sync --strict
+          node "$cli" pins
+
+      - name: The worker bundles (wrangler dry run)
+        working-directory: ${{ env.APP }}
+        run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-bundle"
+
+  workflow-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      ZIZMOR_VERSION: 1.30.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: actionlint (with shellcheck on every run script)
+        run: |
+          set -euo pipefail
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL "$url" -o "$RUNNER_TEMP/actionlint.tgz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+      - name: zizmor (offline audits)
+        run: pipx run "zizmor==${ZIZMOR_VERSION}" --offline --format github .github/workflows

@@ -27,7 +27,8 @@ through `@daniel-rck/web-base`.
 **HamsterFlight is the deliberate exception**: a pixi.js canvas game with no
 React, no Tailwind, no router, no `src/lib/ui` and no PWA. It shares the
 tooling baseline (Bun, oxlint + oxfmt, CI, hygiene) and nothing else. Don't "align" its
-rendering code — see `docs/specs/08-app-migrations.md`.
+rendering code, and never run `web-base check --strict` there — see
+[`08-app-migrations.md`](https://github.com/daniel-rck/web-base/blob/main/docs/specs/08-app-migrations.md).
 
 Future apps follow the same shape unless the deviation is documented in their
 own `docs/specs/`.
@@ -42,7 +43,8 @@ own `docs/specs/`.
 - PWA via `vite-plugin-pwa` with `injectManifest`
 - `react-router-dom` 7 with typed route constants
 - oxlint + oxfmt (replace ESLint + Prettier and Biome)
-- Optional: R2 + KV E2E-encrypted sync (see `sync` template)
+- Optional extras: R2 end-to-end-encrypted sync with QR/link pairing (`sync`),
+  JSON backup / restore / wipe (`backup`)
 
 Exact version pins live in `references/tech-stack.md`.
 
@@ -51,24 +53,44 @@ Exact version pins live in `references/tech-stack.md`.
 `@daniel-rck/web-base` is a shadcn-style CLI: it copies templates *into* the
 app repo. When working in any of these web app repos, prefer running the CLI
 over hand-copying snippets. The CLI is the source of truth; this skill
-documents the why and when.
+documents the why and when. Pin it to a release (`#vX.Y.Z`) so the templates
+match the app's stamp.
 
 ```bash
-bunx github:daniel-rck/web-base init           # scaffold a new app
-bunx github:daniel-rck/web-base add core       # all shared pieces
-bunx github:daniel-rck/web-base add sync       # extras only some apps have
-bunx github:daniel-rck/web-base update layout  # diff local against template
-bunx github:daniel-rck/web-base update core --apply  # pull every owned block
-bunx github:daniel-rck/web-base check          # fail on drift in owned files
+bunx github:daniel-rck/web-base#vX.Y.Z init --name <app>   # a new app that builds (the `app` template)
+bunx github:daniel-rck/web-base#vX.Y.Z add core            # all shared pieces; also patches package.json
+bunx github:daniel-rck/web-base#vX.Y.Z add backup          # extras: backup, sync
+bunx github:daniel-rck/web-base#vX.Y.Z check               # fail on drift in owned files (--strict, --diff, --json)
+bunx github:daniel-rck/web-base#vX.Y.Z update core --diff  # what update would change
+bunx github:daniel-rck/web-base#vX.Y.Z update core --apply # pull the owned files of the blocks the app uses
+bunx github:daniel-rck/web-base#vX.Y.Z pins                # dependency versions vs. the fleet's pins (--apply)
 ```
 
-`update` and `check` both expand a meta-template's `extends`, so `core` covers
-every building block in one call.
+- **Files are `owned` or `scaffold`.** Owned building blocks (UI primitives,
+  `tokens.css`, `useLiveQuery`, `src/sw/base.ts`, `worker/base.ts`, the sync
+  machinery, `oxlint.base.json`) are never edited in an app — `update --apply`
+  overwrites them. Scaffold seams (`theme.css`, `db.ts`, routes, `src/App.tsx`,
+  `worker/index.ts`, `wrangler.toml`, `public/_headers`) are the app's.
+- **`update` changes files only, never `package.json`.** New dependencies or
+  scripts arrive with `add <template>`, which skips existing files. Expanding
+  `core`, `update` never installs a block the app doesn't use.
+- **`--force`** re-pulls owned files on `add`; **`--force-scaffold`** also
+  overwrites seams (it implies `--force`) and destroys per-app work. `--dry-run`
+  writes nothing.
+- **`webBase.unmanaged`** in `package.json` takes single owned files off the
+  base (Hausverwaltung's `useLiveQuery`): `check` skips them, `update` and
+  `add --force` never write them. A last resort, recorded in 08.
+- **`check --strict`** also fails on blocks not (fully) adopted and on
+  leftovers of a replaced setup — only for apps on the full template, never in
+  HamsterFlight.
+- **Exit codes:** `0` ok, `1` the app doesn't conform (drift, `pins` mismatch),
+  `2` the command couldn't run (bad usage, unknown option, malformed
+  `package.json`).
 
 **`check` is the authority on conformance, not the `webBase.version` stamp.**
-The stamp records which base an app last pulled *something* from — `add hygiene`
-alone stamps the full current version — so it is provenance, not proof. Apps
-wire `web-base-check.yml` into CI to keep owned blocks honest.
+The stamp records which base an app last pulled from — provenance, not proof.
+Apps wire `web-base-check.yml` into CI, which runs the CLI at the app's stamped
+version.
 
 ## Architecture invariants
 
@@ -85,7 +107,8 @@ wire `web-base-check.yml` into CI to keep owned blocks honest.
    shared infrastructure is *copied* via the CLI, not deployed as a runtime
    service.
 6. **Specs in `docs/specs/`.** Living documents, no archiving. Git for
-   history.
+   history. web-base's own specs are at
+   [`daniel-rck/web-base/docs/specs`](https://github.com/daniel-rck/web-base/blob/main/docs/specs).
 
 ## When to consult which reference
 
@@ -95,31 +118,37 @@ pick what's relevant to the current task.
 
 | Working on… | Reference |
 |---|---|
-| Dependency versions, package.json template, vite config | `tech-stack.md` |
+| Dependency versions, package.json template, tsconfig | `tech-stack.md` |
+| A brand-new app (`init`, entry files, vite.config.ts) | `app.md` |
 | oxlint + oxfmt config (linter rules, formatter settings) | `oxc.md` |
 | LICENSE, CONTRIBUTING, SECURITY, .editorconfig | `hygiene.md` |
-| AppShell, design tokens, per-app accent | `layout-system.md` |
-| idb patterns, useLiveQuery, migration recipes | `storage.md` |
-| injectManifest, sw.ts skeleton, Workbox precache | `pwa.md` |
-| react-router-dom 7 setup, typed route constants | `router.md` |
-| /api/* routing, R2/KV bindings, wrangler local dev | `worker.md` |
-| Hausverwaltung-style E2E-encrypted sync | `sync.md` |
-| Reusable workflow caller pattern | `ci.md` |
+| AppShell, design tokens, per-app accent, a11y rules | `layout-system.md` |
+| idb patterns, useLiveQuery, migrations, connection lifecycle | `storage.md` |
+| Vitest setup, fake-indexeddb, component tests | `testing.md` |
+| injectManifest, the service worker, update prompt | `pwa.md` |
+| react-router-dom 7, layout route, error pages | `router.md` |
+| /api/* routing, security headers, R2 bindings, wrangler | `worker.md` |
+| Export / import / wipe of the app's data | `backup.md` |
+| E2E-encrypted device sync, QR pairing | `sync.md` |
+| Reusable workflows (CI, drift guard), release pinning | `ci.md` |
 
 ## Anti-patterns
 
 - **ESLint + Prettier, Biome** → oxlint + oxfmt (ESLint-compatible rules, Prettier-compatible output, one shared base config).
-- **Dexie** → idb (lighter, less magic, our `useLiveQuery` is ~50 lines).
+- **Dexie** → idb (lighter, less magic, our `useLiveQuery` is ~80 lines).
 - **localStorage for app data** → idb (synchronous, no queries, size-limited).
-- **generateSW** → injectManifest (custom message handlers needed).
+- **generateSW, or `skipWaiting()` on install** → injectManifest with a
+  prompt-based update (open tabs would lose their lazy chunks after a deploy).
 - **Skipping react-router** → always include it (cheap to add, painful to
   retrofit).
-- **Per-repo CI duplication** → reusable workflow from web-base.
+- **Per-repo CI duplication** → reusable workflows from web-base.
 - **Starter template repo for existing apps** → the CLI handles updates too.
-- **Custom monorepo (Turborepo, Nx)** → three repos, one tooling repo is
+- **Custom monorepo (Turborepo, Nx)** → nine repos and one tooling repo are
   enough.
-- **Per-app Tailwind config overrides** → single `theme.css`, only
-  `--accent-h` changes.
+- **Editing an owned file in one app** → change the template (and spec), or,
+  as a documented last resort, `webBase.unmanaged`.
+- **Per-app Tailwind config overrides, or editing `tokens.css`** → the
+  `theme.css` seam: `--accent-h` and app-specific tokens.
 - **shadcn/ui as a dependency** → shadcn-style *copy*, no Radix UI.
 
 ## When this skill is wrong
