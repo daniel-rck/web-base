@@ -690,7 +690,7 @@ them, and in the app):
 | `client/client.ts` | `src/lib/sync/client.ts` | owned | `SyncClient` |
 | `client/index.ts` | `src/lib/sync/index.ts` | **scaffold** | barrel + `export const syncClient = new SyncClient()` — the place to configure it |
 | `worker/sync.ts` | `worker/sync.ts` | owned | `handleSync(request, env, { maxBytes? })`, `SyncEnv` |
-| `worker/sync-http.ts` | `worker/sync-http.ts` | owned | `respond()`, `error()`, `bearer()`, `authHash()`, `sameHash()`, `normalizeEtag()`, `parseEnvelope()` |
+| `worker/sync-http.ts` | `worker/sync-http.ts` | owned | `respond()`, `error()`, `bearer()`, `authHash()`, `sameHash()`, `normalizeEtag()`, `parseEnvelope()`, `readBounded()` |
 | `sync.md` | `docs/sync.md` | **scaffold** | protocol, threat model, wiring, merge and QR recipes; the app adds its schema notes |
 
 No dependencies (Web Crypto only). No enums or parameter properties
@@ -742,8 +742,11 @@ in order: route → method → `SYNC_RATE_LIMIT?.limit({ key: objectId })` (`429
   on the normalized ETag. `null` → `404`; wrong `auth` → `403`, checked before
   `304`/`200`; no body → `304` with `etag`; else `200` with the stored bytes,
   `etag: httpEtag`, `content-type: application/json`, `x-content-type-options: nosniff`.
-- `PUT`: `content-length` over `maxBytes` (default 8 MiB) → `413`, re-checked
-  on the bytes read; not a v2 envelope → `400 bad_envelope`; neither `If-Match`
+- `PUT`: `content-length` over `maxBytes` (default 8 MiB) → `413`; the body is
+  then read by `readBounded()`, which stops and cancels the stream as soon as
+  it passes `maxBytes` (→ `413`), so a chunked upload without (or with a false)
+  `content-length` is never buffered beyond the limit; not a v2 envelope →
+  `400 bad_envelope`; neither `If-Match`
   nor `If-None-Match: *` → `428`. Create (`*`): existing object → `412`, else
   `put(…, { onlyIf: { etagDoesNotMatch: "*" }, customMetadata: { auth } })`,
   `null` → `412`. Update: missing → `412`, wrong `auth` → `403`, normalized

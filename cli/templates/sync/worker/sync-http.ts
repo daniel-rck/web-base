@@ -67,3 +67,30 @@ export function parseEnvelope(body: ArrayBuffer): { v: 2; iv: string; ct: string
   if (v !== 2 || typeof iv !== "string" || typeof ct !== "string") return null;
   return IV.test(iv) && CT.test(ct) ? { v, iv, ct } : null;
 }
+
+/**
+ * The body, or `null` once it passes `maxBytes` — reading stops there and the
+ * rest is cancelled, so a missing or lying Content-Length (a chunked upload)
+ * can't make the Worker buffer more than the limit.
+ */
+export async function readBounded(request: Request, maxBytes: number): Promise<ArrayBuffer | null> {
+  if (!request.body) return new ArrayBuffer(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (let next = await reader.read(); !next.done; next = await reader.read()) {
+    size += next.value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(next.value);
+  }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body.buffer;
+}

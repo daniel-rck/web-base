@@ -21,10 +21,15 @@ export function worker(bindings = {}) {
   ) {
     const h = new Headers(headers);
     if (token) h.set("authorization", `Bearer ${token}`);
-    if (body !== undefined && !h.has("content-length")) {
+    // A stream is sent chunked, without Content-Length — as a client may.
+    const streamed = body instanceof ReadableStream;
+    if (body !== undefined && !streamed && !h.has("content-length")) {
       h.set("content-length", String(new TextEncoder().encode(body).byteLength));
     }
-    const init = body === undefined ? { method, headers: h } : { method, headers: h, body };
+    const init =
+      body === undefined
+        ? { method, headers: h }
+        : { method, headers: h, body, ...(streamed ? { duplex: "half" } : {}) };
     const request = new Request(`https://app.test${path}`, init);
     return handleSync(request, env, maxBytes ? { maxBytes } : undefined);
   }

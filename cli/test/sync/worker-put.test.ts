@@ -70,6 +70,22 @@ describe("PUT", () => {
     expect(bucket.objects.size).toBe(0);
   });
 
+  it("stops reading a body without Content-Length as soon as it passes maxBytes", async () => {
+    const { bucket, call } = worker();
+    let pulled = 0;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulled++;
+        if (pulled > 1000) controller.close();
+        else controller.enqueue(new Uint8Array(32).fill(66));
+      },
+    });
+    const response = await call("PUT", { body, maxBytes: 64, headers: { "if-none-match": "*" } });
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThan(10);
+    expect(bucket.objects.size).toBe(0);
+  });
+
   it("400s anything but a v2 envelope", async () => {
     const { create } = worker();
     const bodies = ["not json", "{}", JSON.stringify({ v: 2, ct: "B".repeat(40) })];

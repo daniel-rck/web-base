@@ -199,7 +199,8 @@ Per-app notes (HamsterFlight, Hausverwaltung, Tonspur) are in
   KV.** `GET`/`PUT`/`DELETE /api/sync/<objectId>` need `Authorization: Bearer
   <token>`; the first write binds the object to `SHA-256(token)`, so a leaked
   object id gives neither read nor write. Creates need `If-None-Match: *`,
-  updates `If-Match`, bodies are capped at 8 MiB and must be v2 envelopes,
+  updates `If-Match`, bodies are capped at 8 MiB while they are read (a
+  chunked upload can't get past it) and must be v2 envelopes,
   responses are `no-store`. Rate limiting moves from a KV bucket keyed by raw
   IPs to the optional Rate Limiting binding `SYNC_RATE_LIMIT`, keyed by object
   id — no IP addresses at rest. Apps bind R2 as `SYNC` (plus optional

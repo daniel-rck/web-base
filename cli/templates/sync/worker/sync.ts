@@ -13,6 +13,7 @@ import {
   error,
   normalizeEtag,
   parseEnvelope,
+  readBounded,
   respond,
   sameHash,
 } from "./sync-http.ts";
@@ -86,8 +87,8 @@ async function write(request: Request, target: Target, maxBytes: number): Promis
   if (Number(request.headers.get("content-length") ?? 0) > maxBytes) {
     return error(413, "too_large");
   }
-  const body = await request.arrayBuffer();
-  if (body.byteLength > maxBytes) return error(413, "too_large");
+  const body = await readBounded(request, maxBytes);
+  if (!body) return error(413, "too_large");
   if (!parseEnvelope(body)) return error(400, "bad_envelope");
 
   const ifMatch = request.headers.get("if-match");
