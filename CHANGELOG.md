@@ -226,6 +226,11 @@ Per-app notes (HamsterFlight, Hausverwaltung, Tonspur) are in
 
 ### Fixed
 
+- **`dark:` utilities respect a forced light theme.** The custom variant's
+  `:not([data-theme="light"])` matched every element below `<html>`, so with a
+  dark OS and the toggle on light, `dark:` classes (the active nav pill) still
+  applied over the light tokens. Both alternatives are anchored to `:root` now;
+  `update layout --apply` brings the fix (it lives in the owned `tokens.css`).
 - **`init --dry-run` no longer fails** ("No package.json found") and writes
   nothing at all — no directory, no `.git`.
 - **`add core` without a `package.json` fails before the first write** instead

@@ -68,11 +68,12 @@ export function parseOklch(value: string, hue: number): Oklch {
   return { l: Number(m[1]), c: Number(m[2]), h, alpha: m[4] === undefined ? 1 : Number(m[4]) };
 }
 
+const hexByte = (v: number) =>
+  Math.round(Math.min(1, Math.max(0, toGamma(v))) * 255)
+    .toString(16)
+    .padStart(2, "0");
+
 /** `#rrggbb` of a linear-sRGB colour (already in gamut), as a CSS hex colour. */
 export function toHex(rgb: Rgb): string {
-  const byte = (v: number) =>
-    Math.round(Math.min(1, Math.max(0, toGamma(v))) * 255)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${rgb.map(byte).join("")}`;
+  return `#${rgb.map(hexByte).join("")}`;
 }

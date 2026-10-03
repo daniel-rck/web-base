@@ -29,10 +29,43 @@ function worst(theme: Theme, fg: string, bg: string, tint?: { alpha: number; und
   return Number(min.toFixed(2));
 }
 
+/** Split `a, b:not(c, d)` at its top-level commas. */
+function splitSelectorList(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (const [i, char] of [...list].entries()) {
+    if (char === "(") depth++;
+    else if (char === ")") depth--;
+    else if (char === "," && depth === 0) {
+      parts.push(list.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  return [...parts, list.slice(start).trim()];
+}
+
 describe("theme tokens", () => {
   it("04-layout-system shows tokens.css and theme.css verbatim", () => {
     expect(codeBlocks(section(spec, "tokens.css"), "css")[0]).toBe(tokensCss);
     expect(codeBlocks(section(spec, "theme.css"), "css")[0]).toBe(themeCss);
+  });
+
+  it("the dark: variant follows the root's theme, not an element's lack of one", () => {
+    // `:not([data-theme="light"])` alone matches every descendant (none carries
+    // the attribute), so `dark:` utilities fired under a forced light theme.
+    const variant = tokensCss.slice(
+      tokensCss.indexOf("@custom-variant dark"),
+      tokensCss.indexOf("@theme"),
+    );
+    const alternatives = [...variant.matchAll(/&:where\((.+)\) \{/g)].flatMap((m) =>
+      splitSelectorList(m[1] ?? ""),
+    );
+    expect(alternatives.length).toBeGreaterThanOrEqual(4);
+    for (const selector of alternatives) {
+      const scoped = /^(?::root|\[data-theme="dark"\])/.test(selector);
+      expect({ selector, scoped }).toEqual({ selector, scoped: true });
+    }
   });
 
   it("the two dark blocks (OS preference and forced) declare the same tokens", () => {

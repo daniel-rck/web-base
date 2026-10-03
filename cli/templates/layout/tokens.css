@@ -10,11 +10,12 @@
  * Make Tailwind's `dark:` variant follow the manual theme choice, not just the
  * OS. It triggers when the OS prefers dark AND the user hasn't forced light, or
  * when the user has forced dark — mirroring the token logic below so utilities
- * like `dark:bg-accent-900/40` stay in sync with the surface tokens.
+ * like `dark:bg-accent-900/40` stay in sync with the surface tokens. Only the
+ * root carries `data-theme`, so both alternatives are anchored to `:root`.
  */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
-    &:where(:not([data-theme="light"]), :not([data-theme="light"]) *) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
       @slot;
     }
   }
