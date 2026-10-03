@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, statSync } from "node:fs";
 import { relative, resolve } from "pathe";
 import { describe, expect, it } from "vitest";
 import { listTemplates } from "./lib/manifest/load.ts";
@@ -34,6 +34,11 @@ describe("shipped templates", () => {
       ...(manifest?.files ?? []).map((f) => `${name}/${f.from}`),
     ]);
     expect(filesUnder(resolve(root, name)).filter((f) => !listed.has(f))).toEqual([]);
+  });
+
+  it("ships no symlinks (a copied link could point anywhere on the user's machine)", () => {
+    const links = filesUnder(root).filter((f) => lstatSync(resolve(root, f)).isSymbolicLink());
+    expect(links).toEqual([]);
   });
 
   it.each(["core", "app"])("the %s chain writes every destination only once", async (name) => {

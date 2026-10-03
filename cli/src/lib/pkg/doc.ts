@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "pathe";
+import { dirname, resolve } from "pathe";
 import { CliError, errorMessage } from "../../exit.ts";
+import { assertWritableInside } from "../files/confine.ts";
 import { spliceStamp } from "./splice.ts";
 
 export type StringMap = Record<string, string>;
@@ -112,6 +113,7 @@ export async function savePackageJson(
     reformatted = text === undefined;
   }
   text ??= serialize(doc.data, doc.style);
+  await assertWritableInside(dirname(doc.path), doc.path);
   await writeFile(doc.path, text, "utf8");
   doc.raw = text;
   doc.dirty.clear();

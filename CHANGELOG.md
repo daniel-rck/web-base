@@ -246,6 +246,9 @@ Per-app notes (HamsterFlight, Hausverwaltung, Tonspur) are in
   doesn't match its directory, an unknown key or a missing `extends` target is
   an error before anything is written; `add /abs/dir` no longer loads
   `/abs/dir/manifest.json`. One broken manifest no longer hides the template list.
+  No write goes through a symlink either: a symlinked destination, or a
+  symlinked directory that leads out of the app, is exit 2 — `update --apply`
+  could otherwise overwrite whatever the link points to.
 - **Line endings don't count as drift.** A checkout with `core.autocrlf=true`
   made every owned file differ.
 - **Patching `package.json` keeps its shape.** A dependency the app lists in the

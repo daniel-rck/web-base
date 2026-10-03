@@ -1,10 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { resolve } from "pathe";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInProcess } from "../test/cli.ts";
-import { cleanupScratch, readJson, scratchApp, snapshot, writeJson } from "../test/fixtures.ts";
+import {
+  cleanupScratch,
+  readJson,
+  scratchApp,
+  scratchDir,
+  snapshot,
+  writeJson,
+} from "../test/fixtures.ts";
 import { WEB_BASE_VERSION } from "../version.ts";
 
 afterEach(cleanupScratch);
@@ -22,6 +29,18 @@ describe("web-base update", () => {
     const run = await runInProcess(["update", "core", "--cwd", app, "--apply"]);
     expect(run.code).toBe(0);
     expect(existsSync(resolve(app, "src/lib/ui/primitives.tsx"))).toBe(true);
+  });
+
+  it("refuses (exit 2) to write an owned file through a symlink", async () => {
+    const app = await coreApp();
+    const victim = resolve(await scratchDir("web-base-outside-"), "victim");
+    await writeFile(victim, "keep me");
+    await rm(resolve(app, "src/lib/ui/AppNav.tsx"));
+    await symlink(victim, resolve(app, "src/lib/ui/AppNav.tsx"));
+    const run = await runInProcess(["update", "core", "--cwd", app, "--apply"]);
+    expect(run.code).toBe(2);
+    expect(run.text).toMatch(/symlink/);
+    expect(await readFile(victim, "utf8")).toBe("keep me");
   });
 
   it("only reports without --apply", async () => {

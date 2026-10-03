@@ -16,11 +16,16 @@ export function relativePathProblem(rel: string): string | undefined {
   return undefined;
 }
 
+/** Whether `abs` is `root` or lies below it — lexically; see files/confine.ts for symlinks. */
+export function isInside(root: string, abs: string): boolean {
+  const back = relative(root, abs);
+  return back !== ".." && !back.startsWith("../") && !isAbsolute(back);
+}
+
 /** Resolve `rel` under `root`; throw if the result is `root` itself or outside it. */
 export function resolveInside(root: string, rel: string): string {
   const abs = resolve(root, rel);
-  const back = relative(root, abs);
-  if (back === "" || back === ".." || back.startsWith("../") || isAbsolute(back)) {
+  if (abs === resolve(root) || !isInside(root, abs)) {
     throw new CliError(`Path "${rel}" is not inside ${root}.`);
   }
   return abs;

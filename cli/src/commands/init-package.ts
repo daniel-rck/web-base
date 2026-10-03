@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "pathe";
 import { CliError } from "../exit.ts";
+import { assertWritableInside } from "../lib/files/confine.ts";
 import type { PackageJson } from "../lib/pkg/doc.ts";
 
 /**
@@ -65,6 +66,7 @@ export async function fillPlaceholders(
     const path = resolve(targetDir, file);
     const text = await readFile(path, "utf8");
     if (text.includes(APP_NAME_PLACEHOLDER)) {
+      await assertWritableInside(targetDir, path);
       await writeFile(path, text.replaceAll(APP_NAME_PLACEHOLDER, name), "utf8");
     }
   }

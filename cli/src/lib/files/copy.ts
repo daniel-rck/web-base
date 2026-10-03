@@ -3,6 +3,7 @@ import { copyFile, mkdir } from "node:fs/promises";
 import { dirname } from "pathe";
 import { filePolicy, type TemplateFileSpec } from "../manifest/types.ts";
 import { compareTemplateFile, filePaths } from "./compare.ts";
+import { assertWritableInside } from "./confine.ts";
 
 export type CopyAction =
   | "copied"
@@ -38,7 +39,7 @@ export async function copyTemplateFile(
   const { src, dst } = filePaths(spec, options);
   if (!existsSync(dst)) {
     if (dryRun) return "would-copy";
-    await writeTemplateFile(src, dst);
+    await writeTemplateFile(src, dst, options.targetDir);
     return "copied";
   }
   if (options.unmanaged?.has(spec.to)) return "unmanaged";
@@ -51,12 +52,16 @@ export async function copyTemplateFile(
   const allowOverwrite = scaffold ? force && forceScaffold : force || spec.overwrite === true;
   if (!allowOverwrite) return scaffold && force ? "kept-scaffold" : "kept-differs";
   if (dryRun) return "would-overwrite";
-  await writeTemplateFile(src, dst);
+  await writeTemplateFile(src, dst, options.targetDir);
   return "overwritten";
 }
 
-/** Copy `src` to `dst` byte for byte, creating parent directories as needed. */
-export async function writeTemplateFile(src: string, dst: string): Promise<void> {
+/**
+ * Copy `src` to `dst` byte for byte, creating parent directories as needed —
+ * after checking that `dst` really lies inside `root` (no symlink on the way).
+ */
+export async function writeTemplateFile(src: string, dst: string, root: string): Promise<void> {
+  await assertWritableInside(root, dst);
   await mkdir(dirname(dst), { recursive: true });
   await copyFile(src, dst);
 }

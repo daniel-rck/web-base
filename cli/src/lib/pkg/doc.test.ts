@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, symlink, writeFile } from "node:fs/promises";
 import { resolve } from "pathe";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanupScratch, scratchDir } from "../../test/fixtures.ts";
@@ -62,6 +62,18 @@ describe("savePackageJson", () => {
     stampVersion(doc, "0.6.0");
     expect(await savePackageJson(doc, { dryRun: true })).toBe("would-write");
     expect(await readFile(resolve(dir, "package.json"), "utf8")).toBe('{"name":"x"}');
+  });
+
+  it("refuses to write through a symlinked package.json", async () => {
+    const dir = await pkgDir('{"name":"x"}');
+    const elsewhere = resolve(await scratchDir(), "package.json");
+    await rename(resolve(dir, "package.json"), elsewhere);
+    await symlink(elsewhere, resolve(dir, "package.json"));
+    const doc = await loadPackageJson(dir);
+    if (!doc) throw new Error("no doc");
+    stampVersion(doc, "0.6.0");
+    await expect(savePackageJson(doc)).rejects.toThrow(/symlink/);
+    expect(await readFile(elsewhere, "utf8")).toBe('{"name":"x"}');
   });
 
   it("splices a stamp-only change without reformatting the rest of the file", async () => {

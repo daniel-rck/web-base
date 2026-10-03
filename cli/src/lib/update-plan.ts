@@ -86,7 +86,7 @@ export async function applyUpdate(targetDir: string, entries: UpdateEntry[]): Pr
   for (const entry of entries) {
     if (entry.action !== "apply") continue;
     const src = resolve(templateDir(entry.template), entry.spec.from);
-    await writeTemplateFile(src, resolveInside(targetDir, entry.spec.to));
+    await writeTemplateFile(src, resolveInside(targetDir, entry.spec.to), targetDir);
     written.push(entry.spec.to);
   }
   return written;

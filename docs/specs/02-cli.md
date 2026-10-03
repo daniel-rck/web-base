@@ -29,7 +29,7 @@ cli/
 │   │   └── pins.ts             # compare package.json against the pin table
 │   ├── lib/
 │   │   ├── manifest/           # types, validate (shape + paths), load, resolve (extends)
-│   │   ├── files/              # compare (EOL-insensitive), copy (policy-aware)
+│   │   ├── files/              # compare (EOL-insensitive), copy (policy-aware), confine (no symlinks)
 │   │   ├── pkg/                # doc (load/save package.json), patch, webbase (stamp, unmanaged), splice
 │   │   ├── diff/               # lines (LCS line diff, counts), unified (--diff output)
 │   │   ├── pins.ts             # loadPins / comparePins / applyPins
@@ -37,7 +37,7 @@ cli/
 │   │   ├── update-plan.ts      # planUpdate / applyUpdate
 │   │   ├── check.ts            # collectCheck / judgeCheck
 │   │   ├── obsolete.ts         # findObsolete
-│   │   ├── paths.ts            # relativePathProblem, resolveInside, normalizeRepoPath
+│   │   ├── paths.ts            # relativePathProblem, isInside, resolveInside, normalizeRepoPath
 │   │   ├── templates-dir.ts    # where the templates live
 │   │   ├── git.ts              # work-tree detection, git init
 │   │   └── text.ts             # normalizeEol, writeOut
@@ -221,6 +221,15 @@ The template name given on the command line must match the same pattern
 before it touches the filesystem (`add /abs/dir`, `add ../x` → exit 2). Every
 source and destination is additionally resolved through `resolveInside`, which
 throws if the path leaves the template directory or the target app.
+
+`resolveInside` is lexical, so every write (template files, the `<app-name>`
+fill-in, `package.json`) also goes through `assertWritableInside`
+(`lib/files/confine.ts`): the destination must not be a symlink — dangling ones
+included — and its parent, symlinks resolved, must lie inside the target,
+symlinks resolved. Otherwise the command stops with exit 2 before writing that
+file. Symlinks that stay inside the app, and a symlinked app directory, are
+fine; reads (`check`, `update --diff`) may follow symlinks. `templates.test.ts`
+keeps symlinks out of `cli/templates/`.
 
 **Decision: validate strictly, including paths.** `WEB_BASE_TEMPLATES_DIR` lets
 any directory act as the template root, and a manifest with `"to": "../x"` used
@@ -644,7 +653,8 @@ it too.
 returns what it did (`CopyAction`):
 
 - `src = resolveInside(templatesDir()/template, from)`,
-  `dst = resolveInside(targetDir, to)` — both containment-checked.
+  `dst = resolveInside(targetDir, to)` — both containment-checked, and every
+  write first passes `assertWritableInside(targetDir, dst)` (no symlinks).
 - `dst` absent → copy (`mkdir -p`, byte-exact `copyFile`): `copied`
   (`would-copy` in dry-run). An absent file is installed regardless of policy.
 - `dst` listed in `unmanaged` → `unmanaged`, never written.
