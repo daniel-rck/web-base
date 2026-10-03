@@ -56,6 +56,20 @@ describe("end to end: client ⇄ Worker ⇄ R2", () => {
     await expect(a.client.sync({ notes: ["base", "A"] }, union)).resolves.toEqual(merged);
   });
 
+  it("never rolls back a remote change the app didn't get to save", async () => {
+    const { device } = world();
+    const a = device();
+    const b = device();
+    await a.client.enable();
+    await a.client.sync({ notes: ["A"] }, union);
+    await b.client.importPairingCode(a.client.pairingCode());
+    await b.client.sync({ notes: ["B"] }, union);
+    // A receives ["A", "B"] but closes before saving it, then syncs ["A"] again.
+    await a.client.sync({ notes: ["A"] }, union);
+    await expect(a.client.sync({ notes: ["A"] }, union)).resolves.toEqual({ notes: ["A", "B"] });
+    await expect(b.client.sync({ notes: ["B"] }, union)).resolves.toEqual({ notes: ["A", "B"] });
+  });
+
   it("keeps different secrets apart", async () => {
     const { bucket, device } = world();
     const a = device();

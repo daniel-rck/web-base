@@ -90,3 +90,12 @@ export async function open<T>(
     throw new SyncError("decrypt_failed", { cause });
   }
 }
+
+/**
+ * base64url(SHA-256(JSON)) of a document: which version of the data a device
+ * holds, without keeping a copy of it. Stays on the device.
+ */
+export async function fingerprint(document: unknown): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", utf8(JSON.stringify(document) ?? ""));
+  return base64urlEncode(new Uint8Array(digest));
+}

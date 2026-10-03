@@ -1,4 +1,4 @@
-import { deriveKeys, open, seal, type SyncKeys } from "./crypto.ts";
+import { deriveKeys, fingerprint, open, seal, type SyncKeys } from "./crypto.ts";
 import { isSyncError, SyncError } from "./errors.ts";
 import { readEnvelope, requireEtag, send, statusError, type SyncResponse } from "./http.ts";
 import {
@@ -12,6 +12,8 @@ import { safeLocalStorage, SyncStore } from "./storage.ts";
 import type { PullResult, RequestOptions, SyncClientOptions } from "./types.ts";
 
 type Call = { method: "GET" | "PUT" | "DELETE"; headers?: Record<string, string>; body?: string };
+/** A pull plus the ETag it saw — the precondition for a push based on it. */
+type Pulled<T> = PullResult<T> & { etag: string | null };
 
 /**
  * End-to-end encrypted sync of one JSON document per secret. Every method
@@ -44,7 +46,7 @@ export class SyncClient {
   async enable(): Promise<void> {
     if (this.#store.load()) return;
     const code = await encodePairingCode(generateSecret());
-    if (!this.#store.load()) this.#store.save({ v: 2, code, etag: null });
+    if (!this.#store.load()) this.#store.save({ v: 2, code, etag: null, fp: null });
   }
 
   /** The code to type on another device, in groups of four. Throws `not_enabled`. */
@@ -67,39 +69,25 @@ export class SyncClient {
     const current = this.#store.load();
     if (current?.code === canonical) return;
     if (current && !options.replace) throw new SyncError("already_enabled");
-    this.#store.save({ v: 2, code: canonical, etag: null });
+    this.#store.save({ v: 2, code: canonical, etag: null, fp: null });
   }
 
+  /** Download the document. `unchanged` means: since this device's last pull or push. */
   async pull<T>(options: RequestOptions = {}): Promise<PullResult<T>> {
     const { code, etag } = this.#store.require();
-    const keys = await this.#keysFor(code);
-    const headers: Record<string, string> = etag ? { "if-none-match": etag } : {};
-    const response = await this.#send(keys, { method: "GET", headers }, options);
-    if (response.status === 304) return { status: "unchanged" };
-    if (response.status === 404) {
-      this.#store.setEtag(code, null);
-      return { status: "missing" };
-    }
-    if (response.status !== 200) throw statusError(response);
-    const next = requireEtag(response);
-    const data = await open<T>(keys.encKey, keys.objectId, readEnvelope(response.text));
-    this.#store.setEtag(code, next);
-    return { status: "updated", data };
+    const result = await this.#get<T>(code, etag, options);
+    return result.status === "updated"
+      ? { status: "updated", data: result.data }
+      : { status: result.status };
   }
 
-  /** Upload `payload`. Throws `SyncError("conflict")` if the remote moved on. */
+  /**
+   * Upload `payload` over the version this device last pulled or pushed.
+   * Throws `SyncError("conflict")` if the remote moved on.
+   */
   async push(payload: unknown, options: RequestOptions = {}): Promise<void> {
     const { code, etag } = this.#store.require();
-    const keys = await this.#keysFor(code);
-    const body = JSON.stringify(await seal(keys.encKey, keys.objectId, payload));
-    // No known ETag means "create": the server refuses to overwrite what exists.
-    const headers = {
-      ...(etag ? { "if-match": etag } : { "if-none-match": "*" }),
-      "content-type": "application/json",
-    };
-    const response = await this.#send(keys, { method: "PUT", headers, body }, options);
-    if (response.status !== 200 && response.status !== 204) throw statusError(response);
-    this.#store.setEtag(code, requireEtag(response));
+    await this.#put(code, payload, etag, options);
   }
 
   /**
@@ -114,14 +102,21 @@ export class SyncClient {
     const { maxAttempts = 3, ...request } = options;
     let current = local;
     for (let attempt = 1; ; attempt++) {
-      const remote = await this.pull<T>(request);
+      const { code, etag, fp } = this.#store.require();
+      // A 304 proves the remote equals `current` only if `current` is exactly
+      // the document stored at `etag`. Anything else — local edits, or a pull
+      // the app never got to save — is merged with a full download.
+      const known = etag !== null && fp !== null && fp === (await fingerprint(current));
+      const remote = await this.#get<T>(code, known ? etag : null, request);
+      if (remote.status === "unchanged") return current;
       if (remote.status === "updated") {
         current = await merge(current, remote.data);
         // The remote already holds everything we have: skip the upload.
         if (JSON.stringify(current) === JSON.stringify(remote.data)) return current;
       }
       try {
-        await this.push(current, request);
+        // Against the ETag this attempt saw — never one another tab stored since.
+        await this.#put(code, current, remote.etag, request);
         return current;
       } catch (error) {
         if (!isSyncError(error, "conflict") || attempt >= maxAttempts) throw error;
@@ -140,6 +135,36 @@ export class SyncClient {
     }
     this.#store.clear();
     this.#keys = null;
+  }
+
+  /** GET, conditional on `etag`; records the version it receives. */
+  async #get<T>(code: string, etag: string | null, options: RequestOptions): Promise<Pulled<T>> {
+    const keys = await this.#keysFor(code);
+    const headers: Record<string, string> = etag ? { "if-none-match": etag } : {};
+    const response = await this.#send(keys, { method: "GET", headers }, options);
+    if (response.status === 304) return { status: "unchanged", etag };
+    if (response.status === 404) {
+      this.#store.setVersion(code, null, null);
+      return { status: "missing", etag: null };
+    }
+    if (response.status !== 200) throw statusError(response);
+    const next = requireEtag(response);
+    const data = await open<T>(keys.encKey, keys.objectId, readEnvelope(response.text));
+    this.#store.setVersion(code, next, await fingerprint(data));
+    return { status: "updated", data, etag: next };
+  }
+
+  /** PUT over `etag` (`null`: create, never overwrite); records the new version. */
+  async #put(code: string, payload: unknown, etag: string | null, options: RequestOptions) {
+    const keys = await this.#keysFor(code);
+    const body = JSON.stringify(await seal(keys.encKey, keys.objectId, payload));
+    const headers = {
+      ...(etag ? { "if-match": etag } : { "if-none-match": "*" }),
+      "content-type": "application/json",
+    };
+    const response = await this.#send(keys, { method: "PUT", headers, body }, options);
+    if (response.status !== 200 && response.status !== 204) throw statusError(response);
+    this.#store.setVersion(code, requireEtag(response), await fingerprint(payload));
   }
 
   #keysFor(code: string): Promise<SyncKeys> {

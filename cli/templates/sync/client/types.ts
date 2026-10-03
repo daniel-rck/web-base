@@ -17,6 +17,12 @@ export type SyncState = {
   code: string;
   /** Last ETag seen for the remote object; `null` = "assume it does not exist". */
   etag: string | null;
+  /**
+   * `fingerprint()` of the document stored at `etag` (the one pulled or pushed
+   * with it), or `null`. `sync()` trusts a 304 only for exactly that document,
+   * so a pull the app never got to save can't make it push stale data back.
+   */
+  fp: string | null;
 };
 
 export type PullResult<T> =

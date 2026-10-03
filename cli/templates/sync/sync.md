@@ -74,9 +74,10 @@ timestamps beyond R2's own.
 
 ### Client state
 
-`localStorage["web-base-sync"] = { "v": 2, "code": "<pairing code>", "etag": "<last ETag>" | null }`.
-Every `SyncClient` method reads it fresh, so a reload or a second tab needs no
-initialization. A corrupt or older state is removed (the device then shows as
+`localStorage["web-base-sync"] = { "v": 2, "code": "<pairing code>", "etag": "<last ETag>" | null, "fp": "<fingerprint>" | null }`.
+`fp` is a SHA-256 of the document the remote holds at `etag`; it stays on the
+device. Every `SyncClient` method reads the state fresh, so a reload or a
+second tab needs no initialization. A corrupt or older state is removed (the device then shows as
 not set up).
 
 ## Threat model
@@ -144,8 +145,11 @@ field calls the same `importPairingCode(input)`; show
 
 `syncClient.sync(local, merge)` pulls, calls `merge(local, remote)`, pushes the
 result and retries on a conflict (up to three times). It returns the merged
-document — **persist it locally**. `merge` may run more than once, so it must
-be deterministic and idempotent. Last-writer-wins per record with tombstones:
+document — **persist it locally**. If the app can't (it crashed, the tab
+closed), nothing is lost: the next `sync()` sees that its document isn't the
+one it last synced, downloads and merges again, and two tabs syncing at once
+get a conflict instead of overwriting each other. `merge` may run more than
+once, so it must be deterministic and idempotent. Last-writer-wins per record with tombstones:
 
 ```ts
 type SyncedRecord<T> = { updatedAt: number; deleted?: true; value?: T };

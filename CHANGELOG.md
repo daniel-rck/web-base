@@ -192,9 +192,13 @@ Per-app notes (HamsterFlight, Hausverwaltung, Tonspur) are in
   migration — no app used the template's sync code. A 128-bit root secret feeds
   HKDF-SHA256 with separate labels for a non-extractable AES-GCM-256 key, an
   80-bit object id and a 256-bit bearer token; envelopes are `{ v: 2, iv, ct }`
-  with the object id as AAD. Client and worker are split into one-concern files
-  under `client/` and `worker/`; `src/lib/sync/index.ts` and `docs/sync.md` are
-  scaffold seams, everything else is owned.
+  with the object id as AAD. `sync()` pushes against the ETag its own pull saw
+  (two tabs conflict instead of overwriting each other) and trusts a `304` only
+  for the document it last synced, so a result the app never got to save is
+  re-merged, never pushed back over newer remote data. Client and worker are
+  split into one-concern files under `client/` and `worker/`;
+  `src/lib/sync/index.ts` and `docs/sync.md` are scaffold seams, everything
+  else is owned.
 - **Breaking: the sync worker authenticates every request and no longer uses
   KV.** `GET`/`PUT`/`DELETE /api/sync/<objectId>` need `Authorization: Bearer
   <token>`; the first write binds the object to `SHA-256(token)`, so a leaked

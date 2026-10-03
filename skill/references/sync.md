@@ -63,6 +63,10 @@ Optimistic concurrency via R2 ETags:
 
 - No known ETag → `PUT` with `If-None-Match: *` (create, never overwrite).
 - Known ETag → `PUT` with `If-Match`, `GET` with `If-None-Match` (`304`).
+- `sync()` pushes with the ETag its own `GET` saw (overlapping tabs conflict
+  instead of overwriting), and sends `If-None-Match` only when `local` is the
+  very document it last synced (state `fp`, a SHA-256): an unsaved sync result
+  is re-read and re-merged, never rolled back.
 - `412` → `SyncError("conflict")`. A pull `404` means "missing" and clears the
   ETag.
 

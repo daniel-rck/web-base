@@ -4,7 +4,12 @@ import type { SyncState } from "../../templates/sync/client/types.ts";
 import { memoryStorage, throwingStorage } from "./fakes/storage.ts";
 
 const KEY = "web-base-sync";
-const STATE: SyncState = { v: 2, code: "080020G30G2GC1R81450P30D1R7WVC8", etag: '"abc"' };
+const STATE: SyncState = {
+  v: 2,
+  code: "080020G30G2GC1R81450P30D1R7WVC8",
+  etag: '"abc"',
+  fp: "fingerprint",
+};
 const unavailable = { name: "SyncError", code: "storage_unavailable" };
 
 afterEach(() => {
@@ -16,8 +21,8 @@ describe("SyncStore", () => {
     const store = new SyncStore(memoryStorage(), KEY);
     store.save(STATE);
     expect(store.load()).toEqual(STATE);
-    store.setEtag(STATE.code, null);
-    expect(store.require()).toEqual({ ...STATE, etag: null });
+    store.setVersion(STATE.code, null, null);
+    expect(store.require()).toEqual({ ...STATE, etag: null, fp: null });
     store.clear();
     expect(store.load()).toBeNull();
   });
@@ -28,11 +33,17 @@ describe("SyncStore", () => {
     expect(() => store.require()).toThrow(expect.objectContaining({ code: "not_enabled" }));
   });
 
-  it("ignores an ETag for a secret that is no longer stored", () => {
+  it("ignores a version for a secret that is no longer stored", () => {
     const store = new SyncStore(memoryStorage(), KEY);
     store.save(STATE);
-    store.setEtag("some-other-code", '"stale"');
+    store.setVersion("some-other-code", '"stale"', "other");
     expect(store.load()).toEqual(STATE);
+  });
+
+  it("reads a state without a fingerprint as fp: null (never trusted for a 304)", () => {
+    const { fp: _fp, ...legacy } = STATE;
+    const store = new SyncStore(memoryStorage({ [KEY]: JSON.stringify(legacy) }), KEY);
+    expect(store.load()).toEqual({ ...STATE, fp: null });
   });
 
   it("clears corrupt JSON", () => {
@@ -48,6 +59,7 @@ describe("SyncStore", () => {
       { ...STATE, code: "too-short" },
       { ...STATE, code: 42 },
       { ...STATE, etag: 7 },
+      { ...STATE, fp: 7 },
       null,
       [],
       "string",

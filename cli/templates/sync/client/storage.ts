@@ -78,10 +78,13 @@ export class SyncStore {
     this.#storage.setItem(this.#key, JSON.stringify(state));
   }
 
-  /** Record an ETag, unless the device was re-paired while the request ran. */
-  setEtag(code: string, etag: string | null): void {
+  /**
+   * Record which document the remote holds at `etag`, unless the device was
+   * re-paired while the request ran.
+   */
+  setVersion(code: string, etag: string | null, fp: string | null): void {
     const state = this.load();
-    if (state?.code === code) this.save({ ...state, etag });
+    if (state?.code === code) this.save({ ...state, etag, fp });
   }
 
   clear(): void {
@@ -97,8 +100,9 @@ function parseState(raw: string): SyncState | null {
     return null;
   }
   if (typeof value !== "object" || value === null) return null;
-  const { v, code, etag } = value as Record<string, unknown>;
+  const { v, code, etag, fp = null } = value as Record<string, unknown>;
   if (v !== 2 || typeof code !== "string" || parsePairingCode(code)?.version !== 2) return null;
   if (etag !== null && typeof etag !== "string") return null;
-  return { v: 2, code, etag };
+  if (fp !== null && typeof fp !== "string") return null;
+  return { v: 2, code, etag, fp };
 }

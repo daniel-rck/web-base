@@ -757,13 +757,15 @@ in order: route → method → `SYNC_RATE_LIMIT?.limit({ key: objectId })` (`429
 `normalizeEtag()` strips `W/` (Cloudflare weakens ETags when it compresses a
 response) and the quotes `httpEtag` carries.
 
-**Client.** State `{ v: 2, code, etag }` lives in `localStorage["web-base-sync"]`
+**Client.** State `{ v: 2, code, etag, fp }` lives in `localStorage["web-base-sync"]`
 behind the `StorageLike` seam; reads that throw count as "nothing stored",
 writes that throw are `storage_unavailable`, and an invalid or v1 state is
 removed. Every public method reads the state fresh. No ETag sends
 `If-None-Match: *` on `PUT`, otherwise `If-Match`; a `GET` with an ETag sends
 `If-None-Match`. Pull `404` → `missing` and clears the ETag; `304` →
-`unchanged`; `412` → `conflict`. Every request carries `Authorization: Bearer
+`unchanged`; `412` → `conflict`. Every `200` pull and successful push records
+the ETag together with `fp`, the `fingerprint()` (base64url SHA-256 of the
+JSON) of the document the remote holds at that ETag. Every request carries `Authorization: Bearer
 <token>`; the secret and the code never appear in a URL or header. Requests
 use `cache: "no-store"` and a timeout covering the body (default 30 s),
 combined with the caller's `AbortSignal` (`AbortSignal.any`, with a listener
@@ -792,7 +794,23 @@ class SyncClient {
 stored unless `replace` is set (the same code again is a no-op) and resets the
 ETag. `sync()` is pull → merge → push, retried on `conflict` up to
 `maxAttempts` (default 3); it skips the push when the merged document equals
-the pulled one. `disable({ deleteRemote: true })` sends `DELETE` first and only
+the pulled one. Its `GET` is conditional only when `local` is exactly the
+document stored at the known ETag (`fingerprint(local) === fp`), so a `304`
+means "nothing to do"; otherwise it downloads and merges. Its `PUT` carries
+the ETag *this attempt's* `GET` saw (`null` after a `404` → create), never the
+one in storage, which another tab may have advanced meanwhile.
+
+**Decision: a document fingerprint, not a persist callback.** `sync()` returns
+the merged document and the app saves it, but the stored ETag used to claim
+"this device has version E" before that save happened. When `merge` threw or
+the tab closed in between, the next `sync()` got a `304` for its stale
+document and pushed it back over the remote — a silent rollback. Storing
+which document belongs to the ETag makes the claim true whatever the app
+does: an unsaved result just doesn't match, and the next sync re-reads and
+re-merges. The alternative, `sync(local, merge, persist)` with the ETag
+committed after `persist`, changes the API and still trusts the app's save.
+The cost: a sync with local edits downloads the document instead of getting a
+`304` — fine for one JSON document per app. `disable({ deleteRemote: true })` sends `DELETE` first and only
 then forgets the secret.
 
 **Decision: pairing hands over the secret in a URL fragment, not through an
