@@ -556,7 +556,7 @@ satisfies ExportedHandler<Env>`, and a `handleApi` stub that answers
 routed. The app never edits `base.ts`.
 
 `wrangler.toml` ships `name = "<app-name>"`, a real `compatibility_date`
-(`2026-08-31` — the newest date the minimum pinned wrangler, 4.128.0, supports;
+(`2026-09-30` — the newest date the minimum pinned wrangler, 4.145.0, supports;
 a placeholder breaks `wrangler dev` and `--dry-run`), no `compatibility_flags`,
 and `[assets]` with `directory = "./dist"`, `binding = "ASSETS"` and
 `not_found_handling = "single-page-application"`. R2/KV bindings are the `sync`

@@ -1,4 +1,5 @@
-import { type CommandDef, runCommand, showUsage } from "citty";
+import { stripVTControlCharacters } from "node:util";
+import { type CommandDef, renderUsage, runCommand } from "citty";
 import { consola } from "consola";
 import { main, subCommands } from "./cli.ts";
 import { errorMessage, EXIT, type ExitCode } from "./exit.ts";
@@ -7,6 +8,16 @@ import { WEB_BASE_VERSION } from "./version.ts";
 
 function isSubCommand(name: string): name is keyof typeof subCommands {
   return Object.hasOwn(subCommands, name);
+}
+
+/**
+ * citty's `showUsage` writes to `console.log` and colours even piped output;
+ * route usage through consola like everything else, plain unless on a TTY.
+ */
+async function showUsage(cmd: CommandDef, parent?: CommandDef): Promise<void> {
+  const usage = await renderUsage(cmd, parent);
+  const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
+  consola.log(`${color ? usage : stripVTControlCharacters(usage)}\n`);
 }
 
 /**

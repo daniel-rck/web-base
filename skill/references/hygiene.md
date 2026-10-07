@@ -50,7 +50,7 @@ Every app's `package.json` carries the metadata fields documented in
 - `keywords`, `author: "daniel-rck"`, `license: "MIT"`
 - `homepage: "https://<app>.daniel-rck.workers.dev"`
 - `repository`, `bugs` pointing at `github.com/daniel-rck/<App>`
-- `packageManager: "bun@1.3.11"`
+- `packageManager: "bun@1.4.2"`
 
 The `init` command generates this shape automatically.
 

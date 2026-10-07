@@ -44,7 +44,9 @@ export default mergeConfig(
 - `tsconfig.node.json` must include `vitest.config.ts` next to `vite.config.ts`.
 - An app with its own Vitest setup (e.g. projects with
   `@cloudflare/vitest-pool-workers`) keeps it and adds
-  `"./src/test/setup.ts"` to `setupFiles`.
+  `"./src/test/setup.ts"` to `setupFiles`. pool-workers 0.23 still needs
+  Vitest 4, so such an app stays behind the Vitest 5 pin; prefer in-memory
+  fakes for worker tests in new code.
 - App-specific setup goes in its own file, listed after `./src/test/setup.ts`.
   Never edit `setup.ts` — `web-base update` overwrites it.
 

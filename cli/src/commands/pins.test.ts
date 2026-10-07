@@ -6,7 +6,7 @@ import { cleanupScratch, readJson, scratchApp } from "../test/fixtures.ts";
 
 afterEach(cleanupScratch);
 
-const pinned = { packageManager: "bun@1.3.11", dependencies: { react: "^19.2.8" } };
+const pinned = { packageManager: "bun@1.4.2", dependencies: { react: "^19.3.0" } };
 
 describe("web-base pins", () => {
   it("passes when every pinned package the app uses matches", async () => {
@@ -22,13 +22,13 @@ describe("web-base pins", () => {
     const app = await scratchApp({ pkg: { name: "x", dependencies: { react: "^19.0.0" } } });
     const run = await runInProcess(["pins", "--cwd", app]);
     expect(run.code).toBe(1);
-    expect(run.text).toContain("dependencies.react: ^19.0.0 → ^19.2.8 [behind]");
-    expect(run.text).toContain("packageManager: (not set) → bun@1.3.11 [missing]");
+    expect(run.text).toContain("dependencies.react: ^19.0.0 → ^19.3.0 [behind]");
+    expect(run.text).toContain("packageManager: (not set) → bun@1.4.2 [missing]");
   });
 
   it("--json prints the report with the exit code", async () => {
     const app = await scratchApp({
-      pkg: { name: "x", packageManager: "bun@1.3.11", dependencies: { react: "^19.0.0" } },
+      pkg: { name: "x", packageManager: "bun@1.4.2", dependencies: { react: "^19.0.0" } },
     });
     const run = await runInProcess(["pins", "--cwd", app, "--json"]);
     expect(run.code).toBe(1);
@@ -38,7 +38,7 @@ describe("web-base pins", () => {
       ok: false,
       exitCode: 1,
       mismatches: [
-        { name: "react", section: "dependencies", expected: "^19.2.8", actual: "^19.0.0" },
+        { name: "react", section: "dependencies", expected: "^19.3.0", actual: "^19.0.0" },
       ],
     });
   });
@@ -54,8 +54,8 @@ describe("web-base pins", () => {
     const pkg = await readJson(resolve(app, "package.json"));
     expect(pkg).toEqual({
       name: "x",
-      devDependencies: { react: "^19.2.8", zod: "^4.0.0" },
-      packageManager: "bun@1.3.11",
+      devDependencies: { react: "^19.3.0", zod: "^4.0.0" },
+      packageManager: "bun@1.4.2",
     });
     expect(await readFile(resolve(app, "package.json"), "utf8")).toContain('\n    "name"');
     expect((await runInProcess(["pins", "--cwd", app])).code).toBe(0);

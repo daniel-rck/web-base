@@ -26,8 +26,8 @@
     { "from": "index.ts", "to": "src/lib/ui/index.ts", "policy": "scaffold" }
   ],
   "dependencies": {
-    "lucide-react": "^1.39.0",
-    "react-router-dom": "^7.18.3"
+    "lucide-react": "^1.49.0",
+    "react-router-dom": "^7.18.4"
   },
   "postInstall": [
     "Import theme: add `@import \"./lib/ui/theme.css\";` to your `src/index.css`",

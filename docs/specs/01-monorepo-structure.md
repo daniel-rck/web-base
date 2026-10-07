@@ -19,7 +19,7 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
   "homepage": "https://github.com/daniel-rck/web-base",
   "repository": { "type": "git", "url": "https://github.com/daniel-rck/web-base.git" },
   "bugs": { "url": "https://github.com/daniel-rck/web-base/issues" },
-  "packageManager": "bun@1.3.11",
+  "packageManager": "bun@1.4.2",
   "bin": {
     "web-base": "./cli/dist/index.js"
   },
@@ -35,16 +35,16 @@ The root `package.json` declares the CLI binary so `bunx github:daniel-rck/web-b
     "prepare": "bun run build"
   },
   "dependencies": {
-    "citty": "^0.1.6",
+    "citty": "^0.2.2",
     "consola": "^3.4.0",
-    "pathe": "^1.1.2"
+    "pathe": "^2.0.3"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "oxfmt": "^0.70.0",
-    "oxlint": "^1.85.0",
-    "typescript": "~6.0.2",
-    "vitest": "^4.1.5"
+    "@types/node": "^26.6.3",
+    "oxfmt": "^0.71.0",
+    "oxlint": "^1.86.0",
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.3"
   }
 }
 ```

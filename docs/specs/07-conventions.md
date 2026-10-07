@@ -12,6 +12,14 @@ fails otherwise, including on a package missing from one side). Bump them as a
 group through a PR to this repo: edit `pins.json`, then the tables and any
 manifest that installs the package.
 
+**Decision: a pin names a release at least seven days old.** A bump takes the
+newest version published a week or more before the bump, the same cooldown
+Dependabot keeps for the actions (`06-workflows.md`), so a broken release has
+time to be pulled. An exception needs a reason in the PR — `vite-plugin-pwa`
+2.0.0 went in four days old because its code is byte-identical to 1.3.0 (only
+the Node engine moved). When a pin needs an app-side change, the CHANGELOG
+entry says so.
+
 Apps check themselves against the table with `web-base pins` (exit 1 on any
 mismatch; packages the app doesn't use are ignored) and catch up with
 `web-base pins --apply`, which rewrites mismatched ranges and `packageManager`
@@ -21,11 +29,11 @@ in place and adds nothing. See `02-cli.md`.
 
 ```json
 {
-  "react": "^19.2.8",
-  "react-dom": "^19.2.8",
-  "react-router-dom": "^7.18.3",
+  "react": "^19.3.0",
+  "react-dom": "^19.3.0",
+  "react-router-dom": "^7.18.4",
   "idb": "^8.0.3",
-  "lucide-react": "^1.39.0"
+  "lucide-react": "^1.49.0"
 }
 ```
 
@@ -34,9 +42,9 @@ in place and adds nothing. See `02-cli.md`.
 ```json
 {
   "typescript": "~7.0.2",
-  "vite": "^8.2.2",
+  "vite": "^8.3.1",
   "@vitejs/plugin-react": "^6.1.1",
-  "vite-plugin-pwa": "^1.3.0",
+  "vite-plugin-pwa": "^2.0.0",
   "workbox-precaching": "^7.4.1",
   "workbox-routing": "^7.4.1",
   "workbox-strategies": "^7.4.1",
@@ -44,21 +52,21 @@ in place and adds nothing. See `02-cli.md`.
   "workbox-window": "^7.4.1",
   "tailwindcss": "^4.3.3",
   "@tailwindcss/vite": "^4.3.3",
-  "oxlint": "^1.85.0",
-  "oxfmt": "^0.70.0",
-  "vitest": "^4.1.11",
-  "@vitest/ui": "^4.1.11",
-  "jsdom": "^30.0.1",
+  "oxlint": "^1.86.0",
+  "oxfmt": "^0.71.0",
+  "vitest": "^5.0.3",
+  "@vitest/ui": "^5.0.3",
+  "jsdom": "^30.1.1",
   "fake-indexeddb": "^6.2.5",
   "@testing-library/react": "^16.3.3",
   "@testing-library/dom": "^10.4.2",
   "@testing-library/user-event": "^14.6.7",
   "@testing-library/jest-dom": "^7.0.1",
-  "wrangler": "^4.128.0",
-  "@cloudflare/workers-types": "^5.20260902.1",
-  "@types/react": "^19.2.18",
-  "@types/react-dom": "^19.2.5",
-  "@types/node": "^26.4.1"
+  "wrangler": "^4.145.0",
+  "@cloudflare/workers-types": "^5.20260930.2",
+  "@types/react": "^19.3.0",
+  "@types/react-dom": "^19.3.0",
+  "@types/node": "^26.6.3"
 }
 ```
 
@@ -76,11 +84,16 @@ Domain dependencies stay per-app and out of this table: `chart.js`,
 `@fontsource-variable/*`, `@playwright/test`, `@cloudflare/vitest-pool-workers`,
 `@vite-pwa/assets-generator`.
 
+Vitest 5 needs Node ≥ 22.12: `bun run test` starts it under Node, not Bun. `@cloudflare/vitest-pool-workers` (0.23.0) still requires Vitest 4,
+so an app that runs its worker tests in it stays on Vitest 4 until it either
+ships Vitest 5 support or the app drops it — see Hausverwaltung in
+`08-app-migrations.md`.
+
 ### Package manager
 
 ```json
 {
-  "packageManager": "bun@1.3.11"
+  "packageManager": "bun@1.4.2"
 }
 ```
 
@@ -105,7 +118,7 @@ The `init` command generates this shape for new apps:
   "homepage": "https://<app>.daniel-rck.workers.dev",
   "repository": { "type": "git", "url": "https://github.com/daniel-rck/<App>.git" },
   "bugs": { "url": "https://github.com/daniel-rck/<App>/issues" },
-  "packageManager": "bun@1.3.11",
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -54,7 +54,7 @@ WebSocket upgrade passes through untouched).
 ```toml
 name = "<app-name>"
 main = "worker/index.ts"
-compatibility_date = "2026-08-31" # today's date when you create the app; >= 2025-04-01
+compatibility_date = "2026-09-30" # today's date when you create the app; >= 2025-04-01
 
 [assets]
 directory = "./dist"

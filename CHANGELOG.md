@@ -14,6 +14,49 @@ records which base it last pulled.
 
 ## [Unreleased]
 
+### Migration
+
+Pins moved, two of them a major: Vitest 5 and `vite-plugin-pwa` 2. Neither
+needs a code change in a scaffolded app, but Vitest 5 runs on Node ≥ 22.12.
+In each app:
+
+```bash
+bunx github:daniel-rck/web-base pins --apply   # rewrites ranges and packageManager
+bun install
+bun run typecheck && bun run test && bun run build
+```
+
+`setup-bun` reads the new `packageManager` (`bun@1.4.2`) on its own.
+**Hausverwaltung** stays on Vitest 4 for now: its
+`@cloudflare/vitest-pool-workers` 0.23 requires it. Bump its other pins by
+hand and leave `vitest` / `@vitest/ui` as `pins` reports them (see
+`08-app-migrations.md`).
+
+### Changed
+
+- **Stack pins raised.** `packageManager` `bun@1.4.2`; Vitest and
+  `@vitest/ui` `^5.0.3`; `vite-plugin-pwa` `^2.0.0`; React and React DOM
+  `^19.3.0` (and their types); `react-router-dom` `^7.18.4`; Vite `^8.3.1`;
+  `lucide-react` `^1.49.0`; oxlint `^1.86.0`, oxfmt `^0.71.0`; jsdom
+  `^30.1.1`; wrangler `^4.145.0`, `@cloudflare/workers-types`
+  `^5.20260930.2`; `@types/node` `^26.6.3`.
+- The `worker` template's `wrangler.toml` ships `compatibility_date =
+  "2026-09-30"`, the newest date the pinned wrangler supports. A scaffold
+  seam: existing apps keep theirs.
+- A pin now names a release at least seven days old (`07-conventions.md`).
+- The CLI runs on citty 0.2 and pathe 2; this repo's own tooling on
+  TypeScript 7, Vitest 5 and Bun 1.4.2.
+
+### Fixed
+
+- **Usage is plain text when piped.** citty 0.2's usage printer colours its
+  output even into a pipe and bypasses consola; `--help` now goes through
+  consola and keeps colours for a terminal only (and never with `NO_COLOR`).
+- **`--cwd --json` is "--cwd needs a directory."** A string option takes the
+  next token as its value, so the flag used to become the target directory;
+  a `--cwd` starting with `-` is rejected (exit 2). Reach such a directory as
+  `./-dir`.
+
 ## [0.6.0] - 2026-10-02
 
 ### Migration

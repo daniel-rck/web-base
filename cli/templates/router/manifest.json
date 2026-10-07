@@ -12,8 +12,8 @@
     { "from": "routing/useDocumentTitle.ts", "to": "src/lib/routing/useDocumentTitle.ts" }
   ],
   "dependencies": {
-    "lucide-react": "^1.39.0",
-    "react-router-dom": "^7.18.3"
+    "lucide-react": "^1.49.0",
+    "react-router-dom": "^7.18.4"
   },
   "postInstall": [
     "Render <RouterProvider router={router} /> in src/main.tsx — do not wrap it in AppShell: the shell is the root layout route in src/App.tsx",
