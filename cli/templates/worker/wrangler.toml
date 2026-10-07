@@ -4,7 +4,7 @@ main = "worker/index.ts"
 # deploy-checked PR at a time. Keep it >= 2025-04-01: from that date on,
 # navigations that match no asset get index.html without invoking the Worker.
 # It must stay a real date — a placeholder breaks `wrangler dev` and `--dry-run`.
-compatibility_date = "2026-08-31"
+compatibility_date = "2026-09-30"
 # No compatibility_flags by default. Add `compatibility_flags = ["nodejs_compat"]`
 # only when the worker imports a Node built-in (node:buffer, node:crypto, …).
 

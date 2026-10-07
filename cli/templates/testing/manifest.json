@@ -7,8 +7,8 @@
     { "from": "environment-test.tsx", "to": "src/test/environment.test.tsx" }
   ],
   "devDependencies": {
-    "vitest": "^4.1.11",
-    "jsdom": "^30.0.1",
+    "vitest": "^5.0.3",
+    "jsdom": "^30.1.1",
     "fake-indexeddb": "^6.2.5",
     "@testing-library/react": "^16.3.3",
     "@testing-library/dom": "^10.4.2",

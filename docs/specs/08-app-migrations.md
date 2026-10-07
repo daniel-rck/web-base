@@ -92,6 +92,14 @@ re-pair every device). Follow-up: review whether its OTP pairing derives a wrap
 key from the OTP alone — the design the template abandoned in 0.6.0 because
 the server could unwrap the secret. Its `vitest.config.ts` uses `@cloudflare/vitest-pool-workers` projects.
 
+**Vitest stays on 4 here for now.** `@cloudflare/vitest-pool-workers` 0.23.0
+peers `vitest ^4.1`, while the fleet pin is `^5`. `web-base pins` reports
+`vitest` and `@vitest/ui` as behind in Hausverwaltung — expected; don't run
+`pins --apply` there, bump the other mismatches by hand. Follow-up, in the
+app's repo: test the worker with in-memory fakes in plain Vitest, as the sync
+template does (`cli/test/sync/fakes/`), and drop pool-workers — or adopt the
+sync template, which goes together with the OTP review above.
+
 ### Pizzateig — warm theme fork
 
 `theme.css` keeps hue-65 warm-tinted surfaces, `--color-accent-warm`,
