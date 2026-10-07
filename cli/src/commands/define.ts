@@ -16,7 +16,7 @@ const camelCase = (name: string) => name.replaceAll(/-([a-z])/g, (_, c: string) 
  * run as a plain `check` and pass. Reject unknown options and surplus
  * positionals before the command does anything.
  */
-export function assertKnownArgs(args: ParsedArgs, defs: ArgsDef): void {
+export function assertKnownArgs(args: { _: string[] }, defs: ArgsDef): void {
   const known = new Set(["_"]);
   let positionals = 0;
   for (const [name, def] of Object.entries(defs)) {

@@ -7,6 +7,7 @@ describe("runCli", () => {
     const run = await runInProcess([]);
     expect(run.code).toBe(2);
     expect(run.text).toContain("USAGE");
+    expect(run.text).not.toContain("\u001b[");
   });
 
   it("prints usage and exits 0 for --help, also per command", async () => {
@@ -26,6 +27,17 @@ describe("runCli", () => {
     const run = await runInProcess(["frobnicate"]);
     expect(run.code).toBe(2);
     expect(run.text).toContain('Unknown command "frobnicate"');
+  });
+
+  it("exits 2 when --cwd has no directory", async () => {
+    for (const args of [
+      ["check", "--cwd"],
+      ["check", "--cwd", "--json"],
+    ]) {
+      const run = await runInProcess(args);
+      expect(run.code).toBe(2);
+      expect(run.text).toContain("--cwd needs a directory.");
+    }
   });
 
   it("exits 2 when a required positional is missing", async () => {

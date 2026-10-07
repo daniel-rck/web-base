@@ -14,6 +14,21 @@ records which base it last pulled.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Usage is plain text when piped.** citty 0.2's usage printer colours its
+  output even into a pipe and bypasses consola; `--help` now goes through
+  consola and keeps colours for a terminal only (and never with `NO_COLOR`).
+- **`--cwd --json` is "--cwd needs a directory."** A string option takes the
+  next token as its value, so the flag used to become the target directory;
+  a `--cwd` starting with `-` is rejected (exit 2). Reach such a directory as
+  `./-dir`.
+
+### Changed
+
+- The CLI runs on citty 0.2 and pathe 2; this repo's own tooling on
+  TypeScript 7, Vitest 5 and Bun 1.4.2.
+
 ## [0.6.0] - 2026-10-02
 
 ### Migration

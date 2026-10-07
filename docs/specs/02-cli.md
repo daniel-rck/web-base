@@ -80,9 +80,16 @@ subcommand's usage and exits 2.
 **Decision: our own dispatcher instead of citty's `runMain`.** `runMain`
 discards a command's return value and exits 1 for every failure, which would
 erase the difference between "the app drifted" (1) and "the command could not
-run" (2). The cost is relying on `runCommand`/`showUsage`, citty 0.1.x API;
+run" (2). The cost is relying on `runCommand`/`renderUsage`, citty 0.2.x API;
 `run.test.ts` covers the dispatch so a citty upgrade that changes it fails
 loudly.
+
+**Decision: usage goes through consola, uncoloured unless on a TTY.** citty
+0.2's `showUsage` writes with `console.log` and colours its output even when
+piped. `run.ts` renders the usage with `renderUsage` and logs it with
+`consola.log`, stripping the colour codes when stdout isn't a TTY or `NO_COLOR`
+is set — so usage lands where every other message lands, and `--help | less`
+stays readable.
 
 ### Exit codes
 
@@ -104,6 +111,12 @@ citty ignores options it doesn't know, so `check --strcit` used to run as a
 plain `check` and pass. `defineCliCommand` rejects, before the command does
 anything, every option that isn't declared (in kebab- or camelCase) and every
 positional beyond the declared ones: exit 2, "Unknown option: --strcit".
+
+A string option takes the next token as its value, even one that looks like a
+flag: `--cwd --json` sets `cwd` to `"--json"`. `resolveTargetDir` therefore
+rejects an empty `--cwd` or one starting with `-` ("--cwd needs a directory.",
+exit 2); a directory named `-x` is reached as `./-x`. A repeated string option
+keeps its last value.
 
 ## Versioning
 

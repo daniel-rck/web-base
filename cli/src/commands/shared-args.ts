@@ -30,9 +30,13 @@ export const jsonArg = {
   json: { type: "boolean", description: "Print a machine-readable JSON result on stdout" },
 } as const;
 
-/** The absolute target directory; it must exist (only `init` may create it). */
+/**
+ * The absolute target directory; it must exist (only `init` may create it).
+ * citty takes the next token as the value, so `--cwd --json` arrives as
+ * `"--json"`; a directory whose name starts with `-` needs `./-dir`.
+ */
 export function resolveTargetDir(cwd: string | undefined, { mustExist = true } = {}): string {
-  if (cwd === "") throw new CliError("--cwd needs a directory.");
+  if (cwd === "" || cwd?.startsWith("-")) throw new CliError("--cwd needs a directory.");
   const dir = resolve(cwd ?? process.cwd());
   if (mustExist && (!existsSync(dir) || !statSync(dir).isDirectory())) {
     throw new CliError(`Target directory not found: ${dir}`);
