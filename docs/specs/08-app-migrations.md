@@ -31,24 +31,35 @@ because those files are written against oxfmt's formatting rules.
 
 ## Fleet state
 
-Snapshot of 2026-10-02 (stamps read from each app's `package.json`). All nine
-wire `web-base-check.yml`, still `@main`; from web-base 0.6.0 the check runs
-the CLI at the app's stamped version, so `main` no longer breaks them.
+Snapshot of 2026-10-08 (stamps read from each app's `package.json` on `main`).
+ErinnerMich, Hausverwaltung, Minispiele, Tennisturnier and Zeiterfassung
+migrated to 0.6.0 that day, one PR each, and pin `web-base-check.yml@v0.6.0`.
+The rows for HamsterFlight, Pizzateig, Tankzettel and Tonspur are unchanged
+from the 2026-10-02 snapshot; those four still wire the check `@main`. Since
+0.6.0 the check runs the CLI at the app's stamped version, so `main` no longer
+breaks them.
 
 | App | Stamp | Lint | Router | Storage | PWA | Worker | CI | Layout |
 |---|---|---|---|---|---|---|---|---|
-| ErinnerMich | 0.5.0 | oxc | react-router 7 (`BrowserRouter`) | idb | injectManifest | Assets + `/api` | reusable | own shell over base tokens |
+| ErinnerMich | 0.6.0 | oxc | react-router 7 (`createBrowserRouter`) | idb + own BroadcastChannel hooks | injectManifest, prompt | Assets + `/healthz` (no API) | reusable; check `@v0.6.0` | own shell over base tokens |
 | HamsterFlight | 0.5.0 | oxc | — | — | — | Assets only | reusable + own gates | — (canvas game) |
-| Hausverwaltung | 0.3.1 | Biome | react-router 7 (`HashRouter`) | idb + query layer | injectManifest | Assets + own R2/KV sync (not the template) | reusable | own design system |
-| Minispiele | 0.3.1 | Biome | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + e2e | base |
+| Hausverwaltung | 0.6.0 | oxc | react-router 7 (`createHashRouter`) | idb + query layer | injectManifest, prompt | Assets + own R2/KV sync (not the template) | reusable; check `@v0.6.0` strict | own design system |
+| Minispiele | 0.6.0 | oxc | react-router 7 | idb (prepared, unused) | injectManifest, prompt | Assets + `/api` | own (gates + bundle budget + e2e); check `@v0.6.0` | base, partial (no `AppShell`/`AppNav`/`PageHeader`) |
 | Pizzateig | 0.3.1 | Biome | react-router 7 | idb | injectManifest | Assets + `/api` | reusable | base + warm fork |
 | Tankzettel | 0.5.0 | oxc | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + guard | **base, zero drift** |
-| Tennisturnier | 0.5.0 | oxc | react-router 7 | idb | injectManifest | Assets + KV sync | reusable | base |
+| Tennisturnier | 0.6.0 | oxc | react-router 7 | idb | injectManifest, prompt | Assets + KV sync | reusable; check `@v0.6.0` strict | base |
 | Tonspur | 0.5.0 | oxc | react-router 7 | idb | injectManifest | Assets | reusable | base + game skin |
-| Zeiterfassung | 0.5.0 | oxc | react-router 7 | idb | injectManifest | Assets + `/api` | reusable | base |
+| Zeiterfassung | 0.6.0 | oxc | react-router 7 | idb | injectManifest, prompt | Assets + `/api` | reusable; check `@v0.6.0` strict + pins | base |
 
-Hausverwaltung, Minispiele and Pizzateig still lint with Biome: they take
-`web-base add oxc` first (see the 0.4.0 CHANGELOG entry).
+Only Pizzateig still lints with Biome: it takes `web-base add oxc` first (see
+the 0.4.0 CHANGELOG entry). Hausverwaltung and Minispiele switched as part of
+their 0.6.0 migration.
+
+Minispiele runs the check without `strict`: it keeps its own shell, theme
+(settings blob) and update UI, so `AppShell`, `AppNav`, `PageHeader`,
+`ThemeToggle`, `useTheme` and `UpdatePrompt` are deliberately absent and
+`check --strict` reports layout and pwa as partially adopted. Its `CLAUDE.md`
+records this.
 
 `daniel-rck/Codes` also carries a `webBase` stamp (0.2.1) but is not part of
 the fleet listed here; whether it joins is open.
@@ -65,15 +76,18 @@ first app to wire the `web-base-check.yml` drift guard. When a question about
 A deviation is accepted when the app's version is *better for that app*, not
 merely different. Each one is also recorded in the app's own `CLAUDE.md`.
 
-### ErinnerMich — own app shell and `BrowserRouter`
+### ErinnerMich — own app shell
 
 `src/components/AppShell.tsx` replaces the template's `AppShell`: a greeting
 header, a centre floating action button and safe-area padding. These are product
-decisions, not drift. It mounts `<BrowserRouter>` with `<Routes>` rather than
-the template's `createBrowserRouter` — a known gap, not yet an accepted
-deviation: adopting 0.6.0's layout route and `RouteError` needs the data
-router. The app composes the base's `AppHeader`, `AppNav`,
-`primitives`, `useTheme` and `InstallButton` rather than duplicating them.
+decisions, not drift. Since 0.6.0 the app uses `createBrowserRouter` with
+`src/App.tsx` as the root layout route that renders this shell, so the former
+`<BrowserRouter>` gap is closed. Its `AppRouteError` wraps the base's
+`RouteError` and adds the JSON backup export of the old error screen. The app
+uses the base's `tokens.css`, `primitives`, `useTheme` and `InstallButton`
+rather than duplicating them. The base `AppShell`, `AppHeader`, `AppNav`,
+`PageHeader` and `ThemeToggle` are installed only so `check --strict` passes;
+nothing imports them.
 
 ### Hausverwaltung — own design system
 
@@ -82,7 +96,8 @@ router. The app composes the base's `AppHeader`, `AppNav`,
 substantially exceeds the layout scaffold. Its `AppShell` and `PageHeader` are
 rewritten; `AppHeader` and `AppNav` are replaced by `layout/Nav.tsx`.
 
-Also: `HashRouter` rather than `createBrowserRouter`, because the app shares
+Also: `createHashRouter` (a data router since 0.6.0, with the app shell as the
+root layout route) rather than `createBrowserRouter`, because the app shares
 data through hash-encoded URLs (`#/import/:payload`) and wants zero server
 config. Its own worker sync (OTP pairing, R2 snapshots with `If-Match`, KV rate
 limits) predates the template and is not wire-compatible with sync v2. **Do not
