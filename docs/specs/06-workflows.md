@@ -20,8 +20,8 @@ snippet.
 
 ## Rules for every workflow
 
-`web-app-ci.yml` and `web-base-check.yml` run in nine app repos, so a weakness
-in them is a weakness nine times over. Every workflow here follows the same
+`web-app-ci.yml` and `web-base-check.yml` run in ten app repos, so a weakness
+in them is a weakness ten times over. Every workflow here follows the same
 rules:
 
 - **Least privilege.** Top-level `permissions: {}`; each job requests only

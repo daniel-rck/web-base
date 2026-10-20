@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { read, section } from "./markdown.ts";
 
-// The nine apps are named in several places; a new app (or a rename) must
+// The ten apps are named in several places; a new app (or a rename) must
 // reach all of them, or notify-apps silently skips it.
 
 const firstColumn = (table: string) =>
@@ -14,8 +14,8 @@ const fleet = firstColumn(
 ).toSorted();
 
 describe("the fleet", () => {
-  it("08's fleet table lists nine apps", () => {
-    expect(fleet).toHaveLength(9);
+  it("08's fleet table lists ten apps", () => {
+    expect(fleet).toHaveLength(10);
   });
 
   it("SKILL.md's app table matches", () => {

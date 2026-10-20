@@ -29,10 +29,12 @@ in web-base. This reference is the day-to-day terse version.
 | Hausverwaltung | Indigo | `280` | `#524bc2` |
 | ErinnerMich | Violett | `305` | `#793bb0` |
 | Tonspur | Magenta | `330` | `#952c8f` |
-| (nächste App) | Himbeere | `355` | `#a71f65` |
+| Malbuch | Himbeere | `355` | `#a71f65` |
 
 Reserved for the semantic tokens: danger 25, warning 80, success 150, info
-230. Every accent keeps ≥25° from those and from every other app.
+230. Every accent keeps ≥25° from those and from every other app. The wheel is
+full since Malbuch took 355 (the template default): a new app needs a rule
+change in `04-layout-system.md` before it gets an accent of its own.
 
 Change *only* `--accent-h` in `theme.css` to change the app's accent. All
 tokens live in `tokens.css` (owned by web-base, never edited); all accent

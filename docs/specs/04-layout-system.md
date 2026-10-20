@@ -52,7 +52,7 @@ Per-app hues:
 | Hausverwaltung | Indigo | `280` | `#524bc2` |
 | ErinnerMich | Violett | `305` | `#793bb0` |
 | Tonspur | Magenta | `330` | `#952c8f` |
-| (nächste App) | Himbeere | `355` | `#a71f65` |
+| Malbuch | Himbeere | `355` | `#a71f65` |
 
 HamsterFlight is not in the table: it is not a Tailwind app (a pixi.js canvas
 game with no `theme.css`) — excluded by decision, not by omission.
@@ -66,8 +66,13 @@ the wheel has exactly nine free slots: one in 50–55, one in 105–125, two in
 around it) and Tankzettel (110, the zero-drift reference) stay; the others
 move by 5–30° to exact 25° spacing, so no app changes colour family (the two
 blues stay blue, Hausverwaltung now reads indigo, ErinnerMich violet). The
-last slot, 355, is the template default — the next app takes it and records
-itself here. A tenth accent needs a rule change, not a squeeze.
+last slot, 355, is the template default.
+
+**Decision: the wheel is full.** Malbuch, the ninth Tailwind app, took 355 in
+2026-10. The template keeps 355 as its default, so a freshly scaffolded app
+shares Malbuch's accent until its slot exists: the next accent needs a rule
+change (a smaller spacing, or a second lightness band), not a squeeze, and
+that change gives the template a new default.
 
 An earlier decision moved two of the three warm apps (Tankzettel 55 → 110,
 Tonspur 45 → 320) out of the 10° band they shared between `danger` and
@@ -290,7 +295,8 @@ body {
 @import "./tokens.css";
 
 /* The accent hue: take your app's slot from the table in 04-layout-system.md.
- * 355 is the one free slot (the fallback in tokens.css). Unlayered on purpose,
+ * 355 (the fallback in tokens.css) is the last slot, Malbuch's: the wheel is
+ * full, so a new app needs a rule change first. Unlayered on purpose,
  * so it wins over the `@theme` default whatever the cascade layers say. */
 :root {
   --accent-h: 355;

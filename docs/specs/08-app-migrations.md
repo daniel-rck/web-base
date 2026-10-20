@@ -37,13 +37,16 @@ migrated to 0.6.0 that day, one PR each, and pin `web-base-check.yml@v0.6.0`.
 The rows for HamsterFlight, Pizzateig, Tankzettel and Tonspur are unchanged
 from the 2026-10-02 snapshot; those four still wire the check `@main`. Since
 0.6.0 the check runs the CLI at the app's stamped version, so `main` no longer
-breaks them.
+breaks them. Malbuch joined on 2026-10-20: scaffolded with `init` from `main`
+(stamp 0.6.0, the `[Unreleased]` pins), the tenth app and the first one born on
+the base rather than migrated onto it.
 
 | App | Stamp | Lint | Router | Storage | PWA | Worker | CI | Layout |
 |---|---|---|---|---|---|---|---|---|
 | ErinnerMich | 0.6.0 | oxc | react-router 7 (`createBrowserRouter`) | idb + own BroadcastChannel hooks | injectManifest, prompt | Assets + `/healthz` (no API) | reusable; check `@v0.6.0` | own shell over base tokens |
 | HamsterFlight | 0.5.0 | oxc | — | — | — | Assets only | reusable + own gates | — (canvas game) |
 | Hausverwaltung | 0.6.0 | oxc | react-router 7 (`createHashRouter`) | idb + query layer | injectManifest, prompt | Assets + own R2/KV sync (not the template) | reusable; check `@v0.6.0` strict | own design system |
+| Malbuch | 0.6.0 | oxc | react-router 7 (one route) | idb | injectManifest, prompt (own icon, no `UpdatePrompt`) | Assets only | reusable; check `@v0.6.0` strict | own text-free kids' UI over base tokens |
 | Minispiele | 0.6.0 | oxc | react-router 7 | idb (prepared, unused) | injectManifest, prompt | Assets + `/api` | own (gates + bundle budget + e2e); check `@v0.6.0` | base, partial (no `AppShell`/`AppNav`/`PageHeader`) |
 | Pizzateig | 0.3.1 | Biome | react-router 7 | idb | injectManifest | Assets + `/api` | reusable | base + warm fork |
 | Tankzettel | 0.5.0 | oxc | react-router 7 | idb | injectManifest | Assets + `/api` | reusable + guard | **base, zero drift** |
@@ -114,6 +117,23 @@ peers `vitest ^4.1`, while the fleet pin is `^5`. `web-base pins` reports
 app's repo: test the worker with in-memory fakes in plain Vitest, as the sync
 template does (`cli/test/sync/fakes/`), and drop pool-workers — or adopt the
 sync template, which goes together with the OTP review above.
+
+### Malbuch — text-free kids' paint surface
+
+A colouring app for children aged 3–8 who can't read yet: one fullscreen
+canvas with icon buttons, colour blobs and dot sizes, text only in
+`aria-label`. Everything the base shell renders as visible German text would
+be noise there, so `AppShell`, `AppHeader`, `AppNav`, `PageHeader`,
+`ThemeToggle`, `InstallButton`, `OfflineIndicator` and `UpdatePrompt` are
+installed only so `check --strict` passes (the ErinnerMich approach) and
+nothing imports them. `src/App.tsx` is a bare `<Outlet />`; updates surface as
+a reload icon driven by `useAppUpdate`. One route, like Tonspur. The theme
+follows the OS (no toggle), and the app's own palette — sky blue with a dot
+grid, an indigo tray, sun-yellow selection — lives as app tokens in its
+`theme.css` seam, the way Pizzateig's warm palette does. It takes the last
+accent slot (355, Himbeere) for the base pieces and `theme_color`. The
+manifest uses `display: "fullscreen"`. Its spec, `docs/specs/malbuch.md`,
+is German, the owner's working language for this app.
 
 ### Pizzateig — warm theme fork
 
@@ -213,8 +233,8 @@ unmanaged — it gets `open.ts`/`mutations.ts` with plain `web-base add storage`
 ## Deferred — known gaps, not yet scheduled
 
 **Worker runtime settings.** `compatibility_date` currently spans 2025-10-01
-(ErinnerMich, Minispiele) to 2026-08-31 (HamsterFlight), and
-`compatibility_flags = ["nodejs_compat"]` is set in five of nine apps with no
+(ErinnerMich, Minispiele) to 2026-09-30 (Malbuch), and
+`compatibility_flags = ["nodejs_compat"]` is set in five of ten apps with no
 discernible rule.
 
 **Decision: these are deliberately out of scope for a fleet-wide alignment
@@ -234,7 +254,7 @@ worker template ships SPA mode and no `nodejs_compat`; existing apps adopt
 
 Re-verify after any base change:
 
-- [ ] All nine repos have the same `oxlint.base.json` and `.oxfmtrc.json` (per-app
+- [ ] All ten repos have the same `oxlint.base.json` and `.oxfmtrc.json` (per-app
   overrides live in `.oxlintrc.json` / `.prettierignore`)
 - [ ] All React repos have identical `src/lib/db/{open,mutations,useLiveQuery}.ts`
   (Hausverwaltung's `useLiveQuery.ts` is unmanaged) and `src/test/setup.ts`
@@ -242,10 +262,10 @@ Re-verify after any base change:
   `theme.css` seam differs by its `--accent-h` and app tokens)
 - [ ] All repos with a Worker have identical `worker/base.ts` and a reviewed
   `public/_headers`
-- [ ] All nine repos call `web-app-ci.yml` and wire `web-base-check.yml`, pinned `@vX.Y.Z`
-- [ ] All nine repos have the pinned `packageManager` (`07-conventions.md`) and a `bun.lock`
-- [ ] `bunx github:daniel-rck/web-base#vX.Y.Z pins` is clean in all nine
-- [ ] All nine repos have LICENSE, CONTRIBUTING.md, SECURITY.md, `.editorconfig`
-- [ ] All nine repos have `CLAUDE.md` and `docs/specs/`
+- [ ] All ten repos call `web-app-ci.yml` and wire `web-base-check.yml`, pinned `@vX.Y.Z`
+- [ ] All ten repos have the pinned `packageManager` (`07-conventions.md`) and a `bun.lock`
+- [ ] `bunx github:daniel-rck/web-base#vX.Y.Z pins` is clean in all ten
+- [ ] All ten repos have LICENSE, CONTRIBUTING.md, SECURITY.md, `.editorconfig`
+- [ ] All ten repos have `CLAUDE.md` and `docs/specs/`
 - [ ] Every app's `--accent-h` is distinct and ≥25° from the reserved semantic hues
-- [ ] `bunx github:daniel-rck/web-base#vX.Y.Z check core` is clean in all nine
+- [ ] `bunx github:daniel-rck/web-base#vX.Y.Z check core` is clean in all ten

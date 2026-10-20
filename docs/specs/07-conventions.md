@@ -199,7 +199,7 @@ Rejected approaches with the reason and the replacement:
 | Skip react-router | Painful to retrofit when a second view appears | Always include the router |
 | Per-repo CI duplication | Drift across apps, hard to bump versions everywhere | Reusable workflow from web-base |
 | Starter-template GitHub feature for existing apps | Doesn't help with updates after initial copy | The CLI |
-| Custom-built monorepo with Turborepo/Nx | Overkill for nine independent apps | Nine app repos, one tooling repo |
+| Custom-built monorepo with Turborepo/Nx | Overkill for ten independent apps | Ten app repos, one tooling repo |
 | Tailwind config overrides per app | Drift, hard to reason about | Owned `tokens.css`; the `theme.css` seam sets `--accent-h` and adds app tokens |
 | `focus-visible:outline-none` + a ring | Forced-colors mode drops box-shadows, so focus disappears | The outline in `cn.ts` (`FOCUS_RING`) |
 | `text-white` on a fill, `text-success` on its own tint | Fails 4.5:1 at several accent hues | `text-fg-on-accent`, `text-*-fg` |

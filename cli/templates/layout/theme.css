@@ -7,7 +7,8 @@
 @import "./tokens.css";
 
 /* The accent hue: take your app's slot from the table in 04-layout-system.md.
- * 355 is the one free slot (the fallback in tokens.css). Unlayered on purpose,
+ * 355 (the fallback in tokens.css) is the last slot, Malbuch's: the wheel is
+ * full, so a new app needs a rule change first. Unlayered on purpose,
  * so it wins over the `@theme` default whatever the cascade layers say. */
 :root {
   --accent-h: 355;

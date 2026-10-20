@@ -1,8 +1,8 @@
 # 00 — Overview
 
 `daniel-rck/web-base` is a monorepo combining three concerns for personal
-web apps (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig,
-Tankzettel, Tennisturnier, Tonspur, Zeiterfassung):
+web apps (ErinnerMich, HamsterFlight, Hausverwaltung, Malbuch, Minispiele,
+Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung):
 
 1. A **CLI** (`cli/`) that copies templates into target app repos — shadcn-style,
    "distribution by copy, not by dependency."
@@ -124,7 +124,7 @@ verifiable on its own:
 
 6. **App migrations** → `08-app-migrations.md`
    - One app at a time, smallest changes first. That spec records the actual
-     state of all nine apps and the deviations each has earned.
+     state of all ten apps and the deviations each has earned.
 
 ## Cross-cutting docs
 

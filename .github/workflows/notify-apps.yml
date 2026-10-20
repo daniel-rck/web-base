@@ -45,6 +45,7 @@ jobs:
           - daniel-rck/ErinnerMich
           - daniel-rck/HamsterFlight
           - daniel-rck/Hausverwaltung
+          - daniel-rck/Malbuch
           - daniel-rck/Minispiele
           - daniel-rck/Pizzateig
           - daniel-rck/Tankzettel
