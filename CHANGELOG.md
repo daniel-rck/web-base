@@ -46,6 +46,12 @@ hand and leave `vitest` / `@vitest/ui` as `pins` reports them (see
 - A pin now names a release at least seven days old (`07-conventions.md`).
 - The CLI runs on citty 0.2 and pathe 2; this repo's own tooling on
   TypeScript 7, Vitest 5 and Bun 1.4.2.
+- **Malbuch joins the fleet** as the tenth app (a text-free colouring app for
+  children, scaffolded with `init`). It takes the last accent slot, 355
+  Himbeere, so the hue wheel is full: the `layout` template's `theme.css`
+  comment and post-install note say so, and a new app's accent needs a rule
+  change in `04-layout-system.md` first. The fleet lists, the skill and
+  `notify-apps.yml` name Malbuch.
 
 ### Fixed
 

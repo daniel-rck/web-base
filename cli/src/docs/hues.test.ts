@@ -17,7 +17,7 @@ const escapeRegExp = (text: string) => text.replaceAll(/[()[\]\\.*+?^${}|]/g, "\
 const circular = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 
 describe("accent hues", () => {
-  it("the 04 table lists every React app and the free slot", () => {
+  it("the 04 table lists every React app", () => {
     expect(tableRows.length).toBeGreaterThanOrEqual(9);
   });
 
@@ -45,11 +45,13 @@ describe("accent hues", () => {
     }
   });
 
-  it("the template default is the free slot, in theme.css, tokens.css and the table", () => {
-    const free = tableRows.find((r) => r.app.includes("nächste App"));
-    expect(free).toBeDefined();
-    expect(/--accent-h: (\d+);/.exec(themeCss)?.[1]).toBe(String(free?.hue));
-    expect(light.get("--accent-h")).toBe(String(free?.hue));
+  // The wheel is full: the template default is the last slot (Malbuch's), and
+  // the next app's accent needs a rule change before the default moves.
+  it("the template default is the last slot, in theme.css, tokens.css and the table", () => {
+    const last = tableRows.at(-1);
+    expect(last).toBeDefined();
+    expect(/--accent-h: (\d+);/.exec(themeCss)?.[1]).toBe(String(last?.hue));
+    expect(light.get("--accent-h")).toBe(String(last?.hue));
   });
 
   it("the skill's layout reference shows the same hue table", () => {
@@ -68,13 +70,13 @@ describe("accent hues", () => {
     }
   });
 
-  it("the app template's theme colour is the free slot's", () => {
-    const free = tableRows.find((r) => r.app.includes("nächste App"));
+  it("the app template's theme colour is the last slot's", () => {
+    const last = tableRows.at(-1);
     const viteConfig = read("cli/templates/app/vite.config.ts");
     const indexHtml = read("cli/templates/app/index.html");
-    expect(/theme_color: "(#[0-9a-f]{6})"/.exec(viteConfig)?.[1]).toBe(free?.themeColor);
+    expect(/theme_color: "(#[0-9a-f]{6})"/.exec(viteConfig)?.[1]).toBe(last?.themeColor);
     expect(/name="theme-color" content="(#[0-9a-f]{6})"/.exec(indexHtml)?.[1]).toBe(
-      free?.themeColor,
+      last?.themeColor,
     );
   });
 });

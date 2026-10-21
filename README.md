@@ -1,8 +1,8 @@
 # web-base
 
 Shared tooling, conventions, and templates for the personal web apps under
-daniel-rck — nine of them today (ErinnerMich, HamsterFlight, Hausverwaltung,
-Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung; their
+daniel-rck — ten of them today (ErinnerMich, HamsterFlight, Hausverwaltung,
+Malbuch, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung; their
 state is in [`08-app-migrations.md`](./docs/specs/08-app-migrations.md)) and
 every future one.
 

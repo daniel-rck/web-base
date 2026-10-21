@@ -1,6 +1,6 @@
 ---
 name: daniel-rck-web-app
-description: Conventions and patterns for the personal web apps under daniel-rck (ErinnerMich, HamsterFlight, Hausverwaltung, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", "Minispiele", "Tankzettel", "Zeiterfassung", "Pizzateig", "Tonspur", "HamsterFlight", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
+description: Conventions and patterns for the personal web apps under daniel-rck (ErinnerMich, HamsterFlight, Hausverwaltung, Malbuch, Minispiele, Pizzateig, Tankzettel, Tennisturnier, Tonspur, Zeiterfassung, and future apps). Stack is React 19 + Vite 8 + Tailwind 4 + TypeScript 7 + Bun + Cloudflare Workers + idb + injectManifest PWA + react-router-dom 7 + oxlint + oxfmt. Use this skill whenever working in any of these repos, scaffolding a new app in the same style, migrating an existing app to the shared baseline, or whenever the user mentions "my web apps", "Hausverwaltung", "Tennisturnier", "ErinnerMich", "Minispiele", "Tankzettel", "Zeiterfassung", "Pizzateig", "Tonspur", "HamsterFlight", "Malbuch", or similar personal browser-based PWAs. Also use whenever the @daniel-rck/web-base CLI is mentioned or when copy-pasting shared layout, storage, PWA, worker, or sync code between these repos.
 ---
 
 # daniel-rck Web App Conventions
@@ -16,6 +16,7 @@ through `@daniel-rck/web-base`.
 |---|---|---|
 | ErinnerMich | Erinnerungen, Habits, Mood | `erinnermich.daniel-rck.workers.dev` |
 | Hausverwaltung | Mieter-, Objekt- und Abrechnungsverwaltung | `hausverwaltung.daniel-rck.workers.dev` |
+| Malbuch | Ausmal-App für Kinder (3–8 Jahre) | `malbuch.daniel-rck.workers.dev` |
 | Minispiele | Browser-Minispiele | `minispiele.daniel-rck.workers.dev` |
 | Pizzateig | Teigrechner nach Bäcker-Prozent | `pizzateig.daniel-rck.workers.dev` |
 | Tankzettel | Tankbelege erfassen und auswerten | `tankzettel.daniel-rck.workers.dev` |
@@ -143,7 +144,7 @@ pick what's relevant to the current task.
   retrofit).
 - **Per-repo CI duplication** → reusable workflows from web-base.
 - **Starter template repo for existing apps** → the CLI handles updates too.
-- **Custom monorepo (Turborepo, Nx)** → nine repos and one tooling repo are
+- **Custom monorepo (Turborepo, Nx)** → ten repos and one tooling repo are
   enough.
 - **Editing an owned file in one app** → change the template (and spec), or,
   as a documented last resort, `webBase.unmanaged`.
